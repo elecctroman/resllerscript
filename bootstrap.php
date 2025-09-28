@@ -24,7 +24,6 @@ spl_autoload_register(function ($class) {
 });
 
 $configPath = __DIR__ . '/config/config.php';
-if (!file_exists($configPath)) {
 
     exit;
 }

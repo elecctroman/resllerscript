@@ -15,6 +15,7 @@ if ($user['role'] === 'admin') {
 }
 
 
+
 $pageTitle = 'Ürün Kataloğu';
 
 include __DIR__ . '/templates/header.php';
@@ -29,6 +30,7 @@ include __DIR__ . '/templates/header.php';
                 <?php if (!$categories): ?>
                     <div class="list-group-item text-muted">Tanımlı kategori bulunmuyor.</div>
                 <?php else: ?>
+
                     <?php foreach ($categories as $category): ?>
                         <a href="/products.php?category=<?= (int)$category['id'] ?>"
                            class="list-group-item list-group-item-action <?= $selectedCategoryId === (int)$category['id'] ? 'active' : '' ?>">
