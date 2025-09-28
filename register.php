@@ -64,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             "Başvuru Sahibi: $name\n" .
             "E-posta: $email\n" .
             "Paket: {$selectedPackage['name']}\n" .
-            "Tutar: $" . number_format((float)$selectedPackage['price'], 2, '.', ',') . "\n";
+
 
         foreach ($adminEmails as $adminEmail) {
             Mailer::send($adminEmail, 'Yeni Bayilik Başvurusu', $message);
@@ -108,7 +108,7 @@ include __DIR__ . '/templates/auth-header.php';
                     <option value="">Paket seçiniz</option>
                     <?php foreach ($packages as $package): ?>
                         <option value="<?= (int)$package['id'] ?>" <?= ((int)($selectedPackage['id'] ?? 0) === (int)$package['id']) ? 'selected' : '' ?>>
-                            <?= Helpers::sanitize($package['name']) ?> - $<?= number_format((float)$package['price'], 2, '.', ',') ?>
+
                         </option>
                     <?php endforeach; ?>
                 </select>

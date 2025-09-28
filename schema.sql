@@ -90,22 +90,7 @@ CREATE TABLE IF NOT EXISTS balance_transactions (
     FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS balance_requests (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    amount DECIMAL(12,2) NOT NULL,
-    payment_method VARCHAR(150) NOT NULL,
-    reference VARCHAR(150) NULL,
-    notes TEXT NULL,
-    admin_note TEXT NULL,
-    status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
-    processed_by INT NULL,
-    processed_at DATETIME NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (processed_by) REFERENCES users(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 
 CREATE TABLE IF NOT EXISTS password_resets (
     id INT AUTO_INCREMENT PRIMARY KEY,
