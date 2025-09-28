@@ -37,18 +37,4 @@ class Helpers
         return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
     }
 
-    public static function currentPath(): string
-    {
-        $uri = $_SERVER['REQUEST_URI'] ?? '/';
-        $path = parse_url($uri, PHP_URL_PATH);
-
-        return $path ?: '/';
-    }
-
-    public static function isActive(string $pattern): bool
-    {
-        $current = self::currentPath();
-
-        return fnmatch($pattern, $current);
-    }
 }
