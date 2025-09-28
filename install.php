@@ -62,6 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
 
 
+
             $configTemplate = <<<CONFIG
 <?php
 const DB_HOST = '%s';
