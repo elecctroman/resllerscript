@@ -8,12 +8,7 @@ use RuntimeException;
 
 class Auth
 {
-    public static function attempt(string $email, string $password): ?array
-    {
-        $pdo = Database::connection();
-        $stmt = $pdo->prepare('SELECT * FROM users WHERE email = :email AND status = :status LIMIT 1');
-        $stmt->execute([
-            'email' => $email,
+
             'status' => 'active'
         ]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);

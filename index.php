@@ -46,17 +46,6 @@ if (!empty($_SESSION['user'])) {
     Helpers::redirect('/dashboard.php');
 }
 
-
-$errors = [];
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = trim($_POST['email'] ?? '');
-    $password = $_POST['password'] ?? '';
-
-    if (!$email || !$password) {
-        $errors[] = 'Lütfen e-posta adresi ve şifre alanlarını doldurun.';
-    } else {
-        $user = Auth::attempt($email, $password);
         if ($user) {
             $_SESSION['user'] = $user;
             Helpers::redirect('/dashboard.php');
@@ -88,8 +77,7 @@ include __DIR__ . '/templates/auth-header.php';
 
         <form method="post" class="needs-validation" novalidate>
             <div class="mb-3">
-                <label for="email" class="form-label">E-posta Adresi</label>
-                <input type="email" class="form-control" id="email" name="email" required placeholder="ornek@bayinetwork.com" value="<?= Helpers::sanitize($_POST['email'] ?? '') ?>">
+
             </div>
             <div class="mb-3">
                 <label for="password" class="form-label">Şifre</label>
