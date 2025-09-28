@@ -26,13 +26,7 @@ spl_autoload_register(function ($class) {
 $configPath = __DIR__ . '/config/config.php';
 
 if (!file_exists($configPath)) {
-    $installer = __DIR__ . '/install.php';
-    if (file_exists($installer)) {
-        require $installer;
-    } else {
-        http_response_code(500);
-        echo 'Kurulum dosyası bulunamadı ve yapılandırma tamamlanmadı. Lütfen install.php dosyasını yeniden yükleyin.';
-    }
+
     exit;
 }
 
@@ -52,10 +46,7 @@ if (!empty($_SESSION['user'])) {
     Helpers::redirect('/dashboard.php');
 }
 
-$successMessage = $_SESSION['installation_complete'] ?? null;
-$warningMessage = $_SESSION['installation_warning'] ?? null;
-unset($_SESSION['installation_warning']);
-unset($_SESSION['installation_complete']);
+
 
 $errors = [];
 
@@ -85,17 +76,7 @@ include __DIR__ . '/templates/auth-header.php';
             <p class="text-muted mt-2">Yetkili bayiler için profesyonel yönetim paneli</p>
         </div>
 
-        <?php if ($successMessage): ?>
-            <div class="alert alert-success">
-                <?= Helpers::sanitize($successMessage) ?>
-            </div>
-        <?php endif; ?>
 
-        <?php if ($warningMessage): ?>
-            <div class="alert alert-warning">
-                <?= Helpers::sanitize($warningMessage) ?>
-            </div>
-        <?php endif; ?>
 
         <?php if ($errors): ?>
             <div class="alert alert-danger">

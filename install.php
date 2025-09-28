@@ -1,12 +1,7 @@
 <?php
 session_start();
 
-$configPath = __DIR__ . '/config/config.php';
 
-if (file_exists($configPath)) {
-    header('Location: /');
-    exit;
-}
 
 spl_autoload_register(function ($class) {
     $prefix = 'App\\';
@@ -26,6 +21,7 @@ spl_autoload_register(function ($class) {
 });
 
 $errors = [];
+
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $dbHost = trim($_POST['db_host'] ?? '');
@@ -66,13 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'status' => 'active',
             ]);
 
-            $configDir = dirname($configPath);
 
-            if (!is_dir($configDir)) {
-                if (!mkdir($configDir, 0755, true) && !is_dir($configDir)) {
-                    throw new RuntimeException('config dizini oluşturulamadı.');
-                }
-            }
 
             $configTemplate = <<<CONFIG
 <?php
@@ -94,32 +84,7 @@ CONFIG;
                 addslashes($telegramChatId)
             );
 
-            if (file_put_contents($configPath, $configContent) === false) {
-                throw new RuntimeException('config dosyası yazılamadı. Lütfen dosya izinlerini kontrol edin.');
-            }
 
-            $installerPath = __FILE__;
-            $installerDir = dirname($installerPath);
-            $installerCleaned = false;
-
-            if (is_writable($installerDir)) {
-                if (@unlink($installerPath)) {
-                    $installerCleaned = true;
-                } else {
-                    $renamed = $installerPath . '.disabled';
-                    if (@rename($installerPath, $renamed)) {
-                        $installerCleaned = true;
-                    }
-                }
-            }
-
-            if (!$installerCleaned) {
-                $_SESSION['installation_warning'] = 'Kurulum dosyası kaldırılamadı. Lütfen install.php dosyasını manuel olarak silin.';
-            }
-
-            $_SESSION['installation_complete'] = 'Kurulum başarıyla tamamlandı. Giriş yapabilirsiniz.';
-            header('Location: /');
-            exit;
         } catch (Throwable $exception) {
             $errors[] = 'Kurulum sırasında bir hata oluştu: ' . $exception->getMessage();
         }
@@ -143,6 +108,7 @@ CONFIG;
                     <h4 class="mb-0">Bayi Yönetim Sistemi Kurulumu</h4>
                 </div>
                 <div class="card-body">
+
                         <?php if ($errors): ?>
                             <div class="alert alert-danger">
                                 <ul class="mb-0">
@@ -205,6 +171,7 @@ CONFIG;
                                 <button type="submit" class="btn btn-primary">Kurulumu Tamamla</button>
                             </div>
                         </form>
+
                 </div>
             </div>
         </div>
