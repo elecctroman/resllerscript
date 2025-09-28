@@ -14,6 +14,7 @@ $pdo = Database::connection();
 $pageTitle = 'Kontrol Paneli';
 
 
+
 include __DIR__ . '/templates/header.php';
 ?>
 <div class="row g-4">

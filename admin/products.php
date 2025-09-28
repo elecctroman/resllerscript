@@ -84,7 +84,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->prepare('DELETE FROM products WHERE id = :id')->execute(['id' => $productId]);
             $success = 'Ürün silindi.';
         }
-
     }
 }
 
@@ -212,8 +211,7 @@ include __DIR__ . '/../templates/header.php';
                                     <small class="text-muted"><?= Helpers::sanitize($product['description'] ?? '') ?></small>
                                 </td>
                                 <td><?= Helpers::sanitize($product['category_name']) ?></td>
-
-                                <td>
+                    <td>
                                     <?php if ($product['status'] === 'active'): ?>
                                         <span class="badge bg-success">Aktif</span>
                                     <?php else: ?>

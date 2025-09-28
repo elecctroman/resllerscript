@@ -54,6 +54,7 @@ body {
 }
 
 
+
 .ticket-message {
     border-radius: 12px;
     padding: 1rem;
@@ -65,4 +66,5 @@ body {
     background-color: #e8f4ff;
     border-color: #bcdfff;
 }
+
 

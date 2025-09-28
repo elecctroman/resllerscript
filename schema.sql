@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS balance_transactions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
+
 CREATE TABLE IF NOT EXISTS password_resets (
     id INT AUTO_INCREMENT PRIMARY KEY,
     email VARCHAR(150) NOT NULL,
