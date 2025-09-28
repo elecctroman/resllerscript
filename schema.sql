@@ -107,20 +107,3 @@ CREATE TABLE IF NOT EXISTS system_settings (
     updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO users (id, name, email, password_hash, role, balance, status, created_at)
-VALUES (
-    1,
-    'Muhammet',
-    'muhammet@example.com',
-    '$2y$12$Yq0ismbkZMYrKL0soxdP1ubWjSVs1V.PjJGtSmQMfJ0PAfcGW1U92',
-    'admin',
-    0,
-    'active',
-    NOW()
-)
-ON DUPLICATE KEY UPDATE
-    name = VALUES(name),
-    email = VALUES(email),
-    password_hash = VALUES(password_hash),
-    role = VALUES(role),
-    status = VALUES(status);

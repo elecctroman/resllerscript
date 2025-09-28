@@ -26,31 +26,7 @@ spl_autoload_register(function ($class) {
 $configPath = __DIR__ . '/config/config.php';
 
 if (!file_exists($configPath)) {
-    http_response_code(503);
-    include __DIR__ . '/templates/auth-header.php';
-    ?>
-    <div class="auth-wrapper">
-        <div class="auth-card">
-            <div class="text-center mb-4">
-                <div class="brand">Bayi Yönetim Sistemi</div>
-                <p class="text-muted mt-2">Kuruluma başlamadan önce yapılandırmayı tamamlayın</p>
-            </div>
-            <div class="alert alert-warning">
-                <h5 class="alert-heading">Yapılandırma Gerekli</h5>
-                <p class="mb-2">Lütfen <code>config/config.sample.php</code> dosyasını <code>config/config.php</code> olarak
-                    kopyalayın ve MySQL bağlantı bilgilerinizi girin.</p>
-                <ol class="mb-0 text-start">
-                    <li><code>config/config.sample.php</code> dosyasını kopyalayın.</li>
-                    <li>Yeni dosyada <code>DB_HOST</code>, <code>DB_NAME</code>, <code>DB_USER</code> ve <code>DB_PASSWORD</code>
-                        değerlerini güncelleyin.</li>
-                    <li>Veritabanınızı oluşturup <code>schema.sql</code> dosyasındaki tabloları içeri aktarın.</li>
-                    <li>Ardından bu sayfayı yenileyerek giriş ekranına ulaşın.</li>
-                </ol>
-            </div>
-        </div>
-    </div>
-    <?php
-    include __DIR__ . '/templates/auth-footer.php';
+
     exit;
 }
 
@@ -70,16 +46,6 @@ if (!empty($_SESSION['user'])) {
     Helpers::redirect('/dashboard.php');
 }
 
-$errors = [];
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $identifier = trim($_POST['email'] ?? '');
-    $password = $_POST['password'] ?? '';
-
-    if (!$identifier || !$password) {
-        $errors[] = 'Lütfen kullanıcı adı/e-posta ve şifre alanlarını doldurun.';
-    } else {
-        $user = Auth::attempt($identifier, $password);
         if ($user) {
             $_SESSION['user'] = $user;
             Helpers::redirect('/dashboard.php');
@@ -98,6 +64,7 @@ include __DIR__ . '/templates/auth-header.php';
             <p class="text-muted mt-2">Yetkili bayiler için profesyonel yönetim paneli</p>
         </div>
 
+
         <?php if ($errors): ?>
             <div class="alert alert-danger">
                 <ul class="mb-0">
@@ -110,8 +77,7 @@ include __DIR__ . '/templates/auth-header.php';
 
         <form method="post" class="needs-validation" novalidate>
             <div class="mb-3">
-                <label for="email" class="form-label">E-posta Adresi veya Kullanıcı Adı</label>
-                <input type="text" class="form-control" id="email" name="email" required placeholder="ornek@bayinetwork.com" value="<?= Helpers::sanitize($_POST['email'] ?? '') ?>">
+
             </div>
             <div class="mb-3">
                 <label for="password" class="form-label">Şifre</label>
