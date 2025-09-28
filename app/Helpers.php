@@ -37,33 +37,6 @@ class Helpers
         return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
     }
 
-    public static function truncate(?string $value, int $limit = 100, string $suffix = '…'): string
-    {
-        $value = (string)$value;
-
-        if ($limit <= 0) {
-            return '';
-        }
-
-        if (function_exists('mb_strlen') && function_exists('mb_substr')) {
-            if (mb_strlen($value, 'UTF-8') <= $limit) {
-                return $value;
-            }
-
-            return rtrim(mb_substr($value, 0, $limit, 'UTF-8')) . $suffix;
-        }
-
-        if (strlen($value) <= $limit) {
-            return $value;
-        }
-
-        return rtrim(substr($value, 0, $limit)) . $suffix;
-    }
-
-    public static function defaultProductDescription(): string
-    {
-        return 'Bu ürün için detaylı bilgiye ihtiyaç duyarsanız destek ekibimizle iletişime geçebilirsiniz.';
-    }
 
     public static function currentPath(): string
     {

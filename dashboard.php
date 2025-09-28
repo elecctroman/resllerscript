@@ -17,21 +17,6 @@ if ($user['role'] === 'admin') {
     Helpers::redirect('/admin/dashboard.php');
 }
 
-$orderRows = [];
-$ticketRows = [];
-$dashboardErrors = [];
-
-try {
-    $orders = $pdo->prepare('SELECT po.*, p.name AS package_name FROM package_orders po INNER JOIN packages p ON po.package_id = p.id WHERE po.email = :email ORDER BY po.created_at DESC LIMIT 5');
-    $orders->execute(['email' => $user['email']]);
-    $orderRows = $orders->fetchAll();
-
-    $tickets = $pdo->prepare('SELECT * FROM support_tickets WHERE user_id = :user_id ORDER BY created_at DESC LIMIT 5');
-    $tickets->execute(['user_id' => $user['id']]);
-    $ticketRows = $tickets->fetchAll();
-} catch (\PDOException $exception) {
-    $dashboardErrors[] = 'Panel verileri yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin veya yöneticiyle iletişime geçin.';
-}
 
 include __DIR__ . '/templates/header.php';
 ?>
@@ -50,17 +35,6 @@ include __DIR__ . '/templates/header.php';
         </div>
     </div>
 
-    <?php if ($dashboardErrors): ?>
-        <div class="col-12">
-            <div class="alert alert-danger">
-                <ul class="mb-0">
-                    <?php foreach ($dashboardErrors as $error): ?>
-                        <li><?= Helpers::sanitize($error) ?></li>
-                    <?php endforeach; ?>
-                </ul>
-            </div>
-        </div>
-    <?php endif; ?>
 
     <div class="col-12 col-lg-6">
         <div class="card border-0 shadow-sm">
@@ -69,6 +43,7 @@ include __DIR__ . '/templates/header.php';
                 <a href="/register.php" class="btn btn-sm btn-outline-primary">Yeni Paket Talebi</a>
             </div>
             <div class="card-body">
+
                 <?php if ($orderRows): ?>
                     <div class="table-responsive">
                         <table class="table table-striped align-middle mb-0">
@@ -105,6 +80,7 @@ include __DIR__ . '/templates/header.php';
                 <a href="/support.php" class="btn btn-sm btn-outline-secondary">Tüm Destek Talepleri</a>
             </div>
             <div class="card-body">
+
                 <?php if ($ticketRows): ?>
                     <div class="table-responsive">
                         <table class="table table-striped align-middle mb-0">

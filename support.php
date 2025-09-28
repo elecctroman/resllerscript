@@ -24,25 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$subject || !$message) {
             $errors[] = 'Konu ve mesaj alanları zorunludur.';
         } else {
-            try {
-                $pdo->prepare('INSERT INTO support_tickets (user_id, subject, priority, status, created_at) VALUES (:user_id, :subject, :priority, :status, NOW())')->execute([
-                    'user_id' => $user['id'],
-                    'subject' => $subject,
-                    'priority' => $priority,
-                    'status' => 'open',
-                ]);
 
-                $ticketId = (int)$pdo->lastInsertId();
-                $pdo->prepare('INSERT INTO support_messages (ticket_id, user_id, message, created_at) VALUES (:ticket_id, :user_id, :message, NOW())')->execute([
-                    'ticket_id' => $ticketId,
-                    'user_id' => $user['id'],
-                    'message' => $message,
-                ]);
-
-                $success = 'Destek talebiniz oluşturuldu.';
-            } catch (\PDOException $exception) {
-                $errors[] = 'Destek talebiniz kaydedilirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.';
-            }
         }
     } elseif ($action === 'reply') {
         $ticketId = (int)($_POST['ticket_id'] ?? 0);
@@ -51,49 +33,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($ticketId <= 0 || !$message) {
             $errors[] = 'Mesaj içeriği boş olamaz.';
         } else {
-            try {
-                $ticketStmt = $pdo->prepare('SELECT * FROM support_tickets WHERE id = :id AND user_id = :user_id');
-                $ticketStmt->execute([
-                    'id' => $ticketId,
-                    'user_id' => $user['id'],
-                ]);
-                $ticket = $ticketStmt->fetch();
-
-                if (!$ticket) {
-                    $errors[] = 'Destek talebi bulunamadı.';
-                } else {
-                    $pdo->prepare('INSERT INTO support_messages (ticket_id, user_id, message, created_at) VALUES (:ticket_id, :user_id, :message, NOW())')->execute([
-                        'ticket_id' => $ticketId,
-                        'user_id' => $user['id'],
-                        'message' => $message,
-                    ]);
-
-                    $pdo->prepare("UPDATE support_tickets SET status = 'open', updated_at = NOW() WHERE id = :id")->execute(['id' => $ticketId]);
-                    $success = 'Mesajınız gönderildi.';
-                }
-            } catch (\PDOException $exception) {
-                $errors[] = 'Mesajınız kaydedilirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.';
-            }
-        }
-    }
-}
-
-$tickets = [];
-
-try {
-    $ticketStmt = $pdo->prepare('SELECT * FROM support_tickets WHERE user_id = :user_id ORDER BY created_at DESC');
-    $ticketStmt->execute(['user_id' => $user['id']]);
-    $tickets = $ticketStmt->fetchAll();
-
-    foreach ($tickets as $index => $ticket) {
-        $messages = $pdo->prepare('SELECT sm.*, u.role FROM support_messages sm LEFT JOIN users u ON sm.user_id = u.id WHERE sm.ticket_id = :ticket_id ORDER BY sm.created_at ASC');
-        $messages->execute(['ticket_id' => $ticket['id']]);
-        $tickets[$index]['messages'] = $messages->fetchAll();
-    }
-} catch (\PDOException $exception) {
-    $errors[] = 'Destek talepleriniz yüklenirken bir hata oluştu. Lütfen yöneticiyle iletişime geçin.';
-    $tickets = [];
-}
 $pageTitle = 'Destek Merkezi';
 
 include __DIR__ . '/templates/header.php';
@@ -152,7 +91,7 @@ include __DIR__ . '/templates/header.php';
                     <p class="text-muted mb-0">Henüz bir destek talebi oluşturmadınız.</p>
                 <?php else: ?>
                     <?php foreach ($tickets as $ticket): ?>
-                        <?php $messageRows = $ticket['messages'] ?? []; ?>
+
                         <div class="mb-4">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <div>
