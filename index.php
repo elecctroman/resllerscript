@@ -92,6 +92,7 @@ if (!empty($_SESSION['user'])) {
 }
 
 
+
 $errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -119,6 +120,7 @@ include __DIR__ . '/templates/auth-header.php';
             <div class="brand">Bayi Yönetim Sistemi</div>
             <p class="text-muted mt-2">Yetkili bayiler için profesyonel yönetim paneli</p>
         </div>
+
 
 
         <?php if ($errors): ?>

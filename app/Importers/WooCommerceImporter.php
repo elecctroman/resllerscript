@@ -2,7 +2,6 @@
 
 namespace App\Importers;
 
-
 use PDO;
 use RuntimeException;
 
@@ -84,8 +83,6 @@ class WooCommerceImporter
                         $categoryName = 'Genel';
                     }
                 }
-
-
 
                 $status = 'active';
                 if (isset($map['status'])) {
