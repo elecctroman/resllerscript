@@ -2,7 +2,6 @@
 
 namespace App\Importers;
 
-use App\Helpers;
 use PDO;
 use RuntimeException;
 
@@ -85,7 +84,7 @@ class WooCommerceImporter
                     }
                 }
 
-                $description = Helpers::defaultProductDescription();
+
 
                 $status = 'active';
                 if (isset($map['status'])) {
