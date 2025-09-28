@@ -46,8 +46,6 @@ if (!empty($_SESSION['user'])) {
     Helpers::redirect('/dashboard.php');
 }
 
-$successMessage = $_SESSION['installation_complete'] ?? null;
-unset($_SESSION['installation_complete']);
 
 $errors = [];
 
@@ -77,11 +75,6 @@ include __DIR__ . '/templates/auth-header.php';
             <p class="text-muted mt-2">Yetkili bayiler için profesyonel yönetim paneli</p>
         </div>
 
-        <?php if ($successMessage): ?>
-            <div class="alert alert-success">
-                <?= Helpers::sanitize($successMessage) ?>
-            </div>
-        <?php endif; ?>
 
         <?php if ($errors): ?>
             <div class="alert alert-danger">
