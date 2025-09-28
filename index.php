@@ -26,7 +26,7 @@ spl_autoload_register(function ($class) {
 $configPath = __DIR__ . '/config/config.php';
 
 if (!file_exists($configPath)) {
-    require __DIR__ . '/install.php';
+
     exit;
 }
 
@@ -45,6 +45,7 @@ use App\Helpers;
 if (!empty($_SESSION['user'])) {
     Helpers::redirect('/dashboard.php');
 }
+
 
 
 $errors = [];
@@ -74,6 +75,7 @@ include __DIR__ . '/templates/auth-header.php';
             <div class="brand">Bayi Yönetim Sistemi</div>
             <p class="text-muted mt-2">Yetkili bayiler için profesyonel yönetim paneli</p>
         </div>
+
 
 
         <?php if ($errors): ?>
