@@ -24,13 +24,7 @@ spl_autoload_register(function ($class) {
 });
 
 $configPath = __DIR__ . '/config/config.php';
-$installerPath = __DIR__ . '/install.php';
 
-if (!file_exists($configPath)) {
-    if (file_exists($installerPath)) {
-        header('Location: /install.php');
-        exit;
-    }
 
     include __DIR__ . '/templates/auth-header.php';
     ?>
@@ -72,6 +66,7 @@ try {
         'password' => DB_PASSWORD,
     ]);
 } catch (\PDOException $exception) {
+
     include __DIR__ . '/templates/auth-header.php';
     ?>
     <div class="auth-wrapper">
@@ -96,9 +91,6 @@ if (!empty($_SESSION['user'])) {
     Helpers::redirect('/dashboard.php');
 }
 
-$flashSuccess = $_SESSION['flash_success'] ?? null;
-$flashWarning = $_SESSION['flash_warning'] ?? null;
-unset($_SESSION['flash_success'], $_SESSION['flash_warning']);
 
 $errors = [];
 
@@ -128,17 +120,6 @@ include __DIR__ . '/templates/auth-header.php';
             <p class="text-muted mt-2">Yetkili bayiler için profesyonel yönetim paneli</p>
         </div>
 
-        <?php if ($flashSuccess): ?>
-            <div class="alert alert-success">
-                <?= Helpers::sanitize($flashSuccess) ?>
-            </div>
-        <?php endif; ?>
-
-        <?php if ($flashWarning): ?>
-            <div class="alert alert-warning">
-                <?= Helpers::sanitize($flashWarning) ?>
-            </div>
-        <?php endif; ?>
 
         <?php if ($errors): ?>
             <div class="alert alert-danger">

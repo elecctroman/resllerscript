@@ -7,10 +7,7 @@ use PDO;
 
 class Settings
 {
-    /**
-     * @var array<string,mixed>
-     */
-    private static $cache = [];
+
 
     public static function get(string $key, $default = null)
     {

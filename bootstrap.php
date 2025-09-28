@@ -24,38 +24,7 @@ spl_autoload_register(function ($class) {
 });
 
 $configPath = __DIR__ . '/config/config.php';
-$installerPath = __DIR__ . '/install.php';
 
-if (!file_exists($configPath)) {
-    if (file_exists($installerPath)) {
-        header('Location: /install.php');
-        exit;
-    }
-
-    include __DIR__ . '/templates/auth-header.php';
-    ?>
-    <div class="auth-wrapper">
-        <div class="auth-card">
-            <div class="text-center mb-4">
-                <div class="brand">Bayi Yönetim Sistemi</div>
-                <p class="text-muted mt-2">Kurulum tamamlanmadı</p>
-            </div>
-            <div class="alert alert-warning">
-                <h5 class="alert-heading">Yapılandırma Gerekli</h5>
-                <p class="mb-2">Lütfen <code>config/config.sample.php</code> dosyasını <code>config/config.php</code> olarak
-                    kopyalayın ve MySQL bağlantı bilgilerinizi girin.</p>
-                <ol class="mb-0 text-start">
-                    <li><code>config/config.sample.php</code> dosyasını kopyalayın.</li>
-                    <li>Yeni dosyada <code>DB_HOST</code>, <code>DB_NAME</code>, <code>DB_USER</code> ve <code>DB_PASSWORD</code>
-                        değerlerini güncelleyin.</li>
-                    <li>Veritabanınızı oluşturup <code>schema.sql</code> dosyasındaki tabloları içeri aktarın.</li>
-                    <li>Ardından bu sayfayı yenileyerek giriş ekranına ulaşın.</li>
-                </ol>
-            </div>
-        </div>
-    </div>
-    <?php
-    include __DIR__ . '/templates/auth-footer.php';
     exit;
 }
 
@@ -69,6 +38,7 @@ try {
         'password' => DB_PASSWORD,
     ]);
 } catch (\PDOException $exception) {
+
     include __DIR__ . '/templates/auth-header.php';
     ?>
     <div class="auth-wrapper">
