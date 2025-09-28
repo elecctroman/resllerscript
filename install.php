@@ -1,6 +1,7 @@
 <?php
 session_start();
 
+
 spl_autoload_register(function ($class) {
     $prefix = 'App\\';
     $baseDir = __DIR__ . '/app/';
@@ -19,7 +20,7 @@ spl_autoload_register(function ($class) {
 });
 
 $errors = [];
-$success = false;
+
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $dbHost = trim($_POST['db_host'] ?? '');
@@ -60,6 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'status' => 'active',
             ]);
 
+
             $configTemplate = <<<CONFIG
 <?php
 const DB_HOST = '%s';
@@ -80,9 +82,7 @@ CONFIG;
                 addslashes($telegramChatId)
             );
 
-            file_put_contents(__DIR__ . '/config/config.php', $configContent);
 
-            $success = true;
         } catch (Throwable $exception) {
             $errors[] = 'Kurulum sırasında bir hata oluştu: ' . $exception->getMessage();
         }
@@ -106,11 +106,7 @@ CONFIG;
                     <h4 class="mb-0">Bayi Yönetim Sistemi Kurulumu</h4>
                 </div>
                 <div class="card-body">
-                    <?php if ($success): ?>
-                        <div class="alert alert-success">
-                            Kurulum başarıyla tamamlandı. <a href="/" class="alert-link">Panele gitmek için tıklayın.</a>
-                        </div>
-                    <?php else: ?>
+
                         <?php if ($errors): ?>
                             <div class="alert alert-danger">
                                 <ul class="mb-0">
@@ -173,7 +169,7 @@ CONFIG;
                                 <button type="submit" class="btn btn-primary">Kurulumu Tamamla</button>
                             </div>
                         </form>
-                    <?php endif; ?>
+
                 </div>
             </div>
         </div>
