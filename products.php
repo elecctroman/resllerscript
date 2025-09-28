@@ -14,13 +14,6 @@ if ($user['role'] === 'admin') {
     Helpers::redirect('/admin/products.php');
 }
 
-$pdo = Database::connection();
-$categories = $pdo->query('SELECT * FROM categories ORDER BY name ASC')->fetchAll();
-$selectedCategoryId = isset($_GET['category']) ? (int)$_GET['category'] : 0;
-
-if (!$selectedCategoryId && $categories) {
-    $selectedCategoryId = (int)$categories[0]['id'];
-}
 
 $productsQuery = 'SELECT pr.*, cat.name AS category_name FROM products pr INNER JOIN categories cat ON pr.category_id = cat.id WHERE pr.status = :status';
 $params = ['status' => 'active'];
@@ -49,6 +42,7 @@ include __DIR__ . '/templates/header.php';
                 <?php if (!$categories): ?>
                     <div class="list-group-item text-muted">Tanımlı kategori bulunmuyor.</div>
                 <?php else: ?>
+
                     <?php foreach ($categories as $category): ?>
                         <a href="/products.php?category=<?= (int)$category['id'] ?>"
                            class="list-group-item list-group-item-action <?= $selectedCategoryId === (int)$category['id'] ? 'active' : '' ?>">
@@ -66,6 +60,7 @@ include __DIR__ . '/templates/header.php';
                 <span class="text-muted small">Fiyatlar USD cinsindendir.</span>
             </div>
             <div class="card-body">
+
                 <?php if (!$products): ?>
                     <p class="text-muted mb-0">Seçili kategori için görüntülenecek ürün bulunmuyor.</p>
                 <?php else: ?>
@@ -78,6 +73,7 @@ include __DIR__ . '/templates/header.php';
                                 <th>Kategori</th>
                                 <th>SKU</th>
                                 <th>Fiyat</th>
+
                             </tr>
                             </thead>
                             <tbody>
@@ -86,11 +82,12 @@ include __DIR__ . '/templates/header.php';
                                     <td><?= (int)$product['id'] ?></td>
                                     <td>
                                         <strong><?= Helpers::sanitize($product['name']) ?></strong><br>
-                                        <small class="text-muted"><?= Helpers::sanitize($product['description'] ?? '') ?></small>
+
                                     </td>
                                     <td><?= Helpers::sanitize($product['category_name']) ?></td>
                                     <td><?= Helpers::sanitize($product['sku'] ?? '-') ?></td>
                                     <td>$<?= number_format((float)$product['price'], 2, '.', ',') ?></td>
+
                                 </tr>
                             <?php endforeach; ?>
                             </tbody>
@@ -101,4 +98,5 @@ include __DIR__ . '/templates/header.php';
         </div>
     </div>
 </div>
+
 <?php include __DIR__ . '/templates/footer.php';

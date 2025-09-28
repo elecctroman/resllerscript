@@ -9,6 +9,7 @@ Profesyonel bayilik yönetim süreçlerinizi uçtan uca yönetebilmeniz için ge
 - Sipariş yönetimi: başvuruları onaylama, ödeme/tamamlanma durumları, otomatik bayi hesabı oluşturma
 - Ürün ve kategori yönetimi: kategori bazlı ürün ekleme/düzenleme/silme
 
+
 ## Gereksinimler
 - PHP 8.1 veya üzeri (PDO, cURL, OpenSSL, mbstring eklentileri aktif olmalıdır)
 - MySQL veya MariaDB
