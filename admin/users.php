@@ -170,7 +170,7 @@ include __DIR__ . '/../templates/header.php';
                                 <td><?= (int)$user['id'] ?></td>
                                 <td><?= Helpers::sanitize($user['name']) ?></td>
                                 <td><?= Helpers::sanitize($user['email']) ?></td>
-                                <td><?= number_format((float)$user['balance'], 2, ',', '.') ?> ₺</td>
+
                                 <td>
                                     <?php if ($user['status'] === 'active'): ?>
                                         <span class="badge bg-success">Aktif</span>

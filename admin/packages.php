@@ -112,7 +112,7 @@ include __DIR__ . '/../templates/header.php';
                         <input type="text" name="name" class="form-control" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Paket Ücreti (₺)</label>
+
                         <input type="number" step="0.01" name="price" class="form-control" required>
                     </div>
                     <div class="mb-3">
@@ -148,8 +148,7 @@ include __DIR__ . '/../templates/header.php';
                         <tr>
                             <th>#</th>
                             <th>Paket</th>
-                            <th>Ücret</th>
-                            <th>Başlangıç Bakiyesi</th>
+
                             <th>Durum</th>
                             <th class="text-end">İşlemler</th>
                         </tr>
@@ -162,8 +161,7 @@ include __DIR__ . '/../templates/header.php';
                                     <strong><?= Helpers::sanitize($package['name']) ?></strong><br>
                                     <small class="text-muted"><?= Helpers::sanitize($package['description'] ?? '') ?></small>
                                 </td>
-                                <td><?= number_format((float)$package['price'], 2, ',', '.') ?> ₺</td>
-                                <td><?= number_format((float)$package['initial_balance'], 2, ',', '.') ?> ₺</td>
+
                                 <td>
                                     <?php if ($package['is_active']): ?>
                                         <span class="badge bg-success">Aktif</span>

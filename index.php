@@ -144,6 +144,7 @@ include __DIR__ . '/templates/auth-header.php';
                 <a href="/register.php" class="small">Yeni Bayilik Başvurusu</a>
             </div>
             <button type="submit" class="btn btn-primary w-100">Panele Giriş Yap</button>
+
         </form>
     </div>
 </div>

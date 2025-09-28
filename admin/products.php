@@ -84,6 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->prepare('DELETE FROM products WHERE id = :id')->execute(['id' => $productId]);
             $success = 'Ürün silindi.';
         }
+
     }
 }
 
@@ -163,7 +164,7 @@ include __DIR__ . '/../templates/header.php';
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Fiyat</label>
+
                         <input type="number" step="0.01" name="price" class="form-control" value="0">
                     </div>
                     <div class="mb-3">
@@ -182,6 +183,7 @@ include __DIR__ . '/../templates/header.php';
                 </form>
             </div>
         </div>
+
     </div>
     <div class="col-lg-8">
         <div class="card border-0 shadow-sm">
@@ -210,7 +212,7 @@ include __DIR__ . '/../templates/header.php';
                                     <small class="text-muted"><?= Helpers::sanitize($product['description'] ?? '') ?></small>
                                 </td>
                                 <td><?= Helpers::sanitize($product['category_name']) ?></td>
-                                <td><?= number_format((float)$product['price'], 2, ',', '.') ?> ₺</td>
+
                                 <td>
                                     <?php if ($product['status'] === 'active'): ?>
                                         <span class="badge bg-success">Aktif</span>
@@ -253,7 +255,7 @@ include __DIR__ . '/../templates/header.php';
                                                         </select>
                                                     </div>
                                                     <div class="col-md-4">
-                                                        <label class="form-label">Fiyat</label>
+
                                                         <input type="number" step="0.01" name="price" class="form-control" value="<?= Helpers::sanitize($product['price']) ?>">
                                                     </div>
                                                     <div class="col-md-4">

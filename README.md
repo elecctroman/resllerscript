@@ -8,13 +8,7 @@ Profesyonel bayilik yönetim süreçlerinizi uçtan uca yönetebilmeniz için ge
 - Ücretli bayilik başvuru formu: paket seçimi, başvuru kaydı, otomatik admin bilgilendirmesi
 - Sipariş yönetimi: başvuruları onaylama, ödeme/tamamlanma durumları, otomatik bayi hesabı oluşturma
 - Ürün ve kategori yönetimi: kategori bazlı ürün ekleme/düzenleme/silme
-- Bakiye yönetimi: otomatik kredi işlemleri ve manuel bakiye güncelleme, işlem kayıtları
-- Destek sistemi: bayi tarafı destek talepleri, admin panelinden yanıt ve durum takibi
-- Telegram bildirimi: teslim edilen siparişlerde otomatik Telegram uyarısı (opsiyonel)
-- Modern Bootstrap 5 arayüzü ve responsive tasarım
 
-## Kurulum
-1. Proje dosyalarını sunucunuza yükleyin ve web sunucusunun kök dizinini bu klasöre yönlendirin.
 
 ## Gereksinimler
 - PHP 8.1 veya üzeri (PDO, cURL, OpenSSL, mbstring eklentileri aktif olmalıdır)
