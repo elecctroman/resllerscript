@@ -16,9 +16,14 @@ Profesyonel bayilik yönetim süreçlerinizi uçtan uca yönetebilmeniz için ge
 ## Kurulum
 1. Proje dosyalarını sunucunuza yükleyin ve web sunucusunun kök dizinini bu klasöre yönlendirin.
 2. `config/config.sample.php` dosyasını `config/config.php` olarak kopyalayın ve MySQL/MariaDB bağlantı bilgilerinizi güncelleyin.
-3. Veritabanınızı oluşturun ve `schema.sql` dosyasındaki tabloları içeri aktarın.
-4. İlk yönetici hesabınızı `users` tablosuna manuel olarak ekleyin ya da veri tabanında gerekli kayıtları oluşturun.
-5. Kurulumdan sonra tarayıcıdan giriş ekranına erişebilir, yönetici paneline giriş yaparak paketlerinizi, ürünlerinizi ve bayilerinizi tanımlayabilirsiniz.
+3. Veritabanınızı oluşturun ve `schema.sql` dosyasındaki tabloları içeri aktarın. Kurulum skripti varsayılan olarak aşağıdaki yönetici hesabını oluşturur:
+
+   | Kullanıcı Adı | E-posta                | Şifre          |
+   |---------------|------------------------|----------------|
+   | `Muhammet`    | `muhammet@example.com` | `5806958477i.` |
+
+   İlk girişten sonra şifreyi güncellemeniz tavsiye edilir.
+4. Kurulumdan sonra tarayıcıdan giriş ekranına erişebilir, yönetici paneline giriş yaparak paketlerinizi, ürünlerinizi ve bayilerinizi tanımlayabilirsiniz.
 
 ## Gereksinimler
 - PHP 8.1 veya üzeri (PDO, cURL, OpenSSL, mbstring eklentileri aktif olmalıdır)

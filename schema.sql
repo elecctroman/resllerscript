@@ -112,7 +112,7 @@ VALUES (
     1,
     'Muhammet',
     'muhammet@example.com',
-    '$2y$12$ovZ4BLi67qbhNf2aMBkpne4rA91layMX3n5IJ71P5mMC013I7YpC.',
+    '$2y$12$Yq0ismbkZMYrKL0soxdP1ubWjSVs1V.PjJGtSmQMfJ0PAfcGW1U92',
     'admin',
     0,
     'active',
