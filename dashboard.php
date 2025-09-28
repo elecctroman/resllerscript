@@ -17,6 +17,7 @@ if ($user['role'] === 'admin') {
     Helpers::redirect('/admin/dashboard.php');
 }
 
+
 include __DIR__ . '/templates/header.php';
 ?>
 <div class="row g-4">
@@ -34,6 +35,7 @@ include __DIR__ . '/templates/header.php';
         </div>
     </div>
 
+
     <div class="col-12 col-lg-6">
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
@@ -41,11 +43,7 @@ include __DIR__ . '/templates/header.php';
                 <a href="/register.php" class="btn btn-sm btn-outline-primary">Yeni Paket Talebi</a>
             </div>
             <div class="card-body">
-                <?php
-                $orders = $pdo->prepare('SELECT po.*, p.name AS package_name FROM package_orders po INNER JOIN packages p ON po.package_id = p.id WHERE po.email = :email ORDER BY po.created_at DESC LIMIT 5');
-                $orders->execute(['email' => $user['email']]);
-                $orderRows = $orders->fetchAll();
-                ?>
+
                 <?php if ($orderRows): ?>
                     <div class="table-responsive">
                         <table class="table table-striped align-middle mb-0">
@@ -82,11 +80,7 @@ include __DIR__ . '/templates/header.php';
                 <a href="/support.php" class="btn btn-sm btn-outline-secondary">Tüm Destek Talepleri</a>
             </div>
             <div class="card-body">
-                <?php
-                $tickets = $pdo->prepare('SELECT * FROM support_tickets WHERE user_id = :user_id ORDER BY created_at DESC LIMIT 5');
-                $tickets->execute(['user_id' => $user['id']]);
-                $ticketRows = $tickets->fetchAll();
-                ?>
+
                 <?php if ($ticketRows): ?>
                     <div class="table-responsive">
                         <table class="table table-striped align-middle mb-0">

@@ -15,19 +15,6 @@ if ($user['role'] === 'admin') {
 }
 
 
-$productsQuery = 'SELECT pr.*, cat.name AS category_name FROM products pr INNER JOIN categories cat ON pr.category_id = cat.id WHERE pr.status = :status';
-$params = ['status' => 'active'];
-
-if ($selectedCategoryId) {
-    $productsQuery .= ' AND pr.category_id = :category_id';
-    $params['category_id'] = $selectedCategoryId;
-}
-
-$productsQuery .= ' ORDER BY cat.name, pr.name';
-$productsStmt = $pdo->prepare($productsQuery);
-$productsStmt->execute($params);
-$products = $productsStmt->fetchAll();
-
 $pageTitle = 'Ürün Kataloğu';
 
 include __DIR__ . '/templates/header.php';
@@ -42,7 +29,6 @@ include __DIR__ . '/templates/header.php';
                 <?php if (!$categories): ?>
                     <div class="list-group-item text-muted">Tanımlı kategori bulunmuyor.</div>
                 <?php else: ?>
-
                     <?php foreach ($categories as $category): ?>
                         <a href="/products.php?category=<?= (int)$category['id'] ?>"
                            class="list-group-item list-group-item-action <?= $selectedCategoryId === (int)$category['id'] ? 'active' : '' ?>">
@@ -60,6 +46,7 @@ include __DIR__ . '/templates/header.php';
                 <span class="text-muted small">Fiyatlar USD cinsindendir.</span>
             </div>
             <div class="card-body">
+
 
                 <?php if (!$products): ?>
                     <p class="text-muted mb-0">Seçili kategori için görüntülenecek ürün bulunmuyor.</p>

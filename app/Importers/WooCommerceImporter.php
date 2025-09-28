@@ -2,6 +2,7 @@
 
 namespace App\Importers;
 
+
 use PDO;
 use RuntimeException;
 
@@ -84,12 +85,7 @@ class WooCommerceImporter
                     }
                 }
 
-                $description = '';
-                if (isset($map['description']) && !empty($row[$map['description']])) {
-                    $description = (string)$row[$map['description']];
-                } elseif (isset($map['short description']) && !empty($row[$map['short description']])) {
-                    $description = (string)$row[$map['short description']];
-                }
+
 
                 $status = 'active';
                 if (isset($map['status'])) {

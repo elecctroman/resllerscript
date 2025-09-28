@@ -34,39 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!$errors) {
-        $stmt = $pdo->prepare('INSERT INTO balance_requests (user_id, amount, payment_method, reference, notes, status, created_at) VALUES (:user_id, :amount, :payment_method, :reference, :notes, :status, NOW())');
-        $stmt->execute([
-            'user_id' => $user['id'],
-            'amount' => $amount,
-            'payment_method' => $paymentMethod,
-            'reference' => $reference ?: null,
-            'notes' => $notes ?: null,
-            'status' => 'pending',
-        ]);
 
-        $success = 'Bakiye talebiniz alındı. Ödeme onaylandığında hesabınıza yansıtılacaktır.';
-
-        $adminEmails = $pdo->query("SELECT email FROM users WHERE role = 'admin' AND status = 'active'")->fetchAll(\PDO::FETCH_COLUMN);
-        $message = "Yeni bir bakiye yükleme talebi oluşturuldu.\n\n" .
-            "Bayi: {$user['name']}\n" .
-            "E-posta: {$user['email']}\n" .
-            "Tutar: $" . number_format($amount, 2, '.', ',') . "\n" .
-            "Ödeme Yöntemi: $paymentMethod\n" .
-            ($reference ? "Referans: $reference\n" : '');
-
-        foreach ($adminEmails as $adminEmail) {
-            Mailer::send($adminEmail, 'Yeni Bakiye Talebi', $message);
-        }
-    }
-}
-
-$requestStmt = $pdo->prepare('SELECT * FROM balance_requests WHERE user_id = :user_id ORDER BY created_at DESC');
-$requestStmt->execute(['user_id' => $user['id']]);
-$requests = $requestStmt->fetchAll();
-
-$transactionsStmt = $pdo->prepare('SELECT * FROM balance_transactions WHERE user_id = :user_id ORDER BY created_at DESC LIMIT 20');
-$transactionsStmt->execute(['user_id' => $user['id']]);
-$transactions = $transactionsStmt->fetchAll();
 
 $pageTitle = 'Bakiye Yönetimi';
 

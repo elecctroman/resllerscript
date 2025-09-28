@@ -7,11 +7,7 @@ use PDOException;
 
 class Database
 {
-    private static ?PDO $connection = null;
 
-    public static function initialize(array $config): void
-    {
-        if (self::$connection !== null) {
             return;
         }
 
@@ -29,7 +25,7 @@ class Database
 
     public static function connection(): PDO
     {
-        if (self::$connection === null) {
+
             throw new PDOException('Veritabanı bağlantısı başlatılmadı.');
         }
 
