@@ -25,7 +25,7 @@ spl_autoload_register(function ($class) {
 
 $configPath = __DIR__ . '/config/config.php';
 if (!file_exists($configPath)) {
-    header('Location: /');
+
     exit;
 }
 
@@ -39,7 +39,7 @@ try {
         'password' => DB_PASSWORD,
     ]);
 } catch (\PDOException $exception) {
-    http_response_code(500);
+
     include __DIR__ . '/templates/auth-header.php';
     ?>
     <div class="auth-wrapper">

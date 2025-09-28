@@ -38,6 +38,7 @@ class Helpers
     }
 
 
+
     public static function currentPath(): string
     {
         $uri = $_SERVER['REQUEST_URI'] ?? '/';

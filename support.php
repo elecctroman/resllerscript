@@ -33,6 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($ticketId <= 0 || !$message) {
             $errors[] = 'Mesaj içeriği boş olamaz.';
         } else {
+
 $pageTitle = 'Destek Merkezi';
 
 include __DIR__ . '/templates/header.php';

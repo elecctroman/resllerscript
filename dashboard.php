@@ -18,6 +18,7 @@ if ($user['role'] === 'admin') {
 }
 
 
+
 include __DIR__ . '/templates/header.php';
 ?>
 <div class="row g-4">
@@ -34,6 +35,7 @@ include __DIR__ . '/templates/header.php';
             </div>
         </div>
     </div>
+
 
 
     <div class="col-12 col-lg-6">

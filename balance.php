@@ -35,7 +35,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$errors) {
 
-
 $pageTitle = 'Bakiye Yönetimi';
 
 include __DIR__ . '/templates/header.php';
