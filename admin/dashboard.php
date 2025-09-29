@@ -3,16 +3,15 @@ require __DIR__ . '/../bootstrap.php';
 
 use App\Helpers;
 use App\Database;
+use App\Auth;
 
 if (empty($_SESSION['user'])) {
     Helpers::redirect('/');
 }
 
-$user = $_SESSION['user'];
+Auth::requirePermission('access_admin_panel', '/dashboard.php');
 
-if ($user['role'] !== 'admin') {
-    Helpers::redirect('/dashboard.php');
-}
+$user = $_SESSION['user'];
 
 $pdo = Database::connection();
 $pageTitle = 'Yönetici Paneli';

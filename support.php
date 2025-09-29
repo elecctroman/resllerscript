@@ -3,6 +3,7 @@ require __DIR__ . '/bootstrap.php';
 
 use App\Helpers;
 use App\Database;
+use App\Auth;
 
 if (empty($_SESSION['user'])) {
     Helpers::redirect('/');
@@ -104,9 +105,9 @@ include __DIR__ . '/templates/header.php';
                             </div>
                             <div class="p-3 bg-light rounded">
                                 <?php foreach ($messageRows as $message): ?>
-                                    <div class="ticket-message mb-3 <?= $message['role'] === 'admin' ? 'admin' : '' ?>">
+                                    <div class="ticket-message mb-3 <?= Auth::isAdminRole($message['role'] ?? null) ? 'admin' : '' ?>">
                                         <div class="d-flex justify-content-between align-items-center mb-2">
-                                            <strong><?= $message['role'] === 'admin' ? 'Destek Ekibi' : Helpers::sanitize($user['name']) ?></strong>
+                                            <strong><?= Auth::isAdminRole($message['role'] ?? null) ? 'Destek Ekibi' : Helpers::sanitize($user['name']) ?></strong>
                                             <small class="text-muted"><?= date('d.m.Y H:i', strtotime($message['created_at'])) ?></small>
                                         </div>
                                         <p class="mb-0"><?= nl2br(Helpers::sanitize($message['message'])) ?></p>

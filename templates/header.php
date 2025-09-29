@@ -1,6 +1,7 @@
 <?php
 
 use App\Helpers;
+use App\Auth;
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
@@ -12,38 +13,50 @@ $pageHeadline = $pageTitle ?? 'Panel';
 $menuSections = [];
 
 if ($user) {
-    if ($user['role'] === 'admin') {
-        $menuSections = [
+    if (Auth::userHasPermission($user, 'access_admin_panel')) {
+        $rawSections = [
             [
                 'heading' => 'Genel',
                 'items' => [
-                    ['label' => 'Genel Bakış', 'href' => '/admin/dashboard.php', 'pattern' => '/admin/dashboard.php', 'icon' => 'bi-speedometer2'],
-                    ['label' => 'Paketler', 'href' => '/admin/packages.php', 'pattern' => '/admin/packages.php', 'icon' => 'bi-box-seam'],
-                    ['label' => 'Siparişler', 'href' => '/admin/orders.php', 'pattern' => '/admin/orders.php', 'icon' => 'bi-receipt'],
-                    ['label' => 'Bayiler', 'href' => '/admin/users.php', 'pattern' => '/admin/users.php', 'icon' => 'bi-people'],
+                    ['label' => 'Genel Bakış', 'href' => '/admin/dashboard.php', 'pattern' => '/admin/dashboard.php', 'icon' => 'bi-speedometer2', 'permission' => 'access_admin_panel'],
+                    ['label' => 'Paketler', 'href' => '/admin/packages.php', 'pattern' => '/admin/packages.php', 'icon' => 'bi-box-seam', 'permission' => 'manage_products'],
+                    ['label' => 'Siparişler', 'href' => '/admin/orders.php', 'pattern' => '/admin/orders.php', 'icon' => 'bi-receipt', 'permission' => 'manage_orders'],
+                    ['label' => 'Bayiler', 'href' => '/admin/users.php', 'pattern' => '/admin/users.php', 'icon' => 'bi-people', 'permission' => 'manage_users'],
+                    ['label' => 'Aktivite Kayıtları', 'href' => '/admin/activity-logs.php', 'pattern' => '/admin/activity-logs.php', 'icon' => 'bi-clipboard-data', 'permission' => 'view_audit_logs'],
                 ],
             ],
             [
                 'heading' => 'Ürün Yönetimi',
                 'items' => [
-                    ['label' => 'Ürünler & Kategoriler', 'href' => '/admin/products.php', 'pattern' => '/admin/products.php', 'icon' => 'bi-box'],
-                    ['label' => 'WooCommerce İçe Aktar', 'href' => '/admin/woocommerce-import.php', 'pattern' => '/admin/woocommerce-import.php', 'icon' => 'bi-filetype-csv'],
+                    ['label' => 'Ürünler & Kategoriler', 'href' => '/admin/products.php', 'pattern' => '/admin/products.php', 'icon' => 'bi-box', 'permission' => 'manage_products'],
+                    ['label' => 'WooCommerce İçe Aktar', 'href' => '/admin/woocommerce-import.php', 'pattern' => '/admin/woocommerce-import.php', 'icon' => 'bi-filetype-csv', 'permission' => 'import_products'],
                 ],
             ],
             [
                 'heading' => 'Finans & Destek',
                 'items' => [
-                    ['label' => 'Bakiyeler', 'href' => '/admin/balances.php', 'pattern' => '/admin/balances.php', 'icon' => 'bi-cash-stack'],
-                    ['label' => 'Destek', 'href' => '/admin/support.php', 'pattern' => '/admin/support.php', 'icon' => 'bi-life-preserver'],
+                    ['label' => 'Bakiyeler', 'href' => '/admin/balances.php', 'pattern' => '/admin/balances.php', 'icon' => 'bi-cash-stack', 'permission' => 'manage_finance'],
+                    ['label' => 'Destek', 'href' => '/admin/support.php', 'pattern' => '/admin/support.php', 'icon' => 'bi-life-preserver', 'permission' => 'manage_support'],
                 ],
             ],
             [
                 'heading' => 'Ayarlar',
                 'items' => [
-                    ['label' => 'Mail Ayarları', 'href' => '/admin/settings-mail.php', 'pattern' => '/admin/settings-mail.php', 'icon' => 'bi-envelope-gear'],
+                    ['label' => 'Mail Ayarları', 'href' => '/admin/settings-mail.php', 'pattern' => '/admin/settings-mail.php', 'icon' => 'bi-envelope-gear', 'permission' => 'manage_settings'],
                 ],
             ],
         ];
+
+        foreach ($rawSections as $section) {
+            $items = array_filter($section['items'], static function (array $item) use ($user): bool {
+                return empty($item['permission']) || Auth::userHasPermission($user, $item['permission']);
+            });
+
+            if ($items) {
+                $section['items'] = array_values($items);
+                $menuSections[] = $section;
+            }
+        }
     } else {
         $menuSections = [
             [
@@ -74,11 +87,11 @@ if ($user) {
     <?php if ($user): ?>
         <aside class="app-sidebar">
             <div class="sidebar-brand">
-                <a href="<?= $user['role'] === 'admin' ? '/admin/dashboard.php' : '/dashboard.php' ?>">Bayi Yönetim Sistemi</a>
+                <a href="<?= Auth::userHasPermission($user, 'access_admin_panel') ? '/admin/dashboard.php' : '/dashboard.php' ?>">Bayi Yönetim Sistemi</a>
             </div>
             <div class="sidebar-user">
                 <div class="sidebar-user-name"><?= Helpers::sanitize($user['name']) ?></div>
-                <div class="sidebar-user-role text-uppercase"><?= $user['role'] === 'admin' ? 'Yönetici' : 'Bayi' ?></div>
+                <div class="sidebar-user-role text-uppercase"><?= Helpers::sanitize(Auth::roleLabel($user['role'])) ?></div>
                 <div class="sidebar-user-balance">
                     Bakiye: <strong>$<?= number_format((float)$user['balance'], 2, '.', ',') ?></strong>
                 </div>

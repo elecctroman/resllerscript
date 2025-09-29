@@ -4,6 +4,7 @@ require __DIR__ . '/bootstrap.php';
 use App\Database;
 use App\Helpers;
 use App\Mailer;
+use App\Auth;
 
 if (!empty($_SESSION['user'])) {
     Helpers::redirect('/dashboard.php');
@@ -59,7 +60,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $success = true;
 
-        $adminEmails = $pdo->query("SELECT email FROM users WHERE role = 'admin' AND status = 'active'")->fetchAll(\PDO::FETCH_COLUMN);
+        $notifyRoles = Auth::rolesForPermission('manage_orders');
+        $placeholders = implode(',', array_fill(0, count($notifyRoles), '?'));
+        $stmtAdmins = $pdo->prepare("SELECT email FROM users WHERE role IN ($placeholders) AND status = 'active'");
+        $stmtAdmins->execute($notifyRoles);
+        $adminEmails = $stmtAdmins->fetchAll(\PDO::FETCH_COLUMN);
         $message = "Yeni bir bayilik başvurusu alındı.\n\n" .
             "Başvuru Sahibi: $name\n" .
             "E-posta: $email\n" .

@@ -3,10 +3,14 @@ require __DIR__ . '/../bootstrap.php';
 
 use App\Helpers;
 use App\Settings;
+use App\Auth;
+use App\AuditLogger;
 
-if (empty($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
+if (empty($_SESSION['user'])) {
     Helpers::redirect('/');
 }
+
+Auth::requirePermission('manage_settings');
 
 $errors = [];
 $success = '';
@@ -49,6 +53,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'mail_reply_to' => $replyTo,
             'mail_footer' => $footer,
         ];
+
+        AuditLogger::log('settings.mail_update', [
+            'target_type' => 'system_settings',
+            'description' => 'Mail ayarları güncellendi',
+            'metadata' => [
+                'mail_from_name' => $fromName,
+                'mail_from_address' => $fromAddress,
+                'mail_reply_to' => $replyTo,
+            ],
+        ]);
     }
 }
 

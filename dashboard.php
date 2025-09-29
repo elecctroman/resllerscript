@@ -3,6 +3,7 @@ require __DIR__ . '/bootstrap.php';
 
 use App\Helpers;
 use App\Database;
+use App\Auth;
 
 if (empty($_SESSION['user'])) {
     Helpers::redirect('/');
@@ -13,7 +14,7 @@ $pdo = Database::connection();
 
 $pageTitle = 'Kontrol Paneli';
 
-if ($user['role'] === 'admin') {
+if (Auth::userHasPermission($user, 'access_admin_panel')) {
     Helpers::redirect('/admin/dashboard.php');
 }
 

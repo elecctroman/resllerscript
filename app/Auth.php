@@ -3,11 +3,33 @@
 namespace App;
 
 use App\Database;
+use App\Helpers;
 use PDO;
 use RuntimeException;
 
 class Auth
 {
+    private const ROLE_LABELS = [
+        'super_admin' => 'Üst Yönetici',
+        'admin' => 'Yönetici',
+        'manager' => 'Yönetici Yardımcısı',
+        'support' => 'Destek Uzmanı',
+        'auditor' => 'Denetçi',
+        'reseller' => 'Bayi',
+    ];
+
+    private const ROLE_PERMISSIONS = [
+        'access_admin_panel' => ['super_admin', 'admin', 'manager', 'support', 'auditor'],
+        'manage_users' => ['super_admin', 'admin'],
+        'manage_finance' => ['super_admin', 'admin', 'manager'],
+        'manage_products' => ['super_admin', 'admin', 'manager'],
+        'manage_orders' => ['super_admin', 'admin', 'manager'],
+        'manage_support' => ['super_admin', 'admin', 'support'],
+        'manage_settings' => ['super_admin'],
+        'import_products' => ['super_admin', 'admin'],
+        'view_audit_logs' => ['super_admin', 'auditor'],
+    ];
+
     public static function attempt(string $identifier, string $password): ?array
     {
         $pdo = Database::connection();
@@ -27,6 +49,10 @@ class Auth
 
     public static function createUser(string $name, string $email, string $password, string $role = 'reseller', float $balance = 0): int
     {
+        if (!array_key_exists($role, self::ROLE_LABELS)) {
+            throw new RuntimeException('Geçersiz kullanıcı rolü: ' . $role);
+        }
+
         $pdo = Database::connection();
         $stmt = $pdo->prepare('INSERT INTO users (name, email, password_hash, role, balance, status, created_at) VALUES (:name, :email, :password_hash, :role, :balance, :status, NOW())');
         $stmt->execute([
@@ -97,5 +123,92 @@ class Auth
         $pdo = Database::connection();
         $stmt = $pdo->prepare('UPDATE password_resets SET used = 1 WHERE id = :id');
         $stmt->execute(['id' => $id]);
+    }
+
+    public static function userHasPermission(?array $user, string $permission): bool
+    {
+        if (!$user || empty($user['role'])) {
+            return false;
+        }
+
+        if ($user['role'] === 'super_admin') {
+            return true;
+        }
+
+        $allowedRoles = self::ROLE_PERMISSIONS[$permission] ?? [];
+
+        return in_array($user['role'], $allowedRoles, true);
+    }
+
+    public static function requirePermission(string $permission, string $redirect = '/'): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
+        }
+
+        $user = $_SESSION['user'] ?? null;
+
+        if (!self::userHasPermission($user, $permission)) {
+            Helpers::redirect($redirect);
+        }
+    }
+
+    /**
+     * @return array<string,string>
+     */
+    public static function roleLabels(): array
+    {
+        return self::ROLE_LABELS;
+    }
+
+    /**
+     * @return array<string,string>
+     */
+    public static function assignableRoles(?array $user = null): array
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
+        }
+
+        $user = $user ?? ($_SESSION['user'] ?? null);
+        $roles = self::ROLE_LABELS;
+
+        if (!$user || ($user['role'] ?? null) !== 'super_admin') {
+            unset($roles['super_admin']);
+        }
+
+        return $roles;
+    }
+
+    /**
+     * @return string[]
+     */
+    public static function rolesForPermission(string $permission): array
+    {
+        $roles = self::ROLE_PERMISSIONS[$permission] ?? [];
+
+        if (!in_array('super_admin', $roles, true)) {
+            $roles[] = 'super_admin';
+        }
+
+        return array_values(array_unique($roles));
+    }
+
+    public static function roleLabel(string $role): string
+    {
+        return self::ROLE_LABELS[$role] ?? ucfirst($role);
+    }
+
+    public static function isAdminRole(?string $role): bool
+    {
+        if (!$role) {
+            return false;
+        }
+
+        if ($role === 'super_admin') {
+            return true;
+        }
+
+        return in_array($role, self::ROLE_PERMISSIONS['access_admin_panel'], true);
     }
 }

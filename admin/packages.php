@@ -3,10 +3,14 @@ require __DIR__ . '/../bootstrap.php';
 
 use App\Helpers;
 use App\Database;
+use App\Auth;
+use App\AuditLogger;
 
-if (empty($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
+if (empty($_SESSION['user'])) {
     Helpers::redirect('/');
 }
+
+Auth::requirePermission('manage_products');
 
 $pdo = Database::connection();
 $errors = [];
@@ -37,7 +41,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'features' => $features,
                 'is_active' => $isActive,
             ]);
+            $packageId = (int)$pdo->lastInsertId();
             $success = 'Paket başarıyla oluşturuldu.';
+
+            AuditLogger::log('packages.create', [
+                'target_type' => 'package',
+                'target_id' => $packageId,
+                'description' => 'Yeni paket oluşturuldu',
+                'metadata' => [
+                    'name' => $name,
+                    'price' => $price,
+                    'initial_balance' => $initialBalance,
+                    'is_active' => (bool)$isActive,
+                ],
+            ]);
         }
     } elseif ($action === 'update') {
         $packageId = (int)($_POST['id'] ?? 0);
@@ -68,6 +85,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'is_active' => $isActive,
             ]);
             $success = 'Paket güncellendi.';
+
+            AuditLogger::log('packages.update', [
+                'target_type' => 'package',
+                'target_id' => $packageId,
+                'description' => 'Paket bilgileri güncellendi',
+                'metadata' => [
+                    'name' => $name,
+                    'price' => $price,
+                    'initial_balance' => $initialBalance,
+                    'is_active' => (bool)$isActive,
+                ],
+            ]);
         }
     } elseif ($action === 'delete') {
         $packageId = (int)($_POST['id'] ?? 0);
@@ -75,6 +104,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare('DELETE FROM packages WHERE id = :id');
             $stmt->execute(['id' => $packageId]);
             $success = 'Paket silindi.';
+
+            AuditLogger::log('packages.delete', [
+                'target_type' => 'package',
+                'target_id' => $packageId,
+                'description' => 'Paket silindi',
+            ]);
         }
     }
 }

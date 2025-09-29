@@ -4,10 +4,14 @@ require __DIR__ . '/../bootstrap.php';
 use App\Database;
 use App\Helpers;
 use App\Importers\WooCommerceImporter;
+use App\Auth;
+use App\AuditLogger;
 
-if (empty($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
+if (empty($_SESSION['user'])) {
     Helpers::redirect('/');
 }
+
+Auth::requirePermission('import_products');
 
 $pdo = Database::connection();
 $errors = [];
@@ -25,6 +29,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $result['imported'],
                 $result['updated']
             );
+
+            AuditLogger::log('products.import', [
+                'target_type' => 'product_import',
+                'description' => 'WooCommerce CSV içe aktarımı yapıldı',
+                'metadata' => [
+                    'imported' => $result['imported'],
+                    'updated' => $result['updated'],
+                ],
+            ]);
         } elseif (!empty($result['warning'])) {
             $warning = $result['warning'];
         }

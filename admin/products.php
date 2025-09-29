@@ -4,10 +4,14 @@ require __DIR__ . '/../bootstrap.php';
 use App\Helpers;
 use App\Database;
 use App\Importers\WooCommerceImporter;
+use App\Auth;
+use App\AuditLogger;
 
-if (empty($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
+if (empty($_SESSION['user'])) {
     Helpers::redirect('/');
 }
+
+Auth::requirePermission('manage_products');
 
 $pdo = Database::connection();
 $errors = [];
@@ -28,6 +32,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'description' => $description,
             ]);
             $success = 'Kategori oluşturuldu.';
+
+            AuditLogger::log('categories.create', [
+                'target_type' => 'category',
+                'description' => 'Yeni kategori oluşturuldu',
+                'metadata' => [
+                    'name' => $name,
+                ],
+            ]);
         }
     } elseif ($action === 'delete_category') {
         $categoryId = (int)($_POST['id'] ?? 0);
@@ -35,6 +47,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->prepare('DELETE FROM products WHERE category_id = :id')->execute(['id' => $categoryId]);
             $pdo->prepare('DELETE FROM categories WHERE id = :id')->execute(['id' => $categoryId]);
             $success = 'Kategori ve ilişkili ürünler silindi.';
+
+            AuditLogger::log('categories.delete', [
+                'target_type' => 'category',
+                'target_id' => $categoryId,
+                'description' => 'Kategori silindi',
+            ]);
         }
     } elseif ($action === 'create_product') {
         $name = trim($_POST['name'] ?? '');
@@ -56,6 +74,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'status' => $status,
             ]);
             $success = 'Ürün eklendi.';
+
+            AuditLogger::log('products.create', [
+                'target_type' => 'product',
+                'description' => 'Yeni ürün oluşturuldu',
+                'metadata' => [
+                    'name' => $name,
+                    'category_id' => $categoryId,
+                    'price' => $price,
+                    'status' => $status,
+                ],
+            ]);
         }
     } elseif ($action === 'update_product') {
         $productId = (int)($_POST['id'] ?? 0);
@@ -79,14 +108,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'status' => $status,
             ]);
             $success = 'Ürün güncellendi.';
+
+            AuditLogger::log('products.update', [
+                'target_type' => 'product',
+                'target_id' => $productId,
+                'description' => 'Ürün bilgileri güncellendi',
+                'metadata' => [
+                    'name' => $name,
+                    'category_id' => $categoryId,
+                    'price' => $price,
+                    'status' => $status,
+                ],
+            ]);
         }
     } elseif ($action === 'delete_product') {
         $productId = (int)($_POST['id'] ?? 0);
         if ($productId > 0) {
             $pdo->prepare('DELETE FROM products WHERE id = :id')->execute(['id' => $productId]);
             $success = 'Ürün silindi.';
+
+            AuditLogger::log('products.delete', [
+                'target_type' => 'product',
+                'target_id' => $productId,
+                'description' => 'Ürün silindi',
+            ]);
         }
     } elseif ($action === 'import_csv') {
+        if (!Auth::userHasPermission($_SESSION['user'], 'import_products')) {
+            $errors[] = 'CSV içe aktarma izniniz bulunmuyor.';
+        } else {
         $result = WooCommerceImporter::import($pdo, $_FILES['csv_file'] ?? []);
         $errors = array_merge($errors, $result['errors']);
 
@@ -97,9 +147,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $result['imported'],
                     $result['updated']
                 );
+                AuditLogger::log('products.import', [
+                    'target_type' => 'product_import',
+                    'description' => 'WooCommerce CSV içe aktarımı yapıldı',
+                    'metadata' => [
+                        'imported' => $result['imported'],
+                        'updated' => $result['updated'],
+                    ],
+                ]);
             } elseif (!empty($result['warning'])) {
                 $warning = $result['warning'];
             }
+        }
         }
     }
 }

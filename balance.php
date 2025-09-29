@@ -4,6 +4,7 @@ require __DIR__ . '/bootstrap.php';
 use App\Database;
 use App\Helpers;
 use App\Mailer;
+use App\Auth;
 
 if (empty($_SESSION['user'])) {
     Helpers::redirect('/');
@@ -11,7 +12,7 @@ if (empty($_SESSION['user'])) {
 
 $user = $_SESSION['user'];
 
-if ($user['role'] === 'admin') {
+if (Auth::userHasPermission($user, 'access_admin_panel')) {
     Helpers::redirect('/admin/balances.php');
 }
 

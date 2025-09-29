@@ -3,10 +3,14 @@ require __DIR__ . '/../bootstrap.php';
 
 use App\Helpers;
 use App\Database;
+use App\Auth;
+use App\AuditLogger;
 
-if (empty($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
+if (empty($_SESSION['user'])) {
     Helpers::redirect('/');
 }
+
+Auth::requirePermission('manage_support');
 
 $pdo = Database::connection();
 $errors = [];
@@ -37,6 +41,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $pdo->prepare("UPDATE support_tickets SET status = 'answered', updated_at = NOW() WHERE id = :id")->execute(['id' => $ticketId]);
                 $success = 'Yanıt gönderildi.';
+
+                AuditLogger::log('support.reply', [
+                    'target_type' => 'support_ticket',
+                    'target_id' => $ticketId,
+                    'description' => 'Destek talebine yanıt gönderildi',
+                    'metadata' => [
+                        'message_excerpt' => mb_substr($message, 0, 120),
+                        'ticket_status' => 'answered',
+                    ],
+                ]);
             }
         }
     } elseif ($action === 'status') {
@@ -51,6 +65,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'id' => $ticketId,
             ]);
             $success = 'Destek durumu güncellendi.';
+
+            AuditLogger::log('support.status_update', [
+                'target_type' => 'support_ticket',
+                'target_id' => $ticketId,
+                'description' => 'Destek talep durumu değiştirildi',
+                'metadata' => [
+                    'status' => $status,
+                ],
+            ]);
         }
     }
 }
@@ -150,7 +173,7 @@ include __DIR__ . '/../templates/header.php';
                                     </div>
                                     <div class="bg-light p-3 rounded">
                                         <?php foreach ($messageRows as $message): ?>
-                                            <div class="ticket-message mb-3 <?= $message['role'] === 'admin' ? 'admin' : '' ?>">
+                                            <div class="ticket-message mb-3 <?= Auth::isAdminRole($message['role'] ?? null) ? 'admin' : '' ?>">
                                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                                     <strong><?= Helpers::sanitize($message['name'] ?? 'Sistem') ?></strong>
                                                     <small class="text-muted"><?= date('d.m.Y H:i', strtotime($message['created_at'])) ?></small>

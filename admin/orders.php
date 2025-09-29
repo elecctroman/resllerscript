@@ -6,10 +6,13 @@ use App\Database;
 use App\Auth;
 use App\Mailer;
 use App\Telegram;
+use App\AuditLogger;
 
-if (empty($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
+if (empty($_SESSION['user'])) {
     Helpers::redirect('/');
 }
+
+Auth::requirePermission('manage_orders');
 
 $pdo = Database::connection();
 $errors = [];
@@ -84,6 +87,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 number_format((float)$order['price'], 2, '.', ',')
             ));
         }
+
+        $metadata = [
+            'previous_status' => $order['status'],
+            'new_status' => $newStatus,
+        ];
+
+        if ($newStatus === 'completed') {
+            $metadata['user_id'] = $userId ?? null;
+            $metadata['user_created'] = !$existingUser;
+            $metadata['initial_credit'] = $initialCredit ?? 0;
+        }
+
+        AuditLogger::log('orders.status_change', [
+            'target_type' => 'package_order',
+            'target_id' => $orderId,
+            'description' => 'Sipariş durumu güncellendi',
+            'metadata' => $metadata,
+        ]);
 
         $success = 'Sipariş durumu güncellendi.';
     }

@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS users (
     name VARCHAR(150) NOT NULL,
     email VARCHAR(150) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
-    role ENUM('admin','reseller') NOT NULL DEFAULT 'reseller',
+    role ENUM('super_admin','admin','manager','support','auditor','reseller') NOT NULL DEFAULT 'reseller',
     balance DECIMAL(12,2) NOT NULL DEFAULT 0,
     status ENUM('active','inactive') NOT NULL DEFAULT 'active',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -122,6 +122,23 @@ CREATE TABLE IF NOT EXISTS system_settings (
     setting_value TEXT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS admin_activity_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    user_role VARCHAR(50) NOT NULL,
+    action VARCHAR(150) NOT NULL,
+    target_type VARCHAR(150) NULL,
+    target_id INT NULL,
+    description TEXT NULL,
+    metadata LONGTEXT NULL,
+    ip_address VARCHAR(45) NULL,
+    user_agent VARCHAR(255) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_admin_activity_user_action (user_id, action),
+    INDEX idx_admin_activity_created_at (created_at),
+    FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO users (id, name, email, password_hash, role, balance, status, created_at)

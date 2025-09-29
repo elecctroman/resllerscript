@@ -5,10 +5,14 @@ use App\Database;
 use App\Helpers;
 use App\Mailer;
 use App\Telegram;
+use App\Auth;
+use App\AuditLogger;
 
-if (empty($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
+if (empty($_SESSION['user'])) {
     Helpers::redirect('/');
 }
+
+Auth::requirePermission('manage_finance');
 
 $pdo = Database::connection();
 $errors = [];
@@ -78,6 +82,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     number_format((float)$request['amount'], 2, '.', ',')
                 ));
             }
+
+            AuditLogger::log('balances.request_update', [
+                'target_type' => 'balance_request',
+                'target_id' => $requestId,
+                'description' => 'Bakiye talebi güncellendi',
+                'metadata' => [
+                    'status' => $status,
+                    'amount' => (float)$request['amount'],
+                    'user_id' => $request['user_id'],
+                ],
+            ]);
         } catch (\Throwable $exception) {
             $pdo->rollBack();
             $errors[] = 'İşlem sırasında bir hata oluştu: ' . $exception->getMessage();
