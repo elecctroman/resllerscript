@@ -3,6 +3,7 @@ require __DIR__ . '/../bootstrap.php';
 
 use App\Helpers;
 use App\Database;
+use App\Reports\ReportService;
 
 if (empty($_SESSION['user'])) {
     Helpers::redirect('/');
@@ -16,6 +17,9 @@ if ($user['role'] !== 'admin') {
 
 $pdo = Database::connection();
 $pageTitle = 'Yönetici Paneli';
+
+$monthlyOrderSummary = ReportService::getMonthlyOrderSummary($pdo, 6);
+$monthlyBalanceSummary = ReportService::getMonthlyBalanceSummary($pdo, 6);
 
 include __DIR__ . '/../templates/header.php';
 ?>
@@ -112,5 +116,132 @@ include __DIR__ . '/../templates/header.php';
             </div>
         </div>
     </div>
+    <div class="col-12 col-xxl-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Aylık Sipariş ve Gelir</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="ordersRevenueChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-xxl-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Aylık Bakiye Hareketleri</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="balanceChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+    const orderSummary = <?= json_encode($monthlyOrderSummary, JSON_UNESCAPED_UNICODE); ?>;
+    const balanceSummary = <?= json_encode($monthlyBalanceSummary, JSON_UNESCAPED_UNICODE); ?>;
+
+    const ordersRevenueCtx = document.getElementById('ordersRevenueChart');
+    if (ordersRevenueCtx && typeof Chart !== 'undefined') {
+        new Chart(ordersRevenueCtx, {
+            type: 'bar',
+            data: {
+                labels: orderSummary.labels,
+                datasets: [
+                    {
+                        label: 'Sipariş Adedi',
+                        data: orderSummary.orders,
+                        backgroundColor: 'rgba(13, 110, 253, 0.5)',
+                        borderColor: 'rgba(13, 110, 253, 1)',
+                        borderWidth: 1,
+                        yAxisID: 'y-orders'
+                    },
+                    {
+                        type: 'line',
+                        label: 'Gelir ($)',
+                        data: orderSummary.revenue,
+                        borderColor: 'rgba(25, 135, 84, 1)',
+                        backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.3,
+                        yAxisID: 'y-revenue'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                scales: {
+                    'y-orders': {
+                        position: 'left',
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        }
+                    },
+                    'y-revenue': {
+                        position: 'right',
+                        beginAtZero: true,
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    const balanceCtx = document.getElementById('balanceChart');
+    if (balanceCtx && typeof Chart !== 'undefined') {
+        new Chart(balanceCtx, {
+            type: 'line',
+            data: {
+                labels: balanceSummary.labels,
+                datasets: [
+                    {
+                        label: 'Yatırılan ($)',
+                        data: balanceSummary.credits,
+                        borderColor: 'rgba(13, 202, 240, 1)',
+                        backgroundColor: 'rgba(13, 202, 240, 0.15)',
+                        tension: 0.3,
+                        fill: true
+                    },
+                    {
+                        label: 'Harcanan ($)',
+                        data: balanceSummary.debits,
+                        borderColor: 'rgba(220, 53, 69, 1)',
+                        backgroundColor: 'rgba(220, 53, 69, 0.15)',
+                        tension: 0.3,
+                        fill: true
+                    },
+                    {
+                        label: 'Net ($)',
+                        data: balanceSummary.net,
+                        borderColor: 'rgba(25, 135, 84, 1)',
+                        backgroundColor: 'rgba(25, 135, 84, 0.05)',
+                        tension: 0.3,
+                        borderDash: [5, 5],
+                        fill: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+</script>
 <?php include __DIR__ . '/../templates/footer.php';
