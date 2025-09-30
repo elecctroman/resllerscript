@@ -138,6 +138,8 @@
     return `"${safe}"`;
   };
 
+  const CSV_BOM = String.fromCharCode(0xfeff);
+
   const parsePriceValue = (priceText) => {
     if (!priceText) {
       return { numeric: '', formatted: '' };
@@ -239,7 +241,7 @@
         lines.push('');
       });
 
-    return lines.join('\n');
+    return CSV_BOM + lines.join('\r\n');
   };
 
   const formatCategoryPath = (path) => {
@@ -342,7 +344,7 @@
         lines.push(wooValues.map(escapeForCsv).join(','));
       });
 
-    return lines.join('\n');
+    return CSV_BOM + lines.join('\r\n');
   };
 
   const triggerDownload = (filename, content) => {
