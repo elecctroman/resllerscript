@@ -28,8 +28,7 @@ $installerPath = __DIR__ . '/install.php';
 
 if (!file_exists($configPath)) {
     if (file_exists($installerPath)) {
-        header('Location: /install.php');
-        exit;
+        App\Helpers::redirect('/install.php');
     }
 
     include __DIR__ . '/templates/auth-header.php';

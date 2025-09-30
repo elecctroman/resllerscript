@@ -5,6 +5,11 @@ namespace App;
 class Helpers
 {
     /**
+     * @var string|null
+     */
+    private static $basePath;
+
+    /**
      * @return string
      */
     public static function csrfToken()
@@ -35,7 +40,19 @@ class Helpers
      */
     public static function redirect($path)
     {
-        header('Location: ' . $path);
+        if (!$path) {
+            $path = '/';
+        }
+
+        if (stripos($path, 'http://') === 0 || stripos($path, 'https://') === 0) {
+            header('Location: ' . $path);
+            exit;
+        }
+
+        $normalized = self::normalizeRedirectPath($path, '/');
+        $target = self::url(ltrim($normalized, '/'));
+
+        header('Location: ' . $target);
         exit;
     }
 
@@ -95,6 +112,74 @@ class Helpers
         $value = $value !== null ? trim($value) : '';
 
         return $value !== '' ? $value : 'reseller panel, smm panel, automation';
+    }
+
+    /**
+     * @return string
+     */
+    public static function basePath()
+    {
+        if (self::$basePath !== null) {
+            return self::$basePath;
+        }
+
+        $script = isset($_SERVER['SCRIPT_NAME']) ? (string)$_SERVER['SCRIPT_NAME'] : '';
+
+        if ($script === '') {
+            self::$basePath = '';
+
+            return self::$basePath;
+        }
+
+        $directory = str_replace('\\', '/', dirname($script));
+
+        if ($directory === '.' || $directory === '/' || $directory === '\\') {
+            $directory = '';
+        } else {
+            $directory = rtrim($directory, '/');
+        }
+
+        self::$basePath = $directory;
+
+        return self::$basePath;
+    }
+
+    /**
+     * Build an application-relative URL.
+     *
+     * @param string $path
+     * @param bool   $absolute
+     * @return string
+     */
+    public static function url($path = '', $absolute = false)
+    {
+        $relative = $path !== '' ? '/' . ltrim((string)$path, '/') : '';
+        $base = self::basePath();
+        $uri = ($base ? $base : '') . $relative;
+
+        if ($uri === '') {
+            $uri = '/';
+        }
+
+        if ($absolute) {
+            $scheme = (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off') ? 'https' : 'http';
+            $host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'localhost';
+
+            return $scheme . '://' . $host . $uri;
+        }
+
+        return $uri;
+    }
+
+    /**
+     * @param string $path
+     * @return string
+     */
+    public static function asset($path)
+    {
+        $clean = ltrim((string)$path, '/');
+
+        return self::url('assets/' . $clean);
     }
 
     /**
@@ -355,6 +440,18 @@ class Helpers
     {
         $uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '/';
         $path = parse_url($uri, PHP_URL_PATH);
+
+        if (!$path) {
+            $path = '/';
+        }
+
+        $base = self::basePath();
+        if ($base && strpos($path, $base) === 0) {
+            $path = substr($path, strlen($base));
+            if ($path === '' || $path === false) {
+                $path = '/';
+            }
+        }
 
         return $path ?: '/';
     }

@@ -35,12 +35,12 @@ if (!isset($GLOBALS['app_lang_buffer_started'])) {
 
 $menuSections = array();
 $menuBadges = array();
-$currentScript = isset($_SERVER['SCRIPT_NAME']) ? $_SERVER['SCRIPT_NAME'] : '';
+$currentPath = Helpers::currentPath();
 $isAdminArea = false;
 $isAdminRole = $user ? Auth::isAdminRole($user['role']) : false;
 
 if ($isAdminRole) {
-    $isAdminArea = strpos($currentScript, '/admin/') === 0;
+    $isAdminArea = strpos($currentPath, '/admin/') === 0;
 
     try {
         $sidebarPdo = Database::connection();
@@ -170,14 +170,14 @@ if ($user) {
     <meta property="og:description" content="<?= Helpers::sanitize($metaDescription) ?>">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="/assets/css/style.css" rel="stylesheet">
+    <link href="<?= Helpers::asset('css/style.css') ?>" rel="stylesheet">
 </head>
 <body>
 <div class="app-shell">
     <?php if ($user): ?>
         <aside class="app-sidebar">
             <div class="sidebar-brand">
-                <a href="<?= $isAdminArea ? '/admin/dashboard.php' : '/dashboard.php' ?>"><?= Helpers::sanitize($siteName) ?></a>
+                <a href="<?= Helpers::url($isAdminArea ? 'admin/dashboard.php' : 'dashboard.php') ?>"><?= Helpers::sanitize($siteName) ?></a>
                 <?php if ($siteTagline): ?>
                     <div class="sidebar-brand-tagline text-muted small"><?= Helpers::sanitize($siteTagline) ?></div>
                 <?php endif; ?>
@@ -200,7 +200,7 @@ if ($user) {
                             <?php foreach ($section['items'] as $item): ?>
                                 <li>
                                     <?php $badge = isset($item['badge']) ? (int)$item['badge'] : 0; ?>
-                                    <a href="<?= $item['href'] ?>" class="sidebar-link <?= Helpers::isActive($item['pattern']) ? 'active' : '' ?>">
+                                    <a href="<?= Helpers::url(ltrim($item['href'], '/')) ?>" class="sidebar-link <?= Helpers::isActive($item['pattern']) ? 'active' : '' ?>">
                                         <?php if (!empty($item['icon'])): ?>
                                             <span class="sidebar-link-icon"><i class="<?= Helpers::sanitize($item['icon']) ?>"></i></span>
                                         <?php endif; ?>
@@ -216,7 +216,7 @@ if ($user) {
                 <?php endforeach; ?>
             </nav>
             <div class="sidebar-footer">
-                <a href="/logout.php" class="btn btn-outline-light w-100"><?= Helpers::sanitize('Çıkış Yap') ?></a>
+                <a href="<?= Helpers::url('logout.php') ?>" class="btn btn-outline-light w-100"><?= Helpers::sanitize('Çıkış Yap') ?></a>
             </div>
         </aside>
     <?php endif; ?>
@@ -229,7 +229,7 @@ if ($user) {
                 </div>
                 <?php if ($isAdminRole && !$isAdminArea): ?>
                     <div class="d-flex align-items-center gap-2">
-                        <a href="/admin/dashboard.php" class="btn btn-sm btn-primary">
+                        <a href="<?= Helpers::url('admin/dashboard.php') ?>" class="btn btn-sm btn-primary">
                             <i class="bi bi-speedometer2 me-1"></i> <?= Helpers::sanitize('Yönetim Paneli') ?>
                         </a>
                     </div>
@@ -275,7 +275,7 @@ if ($user) {
                     </div>
                     <?php if (Helpers::featureEnabled('balance')): ?>
                         <div class="flex-shrink-0">
-                            <a href="/balance.php" class="btn btn-warning fw-semibold">
+
                                 <i class="bi bi-wallet2 me-2"></i> Bakiye Yükle
                             </a>
                         </div>

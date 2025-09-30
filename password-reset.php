@@ -48,7 +48,7 @@ if (isset($_GET['token'])) {
 
             <?php if ($successMessage): ?>
                 <div class="alert alert-success"><?= Helpers::sanitize($successMessage) ?></div>
-                <a href="/" class="btn btn-primary w-100">Girişe Dön</a>
+                <a href="<?= Helpers::url('index.php') ?>" class="btn btn-primary w-100">Girişe Dön</a>
             <?php else: ?>
                 <?php if ($errors): ?>
                     <div class="alert alert-danger">
@@ -71,7 +71,7 @@ if (isset($_GET['token'])) {
                     </div>
                     <button type="submit" class="btn btn-primary w-100">Şifremi Güncelle</button>
                     <div class="text-center mt-3">
-                        <a href="/" class="small">Giriş sayfasına dön</a>
+                        <a href="<?= Helpers::url('index.php') ?>" class="small">Giriş sayfasına dön</a>
                     </div>
                 </form>
             <?php endif; ?>
@@ -127,7 +127,7 @@ include __DIR__ . '/templates/auth-header.php';
             </div>
             <button type="submit" class="btn btn-primary w-100">Bağlantı Gönder</button>
             <div class="text-center mt-3">
-                <a href="/" class="small">Giriş sayfasına dön</a>
+                <a href="<?= Helpers::url('index.php') ?>" class="small">Giriş sayfasına dön</a>
             </div>
         </form>
     </div>

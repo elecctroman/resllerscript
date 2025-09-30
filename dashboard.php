@@ -62,7 +62,7 @@ include __DIR__ . '/templates/header.php';
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><?= Helpers::sanitize('Paket Siparişleri') ?></h5>
-                <a href="/register.php" class="btn btn-sm btn-outline-primary"><?= Helpers::sanitize('Yeni Paket Talebi') ?></a>
+                <a href="<?= Helpers::url('register.php') ?>" class="btn btn-sm btn-outline-primary"><?= Helpers::sanitize('Yeni Paket Talebi') ?></a>
             </div>
             <div class="card-body">
                 <?php if ($orderRows): ?>
@@ -98,7 +98,7 @@ include __DIR__ . '/templates/header.php';
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><?= Helpers::sanitize('Destek Talepleri') ?></h5>
-                <a href="/support.php" class="btn btn-sm btn-outline-secondary"><?= Helpers::sanitize('Tüm Destek Talepleri') ?></a>
+                <a href="<?= Helpers::url('support.php') ?>" class="btn btn-sm btn-outline-secondary"><?= Helpers::sanitize('Tüm Destek Talepleri') ?></a>
             </div>
             <div class="card-body">
                 <?php if ($ticketRows): ?>

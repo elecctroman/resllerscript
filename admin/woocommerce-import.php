@@ -102,7 +102,7 @@ include __DIR__ . '/../templates/header.php';
                         <button type="submit" class="btn btn-primary">Dosyayı İçe Aktar</button>
                     </form>
 
-                    <p class="text-muted small mt-4 mb-0">Mevcut ürün listenizi dışa aktarmak için <a href="/admin/woocommerce-export.php">WooCommerce dışa aktarma aracını</a> kullanabilirsiniz.</p>
+                    <p class="text-muted small mt-4 mb-0">Mevcut ürün listenizi dışa aktarmak için <a href="<?= Helpers::url('admin/woocommerce-export.php') ?>">WooCommerce dışa aktarma aracını</a> kullanabilirsiniz.</p>
                 </div>
             </div>
         </div>
@@ -125,7 +125,7 @@ include __DIR__ . '/../templates/header.php';
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Son Güncellenen Ürünler</h5>
-                    <a href="/admin/products.php" class="btn btn-sm btn-outline-primary">Ürün Yönetimine Git</a>
+                    <a href="<?= Helpers::url('admin/products.php') ?>" class="btn btn-sm btn-outline-primary">Ürün Yönetimine Git</a>
                 </div>
                 <div class="card-body">
                     <?php if (!$recentProducts): ?>
