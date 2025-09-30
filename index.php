@@ -100,7 +100,8 @@ $siteName = Helpers::siteName();
 $siteTagline = Helpers::siteTagline();
 
 if (!empty($_SESSION['user'])) {
-    Helpers::redirect('/dashboard.php');
+    $redirectTarget = Auth::isAdminRole($_SESSION['user']['role']) ? '/admin/dashboard.php' : '/dashboard.php';
+    Helpers::redirect($redirectTarget);
 }
 
 $flashSuccess = isset($_SESSION['flash_success']) ? $_SESSION['flash_success'] : null;
@@ -125,7 +126,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 Lang::boot();
             }
-            Helpers::redirect('/dashboard.php');
+            $redirectTarget = Auth::isAdminRole($user['role']) ? '/admin/dashboard.php' : '/dashboard.php';
+            Helpers::redirect($redirectTarget);
         } else {
             $errors[] = 'Bilgileriniz doğrulanamadı. Lütfen tekrar deneyin.';
         }

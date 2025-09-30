@@ -17,7 +17,7 @@ class Auth
         'support' => 'Destek',
         'content' => 'İçerik',
         'reseller' => 'Bayi',
-        'demo' => 'Demo Kullanıcı',
+
     );
 
     /**
@@ -33,7 +33,7 @@ class Auth
      */
     public static function adminRoles()
     {
-        return array('super_admin', 'admin', 'finance', 'support', 'content');
+        return array('super_admin', 'admin', 'finance', 'support', 'content', 'demo');
     }
 
     /**
