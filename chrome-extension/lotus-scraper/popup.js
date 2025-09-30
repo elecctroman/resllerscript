@@ -36,17 +36,45 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 });
 
+const runInTab = async (tabId, func) => {
+  try {
+    const [result] = await chrome.scripting.executeScript({
+      target: { tabId },
+      func,
+    });
+    return result?.result;
+  } catch (error) {
+    appendStatus(`Sekmede komut çalıştırılamadı: ${error.message}`, 'error');
+    return undefined;
+  }
+};
+
 const ensureContentScript = async (tabId) => {
+  const isReady = await runInTab(tabId, () => Boolean(window.__lotusScraperInitialized));
+  if (isReady) {
+    return true;
+  }
+
+  appendStatus('Sayfa hazır değil. İçerik betiği yükleniyor...', 'info');
+
   try {
     await chrome.scripting.executeScript({
       target: { tabId },
       files: ['content-script.js'],
     });
-    return true;
   } catch (error) {
     appendStatus(`İçerik betiği yüklenemedi: ${error.message}`, 'error');
     return false;
   }
+
+  const readyAfterInject = await runInTab(tabId, () => Boolean(window.__lotusScraperInitialized));
+  if (!readyAfterInject) {
+    appendStatus('İçerik betiği başlatılamadı.', 'error');
+    return false;
+  }
+
+  appendStatus('İçerik betiği yüklendi, tarama başlatılıyor...', 'info');
+  return true;
 };
 
 const sendScrapeCommand = (tabId) =>
@@ -87,30 +115,19 @@ const triggerScrape = async () => {
     return;
   }
 
+  const ensured = await ensureContentScript(tab.id);
+  if (!ensured) {
+    setLoading(false);
+    return;
+  }
+
   let response;
   try {
     response = await sendScrapeCommand(tab.id);
   } catch (error) {
-    if (error.message && error.message.includes('Receiving end does not exist')) {
-      appendStatus('Sayfa hazır değil. İçerik betiği yükleniyor...', 'info');
-      const injected = await ensureContentScript(tab.id);
-      if (!injected) {
-        setLoading(false);
-        return;
-      }
-      appendStatus('İçerik betiği yüklendi, tarama tekrar deneniyor...', 'info');
-      try {
-        response = await sendScrapeCommand(tab.id);
-      } catch (retryError) {
-        appendStatus(retryError.message || 'İletişim hatası oluştu.', 'error');
-        setLoading(false);
-        return;
-      }
-    } else {
-      appendStatus(error.message || 'İletişim hatası oluştu.', 'error');
-      setLoading(false);
-      return;
-    }
+    appendStatus(error.message || 'İletişim hatası oluştu.', 'error');
+    setLoading(false);
+    return;
   }
 
   if (!response) {
