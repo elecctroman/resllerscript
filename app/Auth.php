@@ -4,6 +4,7 @@ namespace App;
 
 use App\Database;
 use App\Helpers;
+use App\Settings;
 use PDO;
 use RuntimeException;
 
@@ -16,6 +17,7 @@ class Auth
         'support' => 'Destek',
         'content' => 'İçerik',
         'reseller' => 'Bayi',
+        'demo' => 'Yönetici (Demo)',
     );
 
     /**
@@ -31,7 +33,7 @@ class Auth
      */
     public static function adminRoles()
     {
-        return array('super_admin', 'admin', 'finance', 'support', 'content');
+        return array('super_admin', 'admin', 'finance', 'support', 'content', 'demo');
     }
 
     /**
@@ -40,6 +42,10 @@ class Auth
      */
     public static function isAdminRole($role)
     {
+        if ($role === 'demo') {
+            return Settings::get('demo_mode_enabled') === '1';
+        }
+
         return in_array($role, self::adminRoles(), true);
     }
 
@@ -58,6 +64,20 @@ class Auth
 
         if (!is_array($roles)) {
             $roles = array($roles);
+        }
+
+        if ($role === 'demo') {
+            if (Settings::get('demo_mode_enabled') !== '1') {
+                return false;
+            }
+
+            foreach ($roles as $candidate) {
+                if ($candidate === 'demo' || self::isAdminRole($candidate)) {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         return in_array($role, $roles, true);
@@ -80,7 +100,15 @@ class Auth
 
         $user = isset($_SESSION['user']) ? $_SESSION['user'] : null;
 
-        if (!$user || !self::userHasRole($user, $roles)) {
+        if (!$user) {
+            Helpers::redirect($redirect);
+        }
+
+        if ($user['role'] === 'demo' && Settings::get('demo_mode_enabled') === '1') {
+            return;
+        }
+
+        if (!self::userHasRole($user, $roles)) {
             Helpers::redirect($redirect);
         }
     }
@@ -94,22 +122,18 @@ class Auth
         $role = is_array($actor) ? (isset($actor['role']) ? $actor['role'] : null) : $actor;
 
         if ($role === 'super_admin') {
-            return self::roles();
+            $assignable = self::roles();
+        } elseif ($role === 'admin') {
+            $assignable = array('admin', 'finance', 'support', 'content', 'reseller');
+        } elseif ($role === 'finance') {
+            $assignable = array('finance', 'support', 'reseller');
+        } elseif ($role === 'support' || $role === 'content') {
+            $assignable = array('support', 'content', 'reseller');
+        } else {
+            $assignable = array('reseller');
         }
 
-        if ($role === 'admin') {
-            return array('admin', 'finance', 'support', 'content', 'reseller');
-        }
-
-        if ($role === 'finance') {
-            return array('finance', 'support', 'reseller');
-        }
-
-        if ($role === 'support' || $role === 'content') {
-            return array('support', 'content', 'reseller');
-        }
-
-        return array('reseller');
+        return array_values(array_diff($assignable, array('demo')));
     }
 
     /**
@@ -137,6 +161,10 @@ class Auth
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($user && password_verify($password, $user['password_hash'])) {
+            if ($user['role'] === 'demo' && Settings::get('demo_mode_enabled') !== '1') {
+                return null;
+            }
+
             return $user;
         }
 
