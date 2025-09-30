@@ -181,7 +181,7 @@ $buildProductsUrl = function (array $params = []) use (&$searchTerm) {
 
     $queryString = $query ? '?' . http_build_query($query) : '';
 
-    return '/products.php' . $queryString;
+    return Helpers::url('products.php' . $queryString);
 };
 
 $categoryPath = function ($categoryId) use (&$categoryMap) {
@@ -358,7 +358,7 @@ include __DIR__ . '/templates/header.php';
         <div>
             <h1 class="catalog-title">Ürün Kataloğu</h1>
             <nav class="catalog-breadcrumb" aria-label="Kategori Gezinimi">
-                <a href="/products.php" class="catalog-breadcrumb__link<?= $selectedCategoryId ? '' : ' is-current' ?>">Kategoriler</a>
+                <a href="<?= Helpers::url('products.php') ?>" class="catalog-breadcrumb__link<?= $selectedCategoryId ? '' : ' is-current' ?>">Kategoriler</a>
                 <?php foreach ($breadcrumb as $index => $crumb): ?>
                     <span class="catalog-breadcrumb__divider">/</span>
                     <?php $isLast = $index === count($breadcrumb) - 1; ?>
@@ -371,7 +371,7 @@ include __DIR__ . '/templates/header.php';
                 <?php endforeach; ?>
             </nav>
         </div>
-        <form method="get" action="/products.php" class="catalog-search-form">
+        <form method="get" action="<?= Helpers::url('products.php') ?>" class="catalog-search-form">
             <?php if ($selectedCategoryId): ?>
                 <input type="hidden" name="category" value="<?= (int)$selectedCategoryId ?>">
             <?php endif; ?>
@@ -430,7 +430,7 @@ include __DIR__ . '/templates/header.php';
                         <h2 class="catalog-section__title">Ürünler</h2>
                     <?php endif; ?>
                 </div>
-                <a class="catalog-back" href="/products.php"><i class="bi bi-arrow-left"></i> Tüm kategoriler</a>
+                <a class="catalog-back" href="<?= Helpers::url('products.php') ?>"><i class="bi bi-arrow-left"></i> Tüm kategoriler</a>
             </div>
 
             <?php if ($subCategories): ?>

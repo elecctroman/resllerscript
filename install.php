@@ -28,8 +28,7 @@ $configDir = dirname($configPath);
 
 if (file_exists($configPath)) {
     $_SESSION['flash_success'] = 'Kurulum zaten tamamlanmış durumda.';
-    header('Location: /index.php');
-    exit;
+    App\Helpers::redirect('/index.php');
 }
 
 $errors = [];
@@ -143,8 +142,7 @@ CONFIG;
             $_SESSION['flash_warning'] = 'install.php silinemedi. Lütfen dosyayı manuel olarak kaldırın veya yeniden adlandırın.';
         }
 
-        header('Location: /index.php');
-        exit;
+        App\Helpers::redirect('/index.php');
     }
 }
 

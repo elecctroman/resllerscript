@@ -28,8 +28,7 @@ $installerPath = __DIR__ . '/install.php';
 
 if (!file_exists($configPath)) {
     if (file_exists($installerPath)) {
-        header('Location: /install.php');
-        exit;
+        App\Helpers::redirect('/install.php');
     }
 
     include __DIR__ . '/templates/auth-header.php';
@@ -100,7 +99,8 @@ $siteName = Helpers::siteName();
 $siteTagline = Helpers::siteTagline();
 
 if (!empty($_SESSION['user'])) {
-    Helpers::redirect('/dashboard.php');
+    $redirectTarget = Auth::isAdminRole($_SESSION['user']['role']) ? '/admin/dashboard.php' : '/dashboard.php';
+    Helpers::redirect($redirectTarget);
 }
 
 $flashSuccess = isset($_SESSION['flash_success']) ? $_SESSION['flash_success'] : null;
@@ -125,7 +125,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 Lang::boot();
             }
-            Helpers::redirect('/dashboard.php');
+            $redirectTarget = Auth::isAdminRole($user['role']) ? '/admin/dashboard.php' : '/dashboard.php';
+            Helpers::redirect($redirectTarget);
         } else {
             $errors[] = 'Bilgileriniz doğrulanamadı. Lütfen tekrar deneyin.';
         }
@@ -177,12 +178,12 @@ include __DIR__ . '/templates/auth-header.php';
                 <input type="password" class="form-control" id="password" name="password" required placeholder="Şifreniz">
             </div>
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <a href="/password-reset.php" class="small">Şifremi Unuttum</a>
-                <a href="/register.php" class="small">Yeni Bayilik Başvurusu</a>
+                <a href="<?= Helpers::url('password-reset.php') ?>" class="small">Şifremi Unuttum</a>
+                <a href="<?= Helpers::url('register.php') ?>" class="small">Yeni Bayilik Başvurusu</a>
             </div>
             <button type="submit" class="btn btn-primary w-100">Panele Giriş Yap</button>
             <div class="text-center mt-3">
-                <a href="/admin/" class="small text-muted">Yönetici misiniz? Admin girişine gidin.</a>
+                <a href="<?= Helpers::url('admin/') ?>" class="small text-muted">Yönetici misiniz? Admin girişine gidin.</a>
             </div>
         </form>
     </div>

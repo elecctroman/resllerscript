@@ -82,7 +82,7 @@ include __DIR__ . '/../templates/header.php';
             </div>
             <div class="col-12">
                 <button type="submit" class="btn btn-primary">Filtrele</button>
-                <a href="/admin/activity-logs.php" class="btn btn-outline-secondary">Temizle</a>
+                <a href="<?= Helpers::url('admin/activity-logs.php') ?>" class="btn btn-outline-secondary">Temizle</a>
             </div>
         </form>
 
