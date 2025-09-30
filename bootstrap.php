@@ -23,14 +23,12 @@ spl_autoload_register(function ($class) {
     }
 });
 
+require_once __DIR__ . '/app/ErrorLogger.php';
+App\ErrorLogger::register(__DIR__ . '/error.log');
+
 $configPath = __DIR__ . '/config/config.php';
-$installerPath = __DIR__ . '/install.php';
 
 if (!file_exists($configPath)) {
-    if (file_exists($installerPath)) {
-        header('Location: /install.php');
-        exit;
-    }
 
     include __DIR__ . '/templates/auth-header.php';
     ?>
