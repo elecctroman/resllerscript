@@ -4,6 +4,7 @@ require __DIR__ . '/../bootstrap.php';
 use App\Auth;
 use App\AuditLog;
 use App\Currency;
+use App\DemoMode;
 use App\FeatureToggle;
 use App\Helpers;
 use App\Settings;
@@ -23,6 +24,7 @@ $current = Settings::getMany(array(
     'reseller_auto_suspend_enabled',
     'reseller_auto_suspend_threshold',
     'reseller_auto_suspend_days',
+    'demo_mode_enabled',
 ));
 
 $featureLabels = array(
@@ -101,6 +103,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     Settings::set('reseller_auto_suspend_days', null);
                 }
 
+                $demoModeEnabled = isset($_POST['demo_mode_enabled']) ? '1' : '0';
+                Settings::set('demo_mode_enabled', $demoModeEnabled);
+                if ($demoModeEnabled === '1') {
+                    DemoMode::ensureUser();
+                } else {
+                    DemoMode::disableUser();
+                }
+
                 $success = 'Genel ayarlar kaydedildi.';
                 AuditLog::record(
                     $currentUser['id'],
@@ -119,6 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'reseller_auto_suspend_enabled',
                     'reseller_auto_suspend_threshold',
                     'reseller_auto_suspend_days',
+                    'demo_mode_enabled',
                 ));
             }
         }
@@ -238,6 +249,18 @@ include __DIR__ . '/../templates/header.php';
                         </div>
                     </div>
 
+                    <div class="p-3 border rounded bg-light-subtle">
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="demoMode" name="demo_mode_enabled" <?= isset($current['demo_mode_enabled']) && $current['demo_mode_enabled'] === '1' ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="demoMode">Demo kullanıcı oturumunu etkinleştir</label>
+                        </div>
+                        <p class="mb-2 small text-muted">Demo hesabı ile ziyaretçiler yönetici arayüzünü görüntüleyebilir ancak hiçbir değişiklik kaydedemez.</p>
+                        <ul class="small mb-0">
+                            <li>Kullanıcı adı: <code>demo</code></li>
+                            <li>E-posta: <code>demo@demo.com</code></li>
+                            <li>Şifre: <code>demo123!</code></li>
+                        </ul>
+                    </div>
                     <div class="d-flex justify-content-end">
                         <button type="submit" class="btn btn-primary">Ayarları Kaydet</button>
                     </div>
