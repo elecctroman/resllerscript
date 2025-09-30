@@ -119,7 +119,7 @@ include __DIR__ . '/templates/header.php';
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">Paket Siparişleri</h5>
-                <a href="/register.php" class="btn btn-sm btn-outline-primary">Yeni Paket Talebi</a>
+                <a href="<?= Helpers::url('register.php') ?>" class="btn btn-sm btn-outline-primary">Yeni Paket Talebi</a>
             </div>
             <div class="card-body">
                 <?php if ($packageOrders): ?>

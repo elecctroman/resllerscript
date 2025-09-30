@@ -29,6 +29,6 @@ if (!isset($GLOBALS['app_lang_buffer_started'])) {
     <meta name="description" content="<?= Helpers::sanitize($metaDescription) ?>">
     <meta name="keywords" content="<?= Helpers::sanitize($metaKeywords) ?>">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="/assets/css/style.css" rel="stylesheet">
+    <link href="<?= Helpers::asset('css/style.css') ?>" rel="stylesheet">
 </head>
 <body>

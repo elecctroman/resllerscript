@@ -28,7 +28,7 @@ if ($hasLiveGateway) {
 }
 
 if (!Helpers::featureEnabled('packages')) {
-    include __DIR__ . '/templates/auth-header.php';
+    Helpers::includeTemplate('auth-header.php');
     ?>
     <div class="auth-wrapper">
         <div class="auth-card">
@@ -40,7 +40,7 @@ if (!Helpers::featureEnabled('packages')) {
         </div>
     </div>
     <?php
-    include __DIR__ . '/templates/auth-footer.php';
+    Helpers::includeTemplate('auth-footer.php');
     exit;
 }
 
@@ -231,7 +231,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-include __DIR__ . '/templates/auth-header.php';
+Helpers::includeTemplate('auth-header.php');
 ?>
 <div class="auth-wrapper">
     <div class="auth-card" style="max-width: 720px;">
@@ -322,9 +322,9 @@ include __DIR__ . '/templates/auth-header.php';
                 <button type="submit" class="btn btn-primary w-100" <?= (!$packages || (!$paymentTestMode && !$hasLiveGateway)) ? 'disabled' : '' ?>>Ödemeyi Tamamla</button>
             </div>
             <div class="col-12 text-center">
-                <a href="/" class="small">Giriş sayfasına dön</a>
+                <a href="<?= Helpers::url('index.php') ?>" class="small">Giriş sayfasına dön</a>
             </div>
         </form>
     </div>
 </div>
-<?php include __DIR__ . '/templates/auth-footer.php';
+<?php Helpers::includeTemplate('auth-footer.php'); ?>
