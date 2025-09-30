@@ -1,5 +1,6 @@
 const startButton = document.getElementById('start-scan');
 const statusContainer = document.getElementById('status');
+const LOTUS_HOST_PATTERN = /^https:\/\/partner\.lotuslisans\.com\.tr\//;
 
 const appendStatus = (message, type = 'info') => {
   const line = document.createElement('div');
@@ -35,41 +36,103 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 });
 
+const ensureContentScript = async (tabId) => {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ['content-script.js'],
+    });
+    return true;
+  } catch (error) {
+    appendStatus(`İçerik betiği yüklenemedi: ${error.message}`, 'error');
+    return false;
+  }
+};
+
+const sendScrapeCommand = (tabId) =>
+  new Promise((resolve, reject) => {
+    chrome.tabs.sendMessage(tabId, { action: 'scrapeProducts' }, (response) => {
+      const lastError = chrome.runtime.lastError;
+      if (lastError) {
+        reject(lastError);
+        return;
+      }
+      resolve(response);
+    });
+  });
+
 const triggerScrape = async () => {
   setLoading(true);
   statusContainer.textContent = '';
   appendStatus('Tarama başlatılıyor...');
 
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  let tab;
+  try {
+    [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  } catch (error) {
+    appendStatus(`Sekme bilgisi alınamadı: ${error.message}`, 'error');
+    setLoading(false);
+    return;
+  }
+
   if (!tab || !tab.id) {
     appendStatus('Aktif sekme bulunamadı.', 'error');
     setLoading(false);
     return;
   }
 
-  chrome.tabs.sendMessage(tab.id, { action: 'scrapeProducts' }, (response) => {
-    if (!response) {
-      const lastError = chrome.runtime.lastError;
-      appendStatus(lastError ? lastError.message : 'İletişim hatası oluştu.', 'error');
-      setLoading(false);
-      return;
-    }
-
-    if (!response.success) {
-      appendStatus(response.error || 'Bilinmeyen hata oluştu.', 'error');
-      setLoading(false);
-      return;
-    }
-
-    const { result } = response;
-    appendStatus(`Toplam ${result.recordCount} ürün bulundu.`, 'success');
-    if (Array.isArray(result.filenames)) {
-      result.filenames.forEach((name) => {
-        appendStatus(`İndirilen dosya: ${name}`, 'success');
-      });
-    }
+  if (!tab.url || !LOTUS_HOST_PATTERN.test(tab.url)) {
+    appendStatus('Lütfen Lotus Partner kategori sayfasını açtıktan sonra tekrar deneyin.', 'error');
     setLoading(false);
-  });
+    return;
+  }
+
+  let response;
+  try {
+    response = await sendScrapeCommand(tab.id);
+  } catch (error) {
+    if (error.message && error.message.includes('Receiving end does not exist')) {
+      appendStatus('Sayfa hazır değil. İçerik betiği yükleniyor...', 'info');
+      const injected = await ensureContentScript(tab.id);
+      if (!injected) {
+        setLoading(false);
+        return;
+      }
+      appendStatus('İçerik betiği yüklendi, tarama tekrar deneniyor...', 'info');
+      try {
+        response = await sendScrapeCommand(tab.id);
+      } catch (retryError) {
+        appendStatus(retryError.message || 'İletişim hatası oluştu.', 'error');
+        setLoading(false);
+        return;
+      }
+    } else {
+      appendStatus(error.message || 'İletişim hatası oluştu.', 'error');
+      setLoading(false);
+      return;
+    }
+  }
+
+  if (!response) {
+    appendStatus('Beklenmeyen yanıt alındı.', 'error');
+    setLoading(false);
+    return;
+  }
+
+  if (!response.success) {
+    appendStatus(response.error || 'Bilinmeyen hata oluştu.', 'error');
+    setLoading(false);
+    return;
+  }
+
+  const { result } = response;
+  appendStatus(`Toplam ${result.recordCount} ürün bulundu.`, 'success');
+  if (Array.isArray(result.filenames)) {
+    result.filenames.forEach((name) => {
+      appendStatus(`İndirilen dosya: ${name}`, 'success');
+    });
+  }
+  setLoading(false);
 };
 
 startButton.addEventListener('click', triggerScrape);

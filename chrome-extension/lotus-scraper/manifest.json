@@ -4,7 +4,8 @@
   "description": "Lotus Partner panelindeki tüm kategori ve alt kategorilerdeki ürünleri dolaşarak isim ve fiyatlarını CSV olarak indirir.",
   "version": "1.0.0",
   "permissions": [
-    "scripting"
+    "scripting",
+    "tabs"
   ],
   "host_permissions": [
     "https://partner.lotuslisans.com.tr/*"

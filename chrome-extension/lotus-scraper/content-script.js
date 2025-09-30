@@ -1,4 +1,9 @@
 (() => {
+  if (window.__lotusScraperInitialized) {
+    return;
+  }
+  window.__lotusScraperInitialized = true;
+
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   const normalizeUrl = (rawUrl) => {
