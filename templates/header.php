@@ -10,53 +10,63 @@ $user = $_SESSION['user'] ?? null;
 $pageHeadline = $pageTitle ?? 'Panel';
 
 $menuSections = [];
+$adminMenuSections = [
+    [
+        'heading' => 'Genel',
+        'items' => [
+            ['label' => 'Genel Bakış', 'href' => '/admin/dashboard.php', 'pattern' => '/admin/dashboard.php', 'icon' => 'bi-speedometer2'],
+            ['label' => 'Paketler', 'href' => '/admin/packages.php', 'pattern' => '/admin/packages.php', 'icon' => 'bi-box-seam'],
+            ['label' => 'Siparişler', 'href' => '/admin/orders.php', 'pattern' => '/admin/orders.php', 'icon' => 'bi-receipt'],
+            ['label' => 'Bayiler', 'href' => '/admin/users.php', 'pattern' => '/admin/users.php', 'icon' => 'bi-people'],
+            ['label' => 'Raporlar', 'href' => '/admin/reports.php', 'pattern' => '/admin/reports.php', 'icon' => 'bi-graph-up'],
+        ],
+    ],
+    [
+        'heading' => 'Ürün Yönetimi',
+        'items' => [
+            ['label' => 'Ürünler & Kategoriler', 'href' => '/admin/products.php', 'pattern' => '/admin/products.php', 'icon' => 'bi-box'],
+            ['label' => 'WooCommerce İçe Aktar', 'href' => '/admin/woocommerce-import.php', 'pattern' => '/admin/woocommerce-import.php', 'icon' => 'bi-filetype-csv'],
+        ],
+    ],
+    [
+        'heading' => 'Finans & Destek',
+        'items' => [
+            ['label' => 'Bakiyeler', 'href' => '/admin/balances.php', 'pattern' => '/admin/balances.php', 'icon' => 'bi-cash-stack'],
+            ['label' => 'Destek', 'href' => '/admin/support.php', 'pattern' => '/admin/support.php', 'icon' => 'bi-life-preserver'],
+        ],
+    ],
+    [
+        'heading' => 'Ayarlar',
+        'items' => [
+            ['label' => 'Genel Ayarlar', 'href' => '/admin/settings-general.php', 'pattern' => '/admin/settings-general.php', 'icon' => 'bi-gear'],
+            ['label' => 'Mail Ayarları', 'href' => '/admin/settings-mail.php', 'pattern' => '/admin/settings-mail.php', 'icon' => 'bi-envelope-gear'],
+        ],
+    ],
+];
+
+$resellerMenuSections = [
+    [
+        'heading' => 'Bayi Paneli',
+        'items' => [
+            ['label' => 'Kontrol Paneli', 'href' => '/dashboard.php', 'pattern' => '/dashboard.php', 'icon' => 'bi-speedometer2'],
+            ['label' => 'Ürünler', 'href' => '/products.php', 'pattern' => '/products.php', 'icon' => 'bi-box'],
+            ['label' => 'Bakiyem', 'href' => '/balance.php', 'pattern' => '/balance.php', 'icon' => 'bi-wallet2'],
+            ['label' => 'Destek', 'href' => '/support.php', 'pattern' => '/support.php', 'icon' => 'bi-life-preserver'],
+        ],
+    ],
+];
 
 if ($user) {
     if ($user['role'] === 'admin') {
-        $menuSections = [
-            [
-                'heading' => 'Genel',
-                'items' => [
-                    ['label' => 'Genel Bakış', 'href' => '/admin/dashboard.php', 'pattern' => '/admin/dashboard.php', 'icon' => 'bi-speedometer2'],
-                    ['label' => 'Paketler', 'href' => '/admin/packages.php', 'pattern' => '/admin/packages.php', 'icon' => 'bi-box-seam'],
-                    ['label' => 'Siparişler', 'href' => '/admin/orders.php', 'pattern' => '/admin/orders.php', 'icon' => 'bi-receipt'],
-                    ['label' => 'Bayiler', 'href' => '/admin/users.php', 'pattern' => '/admin/users.php', 'icon' => 'bi-people'],
-                    ['label' => 'Raporlar', 'href' => '/admin/reports.php', 'pattern' => '/admin/reports.php', 'icon' => 'bi-graph-up'],
-                ],
-            ],
-            [
-                'heading' => 'Ürün Yönetimi',
-                'items' => [
-                    ['label' => 'Ürünler & Kategoriler', 'href' => '/admin/products.php', 'pattern' => '/admin/products.php', 'icon' => 'bi-box'],
-                    ['label' => 'WooCommerce İçe Aktar', 'href' => '/admin/woocommerce-import.php', 'pattern' => '/admin/woocommerce-import.php', 'icon' => 'bi-filetype-csv'],
-                ],
-            ],
-            [
-                'heading' => 'Finans & Destek',
-                'items' => [
-                    ['label' => 'Bakiyeler', 'href' => '/admin/balances.php', 'pattern' => '/admin/balances.php', 'icon' => 'bi-cash-stack'],
-                    ['label' => 'Destek', 'href' => '/admin/support.php', 'pattern' => '/admin/support.php', 'icon' => 'bi-life-preserver'],
-                ],
-            ],
-            [
-                'heading' => 'Ayarlar',
-                'items' => [
-                    ['label' => 'Mail Ayarları', 'href' => '/admin/settings-mail.php', 'pattern' => '/admin/settings-mail.php', 'icon' => 'bi-envelope-gear'],
-                ],
-            ],
-        ];
+        $menuSections = $adminMenuSections;
+    } elseif (Helpers::isDemoUser($user)) {
+        $demoSections = $resellerMenuSections;
+        if (isset($demoSections[0])) {
+            $demoSections[0]['heading'] = 'Bayi Deneyimi';
+        }
+        $menuSections = array_merge($adminMenuSections, $demoSections);
     } else {
-        $menuSections = [
-            [
-                'heading' => 'Bayi Paneli',
-                'items' => [
-                    ['label' => 'Kontrol Paneli', 'href' => '/dashboard.php', 'pattern' => '/dashboard.php', 'icon' => 'bi-speedometer2'],
-                    ['label' => 'Ürünler', 'href' => '/products.php', 'pattern' => '/products.php', 'icon' => 'bi-box'],
-                    ['label' => 'Bakiyem', 'href' => '/balance.php', 'pattern' => '/balance.php', 'icon' => 'bi-wallet2'],
-                    ['label' => 'Destek', 'href' => '/support.php', 'pattern' => '/support.php', 'icon' => 'bi-life-preserver'],
-                ],
-            ],
-        ];
+        $menuSections = $resellerMenuSections;
     }
 }
 ?>
@@ -74,12 +84,26 @@ if ($user) {
 <div class="app-shell">
     <?php if ($user): ?>
         <aside class="app-sidebar">
+            <?php
+            $sidebarDashboardLink = '/dashboard.php';
+            if (Helpers::isDemoUser($user) || ($user['role'] ?? null) === 'admin') {
+                $sidebarDashboardLink = '/admin/dashboard.php';
+            }
+            ?>
             <div class="sidebar-brand">
-                <a href="<?= $user['role'] === 'admin' ? '/admin/dashboard.php' : '/dashboard.php' ?>">Bayi Yönetim Sistemi</a>
+                <a href="<?= Helpers::sanitize($sidebarDashboardLink) ?>">Bayi Yönetim Sistemi</a>
             </div>
             <div class="sidebar-user">
                 <div class="sidebar-user-name"><?= Helpers::sanitize($user['name']) ?></div>
-                <div class="sidebar-user-role text-uppercase"><?= $user['role'] === 'admin' ? 'Yönetici' : 'Bayi' ?></div>
+                <div class="sidebar-user-role text-uppercase">
+                    <?php if (Helpers::isDemoUser($user)): ?>
+                        DEMO
+                    <?php elseif ($user['role'] === 'admin'): ?>
+                        Yönetici
+                    <?php else: ?>
+                        Bayi
+                    <?php endif; ?>
+                </div>
                 <div class="sidebar-user-balance">
                     Bakiye: <strong>$<?= number_format((float)$user['balance'], 2, '.', ',') ?></strong>
                 </div>
@@ -118,3 +142,21 @@ if ($user) {
             </header>
         <?php endif; ?>
         <main class="app-content flex-grow-1 container-fluid">
+            <?php
+            $demoNotice = $_SESSION['demo_notice'] ?? null;
+            if ($demoNotice):
+                unset($_SESSION['demo_notice']);
+            ?>
+                <div class="alert alert-danger mb-3">
+                    <?= Helpers::sanitize($demoNotice) ?>
+                </div>
+            <?php endif; ?>
+
+            <?php if ($user && Helpers::isDemoUser($user)): ?>
+                <div class="alert alert-warning d-flex align-items-center gap-2 mb-4">
+                    <i class="bi bi-eye fs-5"></i>
+                    <div>
+                        <strong>Demo modu etkin.</strong> Bu hesap yalnızca görüntüleme içindir ve yapılan değişiklikler kaydedilmez.
+                    </div>
+                </div>
+            <?php endif; ?>

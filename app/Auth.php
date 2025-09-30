@@ -3,8 +3,8 @@
 namespace App;
 
 use App\Database;
+use App\Settings;
 use PDO;
-use RuntimeException;
 
 class Auth
 {
@@ -19,6 +19,14 @@ class Auth
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($user && password_verify($password, $user['password_hash'])) {
+            if ($user['role'] === 'demo') {
+                $demoModeEnabled = Settings::get('demo_mode_enabled', '0') === '1';
+
+                if (!$demoModeEnabled) {
+                    return null;
+                }
+            }
+
             return $user;
         }
 
@@ -97,5 +105,46 @@ class Auth
         $pdo = Database::connection();
         $stmt = $pdo->prepare('UPDATE password_resets SET used = 1 WHERE id = :id');
         $stmt->execute(['id' => $id]);
+    }
+
+    public static function ensureDemoAccount(bool $active): void
+    {
+        $pdo = Database::connection();
+        $email = 'demo@demo.com';
+        $name = 'demo';
+        $passwordHash = password_hash('demo123!', PASSWORD_BCRYPT);
+
+        $stmt = $pdo->prepare('SELECT * FROM users WHERE email = :email LIMIT 1');
+        $stmt->execute(['email' => $email]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($active) {
+            if ($user) {
+                $update = $pdo->prepare('UPDATE users SET name = :name, email = :email, role = :role, status = :status, password_hash = :password_hash, updated_at = NOW() WHERE id = :id');
+                $update->execute([
+                    'id' => $user['id'],
+                    'name' => $name,
+                    'email' => $email,
+                    'role' => 'demo',
+                    'status' => 'active',
+                    'password_hash' => $passwordHash,
+                ]);
+            } else {
+                $insert = $pdo->prepare('INSERT INTO users (name, email, password_hash, role, balance, status, created_at) VALUES (:name, :email, :password_hash, :role, 0, :status, NOW())');
+                $insert->execute([
+                    'name' => $name,
+                    'email' => $email,
+                    'password_hash' => $passwordHash,
+                    'role' => 'demo',
+                    'status' => 'active',
+                ]);
+            }
+        } elseif ($user) {
+            $deactivate = $pdo->prepare('UPDATE users SET status = :status WHERE id = :id');
+            $deactivate->execute([
+                'id' => $user['id'],
+                'status' => 'inactive',
+            ]);
+        }
     }
 }

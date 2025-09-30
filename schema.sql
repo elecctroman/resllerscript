@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS users (
     name VARCHAR(150) NOT NULL,
     email VARCHAR(150) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
-    role ENUM('admin','reseller') NOT NULL DEFAULT 'reseller',
+    role ENUM('admin','reseller','demo') NOT NULL DEFAULT 'reseller',
     balance DECIMAL(12,2) NOT NULL DEFAULT 0,
     status ENUM('active','inactive') NOT NULL DEFAULT 'active',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

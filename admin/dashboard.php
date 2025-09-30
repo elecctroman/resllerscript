@@ -11,7 +11,7 @@ if (empty($_SESSION['user'])) {
 
 $user = $_SESSION['user'];
 
-if ($user['role'] !== 'admin') {
+if (!in_array($user['role'], ['admin', 'demo'], true)) {
     Helpers::redirect('/dashboard.php');
 }
 

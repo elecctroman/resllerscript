@@ -39,6 +39,26 @@ class Helpers
 
 
 
+    public static function isDemoModeEnabled(): bool
+    {
+        return defined('APP_DEMO_MODE_ENABLED') && APP_DEMO_MODE_ENABLED === true;
+    }
+
+    public static function isDemoUser(?array $user = null): bool
+    {
+        if ($user === null) {
+            if (session_status() !== PHP_SESSION_ACTIVE) {
+                session_start();
+            }
+
+            $user = $_SESSION['user'] ?? null;
+        }
+
+        return isset($user['role']) && $user['role'] === 'demo';
+    }
+
+    
+    
     public static function currentPath(): string
     {
         $uri = $_SERVER['REQUEST_URI'] ?? '/';

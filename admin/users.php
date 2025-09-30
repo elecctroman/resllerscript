@@ -6,7 +6,7 @@ use App\Database;
 use App\Auth;
 use App\Mailer;
 
-if (empty($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
+if (empty($_SESSION['user']) || !in_array($_SESSION['user']['role'], ['admin', 'demo'], true)) {
     Helpers::redirect('/');
 }
 

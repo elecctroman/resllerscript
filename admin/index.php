@@ -5,7 +5,7 @@ use App\Auth;
 use App\Helpers;
 
 if (!empty($_SESSION['user'])) {
-    if ($_SESSION['user']['role'] === 'admin') {
+    if (in_array($_SESSION['user']['role'], ['admin', 'demo'], true)) {
         Helpers::redirect('/admin/dashboard.php');
     }
 
@@ -23,12 +23,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $user = Auth::attempt($identifier, $password);
 
-        if ($user && $user['role'] === 'admin') {
+        if ($user && in_array($user['role'], ['admin', 'demo'], true)) {
             $_SESSION['user'] = $user;
             Helpers::redirect('/admin/dashboard.php');
         }
 
-        $errors[] = 'Yalnızca yöneticiler giriş yapabilir. Bilgilerinizi kontrol edin.';
+        $errors[] = 'Yalnızca yetkili kullanıcılar giriş yapabilir. Bilgilerinizi kontrol edin.';
     }
 }
 
