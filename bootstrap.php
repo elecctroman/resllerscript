@@ -108,4 +108,6 @@ if (!empty($_SESSION['user'])) {
     if ($preferredLanguage) {
         App\Lang::setLocale($preferredLanguage);
     }
+
+    App\DemoMode::guard($_SESSION['user']);
 }

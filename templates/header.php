@@ -275,7 +275,7 @@ if ($user) {
                     </div>
                     <?php if (Helpers::featureEnabled('balance')): ?>
                         <div class="flex-shrink-0">
-                            <a href="<?= Helpers::url('balance.php') ?>" class="btn btn-warning fw-semibold">
+
                                 <i class="bi bi-wallet2 me-2"></i> Bakiye Yükle
                             </a>
                         </div>
