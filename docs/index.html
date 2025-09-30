@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ResellerScript Teknik Dokümantasyon</title>
+    <link rel="stylesheet" href="assets/css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="hero" id="top">
+        <div class="container hero__content">
+            <div>
+                <p class="eyebrow">Reseller Yönetim Platformu</p>
+                <h1>Teknik Dokümantasyon &amp; Kurulum Kılavuzu</h1>
+                <p class="lead">Bu doküman ResellerScript yazılımının özelliklerini, kurulum adımlarını, yapılandırma seçeneklerini ve kullanıcı arayüzüne ait ekran görüntülerini kapsamlı bir şekilde sunar.</p>
+                <div class="hero__actions">
+                    <a class="btn btn--primary" href="#installation">Kurulum Adımlarına Git</a>
+                    <a class="btn btn--ghost" href="../README.md">Genel README</a>
+                </div>
+            </div>
+            <aside class="hero__meta">
+                <h2>Sürüm Bilgisi</h2>
+                <dl>
+                    <div>
+                        <dt>Yazılım</dt>
+                        <dd>ResellerScript</dd>
+                    </div>
+                    <div>
+                        <dt>Minimum PHP</dt>
+                        <dd>8.1</dd>
+                    </div>
+                    <div>
+                        <dt>Veritabanı</dt>
+                        <dd>MySQL 5.7+</dd>
+                    </div>
+                </dl>
+                <p>Bu doküman, üretim ortamına aktarılmadan önce kalite güvence kontrolleri ve demo dağıtımları için referans niteliğindedir.</p>
+            </aside>
+        </div>
+    </header>
+
+    <nav class="toc">
+        <div class="container toc__inner">
+            <h2>İçindekiler</h2>
+            <ol>
+                <li><a href="#features">Öne Çıkan Özellikler</a></li>
+                <li><a href="#architecture">Mimari Genel Bakış</a></li>
+                <li><a href="#installation">Kurulum &amp; İlk Yapılandırma</a></li>
+                <li><a href="#configuration">Yapılandırma Detayları</a></li>
+                <li><a href="#operations">Operasyonel İş Akışları</a></li>
+                <li><a href="#security">Güvenlik &amp; Roller</a></li>
+                <li><a href="#screens">Ekran Görüntüleri</a></li>
+                <li><a href="#faq">Sık Sorulan Sorular</a></li>
+                <li><a href="#support">Destek &amp; İletişim</a></li>
+            </ol>
+        </div>
+    </nav>
+
+    <main>
+        <section id="features" class="section">
+            <div class="container">
+                <h2>Öne Çıkan Özellikler</h2>
+                <div class="feature-grid">
+                    <article class="feature">
+                        <h3>Dinamik Bayi Yönetimi</h3>
+                        <p>Bakiye takibi, otomatik pasif etme ve uyarı sistemi ile bayilerin finansal davranışlarını denetleyin. Düşük bakiye senaryolarında otomatik e-posta ve panel içi uyarılar devreye girer.</p>
+                    </article>
+                    <article class="feature">
+                        <h3>Ürün &amp; Sipariş Otomasyonu</h3>
+                        <p>Ürün katalogları, fiyatlandırma, stok güncellemeleri ve sipariş akışı tek bir panel üzerinden kontrol edilir. API bağlantıları sayesinde tedarikçi entegrasyonları yönetilebilir.</p>
+                    </article>
+                    <article class="feature">
+                        <h3>Demo Modu</h3>
+                        <p>Satın alma öncesi müşterilere tam erişimli ancak yetkisiz bir demo hesabı sağlayın. Yönetim paneli dahil tüm sayfalar görüntülenebilir, değişiklik yetkileri kısıtlanır.</p>
+                    </article>
+                    <article class="feature">
+                        <h3>Gelişmiş Loglama</h3>
+                        <p>Yerleşik <code>error.log</code> yönlendirmesiyle çalışma zamanındaki tüm hata ve istisnaları kaydedin. Kritik durumlar için sistem e-postaları ve bildirimleri tetiklenir.</p>
+                    </article>
+                    <article class="feature">
+                        <h3>Çoklu Dil Katmanı</h3>
+                        <p>Yerelleştirme dosyaları üzerinden paneli farklı dillerle sunun. Dinamik dil seçimleri kullanıcı oturumlarında saklanır.</p>
+                    </article>
+                    <article class="feature">
+                        <h3>Esnek Şablonlama</h3>
+                        <p>Yapılandırılabilir tema dosyaları ve yeniden kullanılabilir bileşenler sayesinde arayüzü markanıza göre özelleştirin.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section id="architecture" class="section section--alt">
+            <div class="container">
+                <h2>Mimari Genel Bakış</h2>
+                <div class="split">
+                    <div>
+                        <p>ResellerScript, MVC benzeri hafif bir yapı üzerine inşa edilmiştir. <strong>app/</strong> dizini çekirdek sınıfları barındırırken, <strong>templates/</strong> dizini görsel bileşenleri içerir. <strong>bootstrap.php</strong> temel bağımlılıkları yükler ve oturum yaşam döngüsünü yönetir.</p>
+                        <ul class="checklist">
+                            <li><strong>Auth</strong> modülü token tabanlı oturum kontrolleri sağlar.</li>
+                            <li><strong>Settings</strong> sınıfı sistem yapılandırmasını veritabanından okur ve önbelleğe alır.</li>
+                            <li><strong>ResellerPolicy</strong> düşük bakiye politikalarını ve e-posta bildirimi mekanizmasını yönetir.</li>
+                            <li><strong>DemoMode</strong> servisi demo kullanıcı davranışını kontrol eder.</li>
+                        </ul>
+                    </div>
+                    <aside class="card">
+                        <h3>Teknik Yığın</h3>
+                        <dl>
+                            <div>
+                                <dt>Backend</dt>
+                                <dd>PHP 8.1, PDO, Composer (opsiyonel)</dd>
+                            </div>
+                            <div>
+                                <dt>Veritabanı</dt>
+                                <dd>MySQL/MariaDB</dd>
+                            </div>
+                            <div>
+                                <dt>Ön Yüz</dt>
+                                <dd>Bootstrap 4 tabanlı özel tema</dd>
+                            </div>
+                            <div>
+                                <dt>Loglama</dt>
+                                <dd>error.log, isteğe bağlı dış sistem entegrasyonları</dd>
+                            </div>
+                        </dl>
+                    </aside>
+                </div>
+            </div>
+        </section>
+
+        <section id="installation" class="section">
+            <div class="container">
+                <h2>Kurulum &amp; İlk Yapılandırma</h2>
+                <ol class="steps">
+                    <li>
+                        <h3>Sunucu Gereksinimleri</h3>
+                        <p>PHP 8.1+, MySQL 5.7+, cURL, OpenSSL, PDO MySQL uzantıları ve yazma izinlerine sahip <code>storage/</code> veya <code>error.log</code> konumunu barındıran dizin gereklidir.</p>
+                    </li>
+                    <li>
+                        <h3>Kaynak Kodun Aktarılması</h3>
+                        <p>Kod deposunu sunucuya klonlayın veya FTP ile yükleyin. Web kök dizininde <code>public</code> alt dizini yoksa, kök direktör olarak bu dizini kullanabilirsiniz.</p>
+                    </li>
+                    <li>
+                        <h3>Veritabanı Oluşturma</h3>
+                        <p><code>schema.sql</code> dosyasındaki komutları MySQL sunucunuza çalıştırarak gerekli tabloları oluşturun. Varsayılan yönetici hesabı bu betik aracılığıyla tanımlanır.</p>
+                    </li>
+                    <li>
+                        <h3>config.php Düzenleme</h3>
+                        <p><code>config/config.example.php</code> dosyasını <code>config/config.php</code> olarak kopyalayın ve veritabanı erişim bilgilerini, SMTP bilgilerini ve global ayarları güncelleyin.</p>
+                    </li>
+                    <li>
+                        <h3>Demo Hesabını Aktifleştirme</h3>
+                        <p>Yönetim paneline giriş yaparak <em>Genel Ayarlar &gt; Demo Hesabı</em> bölümünden demo hesabını etkinleştirin. Demo kullanıcı <code>demo / demo123!</code> bilgileriyle sisteme giriş yapabilir.</p>
+                    </li>
+                    <li>
+                        <h3>Bakım Sonrası Kontrol</h3>
+                        <p>Uygulamayı tarayıcıdan ziyaret edip hata kaydı tutan <code>error.log</code> dosyasını gözlemleyin. İlk girişte sistem otomatik olarak kritik yapılandırma eksiklerini bildirir.</p>
+                    </li>
+                </ol>
+            </div>
+        </section>
+
+        <section id="configuration" class="section section--alt">
+            <div class="container">
+                <h2>Yapılandırma Detayları</h2>
+                <div class="accordion" data-accordion>
+                    <details open>
+                        <summary>config/config.php Parametreleri</summary>
+                        <ul>
+                            <li><strong>DB_HOST, DB_NAME, DB_USER, DB_PASS:</strong> MySQL bağlantı bilgileri.</li>
+                            <li><strong>MAIL_HOST, MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD:</strong> SMTP gönderim bilgileri.</li>
+                            <li><strong>APP_URL:</strong> Temel URL, e-posta bildirimleri ve yönlendirmelerde kullanılır.</li>
+                            <li><strong>ERROR_LOG_PATH:</strong> Varsayılan olarak proje kökünde <code>error.log</code>.</li>
+                        </ul>
+                    </details>
+                    <details>
+                        <summary>Düşük Bakiye Politikası</summary>
+                        <p><strong>admin/settings-general.php</strong> üzerinden minimum bakiye ve pasife alma süresi tanımlanır. <code>app/ResellerPolicy.php</code> politikanın işleyişini kontrol eder.</p>
+                    </details>
+                    <details>
+                        <summary>Demo Mode</summary>
+                        <p>Demo modu aktif edildiğinde <strong>app/DemoMode.php</strong> demo kullanıcı oturumlarını yalnızca görüntüleme yetkisiyle sınırlar. Yönetim paneline erişim sağlanır ancak veri değişikliğine izin verilmez.</p>
+                    </details>
+                    <details>
+                        <summary>Hata Kaydı &amp; İzleme</summary>
+                        <p><strong>app/ErrorLogger.php</strong>, uygulama önyüklemesinde devreye girerek tüm PHP uyarı, hata ve istisnaları <code>error.log</code> dosyasına yazar. İsteğe bağlı olarak harici log sunucusuna yönlendirmek için bu sınıf genişletilebilir.</p>
+                    </details>
+                </div>
+            </div>
+        </section>
+
+        <section id="operations" class="section">
+            <div class="container">
+                <h2>Operasyonel İş Akışları</h2>
+                <div class="timeline">
+                    <div class="timeline__item">
+                        <div class="timeline__badge">1</div>
+                        <div class="timeline__content">
+                            <h3>Yeni Bayi Kaydı</h3>
+                            <p><em>register.php</em> üzerinden başvuran bayiler yönetici onayına düşer. Onay sonrası otomatik hoş geldin e-postası gönderilir.</p>
+                        </div>
+                    </div>
+                    <div class="timeline__item">
+                        <div class="timeline__badge">2</div>
+                        <div class="timeline__content">
+                            <h3>Ürün Tanımları</h3>
+                            <p>Yönetim panelinde ürünler kategorilere ayrılır, fiyat ve stok bilgisi tedarikçi entegrasyonları ile güncellenir.</p>
+                        </div>
+                    </div>
+                    <div class="timeline__item">
+                        <div class="timeline__badge">3</div>
+                        <div class="timeline__content">
+                            <h3>Sipariş İşleme</h3>
+                            <p>Siparişler otomatik olarak tedarikçiye iletilir, durum güncellemeleri webhook veya manuel onay ile yönetilir.</p>
+                        </div>
+                    </div>
+                    <div class="timeline__item">
+                        <div class="timeline__badge">4</div>
+                        <div class="timeline__content">
+                            <h3>Bakiye Takibi</h3>
+                            <p>Düşük bakiye uyarıları e-posta ve panel bildirimi olarak iletilir. Belirlenen süre içinde yükleme yapılmazsa bayi pasife alınır.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="security" class="section section--alt">
+            <div class="container">
+                <h2>Güvenlik &amp; Roller</h2>
+                <div class="split">
+                    <div>
+                        <h3>Rol Tanımları</h3>
+                        <ul class="checklist">
+                            <li><strong>Admin:</strong> Tüm modüllere tam erişim.</li>
+                            <li><strong>Reseller:</strong> Bayi paneli ve sipariş yönetimi.</li>
+                            <li><strong>Demo:</strong> Yalnızca görüntüleme, veri manipülasyonu engelli.</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h3>Oturum Yönetimi</h3>
+                        <p>Oturumlar güvenli çerezler aracılığıyla yönetilir. Demo hesabı aktif değilken giriş denemeleri reddedilir.</p>
+                        <h3>Audit Logları</h3>
+                        <p>Yönetim aksiyonları <em>admin/activity-logs.php</em> aracılığıyla takip edilir.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="screens" class="section">
+            <div class="container">
+                <h2>Ekran Görüntüleri</h2>
+                <p>Aşağıdaki görseller demo ortamından alınmıştır. Yüksek çözünürlüklü orijinaller <code>docs/assets/screenshots</code> klasöründe yer alır.</p>
+                <div class="gallery">
+                    <figure>
+                        <img src="assets/screenshots/login.svg" alt="Giriş ekranı">
+                        <figcaption>Giriş Ekranı</figcaption>
+                    </figure>
+                    <figure>
+                        <img src="assets/screenshots/dashboard.svg" alt="Bayi paneli ana sayfası">
+                        <figcaption>Bayi Paneli Ana Sayfa</figcaption>
+                    </figure>
+                    <figure>
+                        <img src="assets/screenshots/products.svg" alt="Ürün listesi">
+                        <figcaption>Ürün Kataloğu</figcaption>
+                    </figure>
+                    <figure>
+                        <img src="assets/screenshots/orders.svg" alt="Sipariş yönetimi">
+                        <figcaption>Sipariş Yönetimi</figcaption>
+                    </figure>
+                    <figure>
+                        <img src="assets/screenshots/support.svg" alt="Destek merkezî">
+                        <figcaption>Destek Merkezi</figcaption>
+                    </figure>
+                    <figure>
+                        <img src="assets/screenshots/admin-dashboard.svg" alt="Yönetici paneli">
+                        <figcaption>Yönetici Paneli</figcaption>
+                    </figure>
+                    <figure>
+                        <img src="assets/screenshots/settings.svg" alt="Genel ayarlar">
+                        <figcaption>Genel Ayarlar</figcaption>
+                    </figure>
+                    <figure>
+                        <img src="assets/screenshots/demo-banner.svg" alt="Demo uyarısı">
+                        <figcaption>Demo Uyarı Paneli</figcaption>
+                    </figure>
+                </div>
+            </div>
+        </section>
+
+        <section id="faq" class="section section--alt">
+            <div class="container">
+                <h2>Sık Sorulan Sorular</h2>
+                <div class="faq">
+                    <article>
+                        <h3>Demo hesabı ile sipariş oluşturulabilir mi?</h3>
+                        <p>Demo hesabı sadece görüntüleme yetkisine sahiptir. Sipariş oluşturma ve bakiye yükleme aksiyonları engellenmiştir.</p>
+                    </article>
+                    <article>
+                        <h3>error.log dosyası hangi durumlarda büyür?</h3>
+                        <p>Herhangi bir PHP uyarısı, hata veya yakalanmamış istisna bu dosyaya yazılır. Dosya boyutunu kontrol etmek için log rotasyonu uygulayabilirsiniz.</p>
+                    </article>
+                    <article>
+                        <h3>Yeni dil paketi nasıl eklenir?</h3>
+                        <p><code>lang/</code> dizininde mevcut dil dosyasını referans alarak yeni bir PHP dil dosyası oluşturun ve ayarlar bölümünden seçilebilir hale getirin.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section id="support" class="section">
+            <div class="container support">
+                <div>
+                    <h2>Destek &amp; İletişim</h2>
+                    <p>Teknik destek veya özel geliştirme talepleriniz için lütfen aşağıdaki kanallardan iletişime geçin.</p>
+                    <ul>
+                        <li><strong>E-posta:</strong> support@resellerscript.com</li>
+                        <li><strong>Destek Portalı:</strong> <a href="https://support.resellerscript.com">support.resellerscript.com</a></li>
+                        <li><strong>Belgelendirme Sürümü:</strong> 1.0.0</li>
+                    </ul>
+                </div>
+                <aside class="card">
+                    <h3>Değişiklik Geçmişi</h3>
+                    <ul class="changelog">
+                        <li><strong>1.0.0</strong> – İlk sürüm, kapsamlı kurulum ve ekran görüntüleri.</li>
+                    </ul>
+                </aside>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container footer__inner">
+            <p>&copy; <span id="doc-year"></span> ResellerScript Dokümantasyon. Tüm hakları saklıdır.</p>
+            <a href="#top">Başa dön</a>
+        </div>
+    </footer>
+
+    <script src="assets/js/accordion.js"></script>
+</body>
+</html>
