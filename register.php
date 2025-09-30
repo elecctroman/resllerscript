@@ -7,6 +7,7 @@ use App\Mailer;
 use App\Settings;
 use App\Telegram;
 use App\Payments\PaymentGatewayManager;
+use App\Services\PackageOrderService;
 
 if (!empty($_SESSION['user'])) {
     Helpers::redirect('/dashboard.php');
@@ -16,6 +17,20 @@ $pdo = Database::connection();
 $packages = $pdo->query('SELECT * FROM packages WHERE is_active = 1 ORDER BY price ASC')->fetchAll();
 $errors = [];
 $selectedPackage = null;
+$selectedPackageId = isset($_POST['package_id']) ? (int)$_POST['package_id'] : 0;
+$paymentReferenceInput = isset($_POST['payment_reference']) ? trim($_POST['payment_reference']) : '';
+$paymentNoticeInput = isset($_POST['payment_notice']) ? trim($_POST['payment_notice']) : '';
+$flashSuccess = isset($_SESSION['flash_success']) ? $_SESSION['flash_success'] : '';
+if ($selectedPackageId === 0 && !empty($packages)) {
+    $selectedPackageId = (int)$packages[0]['id'];
+}
+if ($flashSuccess !== '') {
+    unset($_SESSION['flash_success']);
+}
+$registerBankNotice = isset($_SESSION['register_bank_transfer_notice']) && is_array($_SESSION['register_bank_transfer_notice']) ? $_SESSION['register_bank_transfer_notice'] : array();
+if ($registerBankNotice) {
+    unset($_SESSION['register_bank_transfer_notice']);
+}
 $paymentTestMode = Settings::get('payment_test_mode') === '1';
 $gateways = PaymentGatewayManager::getActiveGateways();
 $hasLiveGateway = !empty($gateways);
@@ -26,9 +41,33 @@ if ($hasLiveGateway) {
         break;
     }
 }
+$selectedGateway = isset($_POST['payment_provider']) ? trim($_POST['payment_provider']) : ($hasLiveGateway ? $defaultGateway : '');
+
+$bankTransferDetails = PaymentGatewayManager::getBankTransferDetails();
+$bankTransferSummary = array();
+if (isset($gateways['bank-transfer'])) {
+    if (!empty($bankTransferDetails['bank_name'])) {
+        $bankTransferSummary[] = 'Banka: ' . $bankTransferDetails['bank_name'];
+    }
+    if (!empty($bankTransferDetails['account_name'])) {
+        $bankTransferSummary[] = 'Hesap Sahibi: ' . $bankTransferDetails['account_name'];
+    }
+    if (!empty($bankTransferDetails['iban'])) {
+        $bankTransferSummary[] = 'IBAN: ' . $bankTransferDetails['iban'];
+    }
+    if (!empty($bankTransferDetails['instructions'])) {
+        $lines = preg_split('/\r\n|\r|\n/', $bankTransferDetails['instructions']);
+        foreach ($lines as $line) {
+            $trimmed = trim($line);
+            if ($trimmed !== '') {
+                $bankTransferSummary[] = $trimmed;
+            }
+        }
+    }
+}
 
 if (!Helpers::featureEnabled('packages')) {
-    include __DIR__ . '/templates/auth-header.php';
+    Helpers::includeTemplate('auth-header.php');
     ?>
     <div class="auth-wrapper">
         <div class="auth-card">
@@ -40,7 +79,7 @@ if (!Helpers::featureEnabled('packages')) {
         </div>
     </div>
     <?php
-    include __DIR__ . '/templates/auth-footer.php';
+    Helpers::includeTemplate('auth-footer.php');
     exit;
 }
 
@@ -68,20 +107,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    $selectedPackageId = $packageId;
+
     if (!$selectedPackage) {
         $errors[] = 'Seçilen paket bulunamadı veya aktif değil.';
     }
 
-    $selectedGateway = isset($_POST['payment_provider']) ? trim($_POST['payment_provider']) : '';
+    $selectedGateway = isset($_POST['payment_provider']) ? trim($_POST['payment_provider']) : $selectedGateway;
     if ($selectedGateway === '' && $hasLiveGateway) {
         $selectedGateway = $defaultGateway;
+    }
+
+    $paymentReferenceInput = isset($_POST['payment_reference']) ? trim($_POST['payment_reference']) : $paymentReferenceInput;
+    $paymentNoticeInput = isset($_POST['payment_notice']) ? trim($_POST['payment_notice']) : $paymentNoticeInput;
+
+    $userCheck = $pdo->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
+    $userCheck->execute(['email' => $email]);
+    if ($userCheck->fetchColumn()) {
+        $errors[] = 'Bu e-posta adresiyle zaten bir hesap mevcut. Lütfen giriş yapmayı deneyin.';
     }
 
     if (!$paymentTestMode && (!$hasLiveGateway || !isset($gateways[$selectedGateway]))) {
         $errors[] = 'Ödeme sağlayıcısı yapılandırılmadığı için başvurunuz tamamlanamadı.';
     }
 
+    if ($selectedGateway === 'bank-transfer' && $paymentNoticeInput === '') {
+        $errors[] = 'Banka havalesi ile ödeme bildirimi yaparken açıklama alanı zorunludur.';
+    }
+
     if (!$errors) {
+        $methodLabel = $paymentTestMode ? 'Test Modu' : PaymentGatewayManager::getLabel($selectedGateway);
         $pdo->beginTransaction();
         try {
             $stmt = $pdo->prepare('INSERT INTO package_orders (package_id, name, email, phone, company, notes, form_data, status, total_amount, created_at) VALUES (:package_id, :name, :email, :phone, :company, :notes, :form_data, :status, :total_amount, NOW())');
@@ -138,6 +193,96 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $_SESSION['flash_success'] = 'Test modu aktif olduğu için başvurunuz otomatik onaylandı. Giriş bilgileri e-posta ile gönderildi.';
                 Helpers::redirect('/index.php');
+            }
+
+            if ($selectedGateway === 'bank-transfer') {
+                $pdo->prepare('UPDATE package_orders SET payment_provider = :provider, payment_reference = :reference WHERE id = :id')
+                    ->execute([
+                        'provider' => $selectedGateway,
+                        'reference' => $displayReference,
+                        'id' => $orderId,
+                    ]);
+
+                $referenceValue = $paymentReferenceInput !== '' ? $paymentReferenceInput : $displayReference;
+                $pdo->prepare('INSERT INTO balance_requests (user_id, package_order_id, amount, payment_method, payment_provider, payment_reference, reference, notes, status, created_at) VALUES (:user_id, :package_order_id, :amount, :payment_method, :payment_provider, :payment_reference, :reference, :notes, :status, NOW())')
+                    ->execute([
+                        'user_id' => null,
+                        'package_order_id' => $orderId,
+                        'amount' => (float)$selectedPackage['price'],
+                        'payment_method' => $methodLabel,
+                        'payment_provider' => $selectedGateway,
+                        'payment_reference' => $paymentReferenceInput !== '' ? $paymentReferenceInput : null,
+                        'reference' => $referenceValue,
+                        'notes' => $paymentNoticeInput !== '' ? $paymentNoticeInput : null,
+                        'status' => 'pending',
+                    ]);
+
+                $pdo->commit();
+
+                $adminEmails = $pdo->query("SELECT email FROM users WHERE role IN ('super_admin','admin','finance') AND status = 'active'")->fetchAll(\PDO::FETCH_COLUMN);
+                $message = "Yeni bir bayilik başvurusu alındı.\n\n" .
+                    "Başvuru Sahibi: $name\n" .
+                    "E-posta: $email\n" .
+                    "Paket: {$selectedPackage['name']}\n" .
+                    "Tutar: " . Helpers::formatCurrency((float)$selectedPackage['price'], 'USD') . "\n" .
+                    "Ödeme Yöntemi: " . $methodLabel . "\n";
+
+                if ($paymentReferenceInput !== '') {
+                    $message .= "Referans / Dekont: $paymentReferenceInput\n";
+                }
+
+                if ($paymentNoticeInput !== '') {
+                    $message .= "Bildirim: $paymentNoticeInput\n";
+                }
+
+                foreach ($adminEmails as $adminEmail) {
+                    Mailer::send($adminEmail, 'Yeni Bayilik Başvurusu', $message);
+                }
+
+                $noticeLines = array();
+                if (!empty($bankTransferDetails['bank_name'])) {
+                    $noticeLines[] = 'Banka: ' . $bankTransferDetails['bank_name'];
+                }
+                if (!empty($bankTransferDetails['account_name'])) {
+                    $noticeLines[] = 'Hesap Sahibi: ' . $bankTransferDetails['account_name'];
+                }
+                if (!empty($bankTransferDetails['iban'])) {
+                    $noticeLines[] = 'IBAN: ' . $bankTransferDetails['iban'];
+                }
+                $noticeLines[] = 'Tutar: ' . Helpers::formatCurrency((float)$selectedPackage['price']);
+                $noticeLines[] = 'Başvuru No: ' . $displayReference;
+                if ($paymentReferenceInput !== '') {
+                    $noticeLines[] = 'Dekont / Referans: ' . $paymentReferenceInput;
+                }
+                if (!empty($bankTransferDetails['instructions'])) {
+                    $lines = preg_split('/\r\n|\r|\n/', $bankTransferDetails['instructions']);
+                    foreach ($lines as $line) {
+                        $trimmed = trim($line);
+                        if ($trimmed !== '') {
+                            $noticeLines[] = $trimmed;
+                        }
+                    }
+                }
+                if ($paymentNoticeInput !== '') {
+                    $noticeLines[] = 'Bildirilen Açıklama: ' . $paymentNoticeInput;
+                }
+
+                $customerMessage = "Bayilik başvurunuz alındı. Havale/EFT bilgileri aşağıdadır:\n\n" . implode("\n", $noticeLines) . "\n\nÖdemenizi tamamladıktan sonra dekontu paylaşmayı unutmayın.";
+                Mailer::send($email, 'Bayilik Başvurusu Ödeme Talimatı', $customerMessage);
+
+                Telegram::notify(sprintf(
+                    "🧾 Yeni bayilik başvurusu alındı!\nAd: %s\nE-posta: %s\nPaket: %s\nTutar: %s\nBaşvuru No: %s",
+                    $name,
+                    $email,
+                    $selectedPackage['name'],
+                    Helpers::formatCurrency((float)$selectedPackage['price'], 'USD'),
+                    $displayReference
+                ));
+
+                $_SESSION['flash_success'] = 'Başvurunuz alındı. Banka havalesi talimatları e-posta adresinize gönderildi.';
+                $_SESSION['register_bank_transfer_notice'] = $noticeLines;
+
+                Helpers::redirect('/register.php');
             }
 
             $pdo->commit();
@@ -199,7 +344,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 "E-posta: $email\n" .
                 "Paket: {$selectedPackage['name']}\n" .
                 "Tutar: " . Helpers::formatCurrency((float)$selectedPackage['price'], 'USD') . "\n" .
-                "Ödeme Yöntemi: " . PaymentGatewayManager::getLabel($selectedGateway) . "\n";
+                "Ödeme Yöntemi: " . $methodLabel . "\n";
 
             foreach ($adminEmails as $adminEmail) {
                 Mailer::send($adminEmail, 'Yeni Bayilik Başvurusu', $message);
@@ -231,7 +376,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-include __DIR__ . '/templates/auth-header.php';
+Helpers::includeTemplate('auth-header.php');
 ?>
 <div class="auth-wrapper">
     <div class="auth-card" style="max-width: 720px;">
@@ -239,6 +384,21 @@ include __DIR__ . '/templates/auth-header.php';
             <div class="brand">Bayi Başvurusu</div>
             <p class="text-muted">Aşağıdan uygun paketi seçerek başvurunuzu iletebilirsiniz.</p>
         </div>
+
+        <?php if ($flashSuccess): ?>
+            <div class="alert alert-success"><?= Helpers::sanitize($flashSuccess) ?></div>
+        <?php endif; ?>
+
+        <?php if ($registerBankNotice): ?>
+            <div class="alert alert-info">
+                <h6 class="mb-2">Banka Havalesi Talimatı</h6>
+                <ul class="mb-0">
+                    <?php foreach ($registerBankNotice as $line): ?>
+                        <li><?= Helpers::sanitize($line) ?></li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+        <?php endif; ?>
 
         <?php if (!$paymentTestMode && !$hasLiveGateway): ?>
             <div class="alert alert-warning">
@@ -256,21 +416,46 @@ include __DIR__ . '/templates/auth-header.php';
             </div>
         <?php endif; ?>
 
-        <?php if (!$packages): ?>
-            <div class="alert alert-warning">Şu anda başvuruya açık paket bulunmuyor. Lütfen daha sonra tekrar deneyin.</div>
-        <?php endif; ?>
-
         <form method="post" class="row g-3">
             <div class="col-12">
                 <label class="form-label">Paket Seçimi</label>
-                <select name="package_id" class="form-select" required <?= !$packages ? 'disabled' : '' ?>>
-                    <option value="">Paket seçiniz</option>
-                    <?php foreach ($packages as $package): ?>
-                        <option value="<?= (int)$package['id'] ?>" <?= ((int)(isset($selectedPackage['id']) ? $selectedPackage['id'] : 0) === (int)$package['id']) ? 'selected' : '' ?>>
-                            <?= Helpers::sanitize($package['name']) ?> - <?= Helpers::sanitize(Helpers::formatCurrency((float)$package['price'])) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
+                <?php if ($packages): ?>
+                    <div class="package-grid">
+                        <?php foreach ($packages as $package): ?>
+                            <?php
+                            $packageId = (int)$package['id'];
+                            $packageInputId = 'package-option-' . $packageId;
+                            $features = isset($package['features']) ? array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', (string)$package['features']))) : array();
+                            $isSelected = $selectedPackageId === $packageId;
+                            ?>
+                            <input type="radio" class="btn-check" name="package_id" id="<?= Helpers::sanitize($packageInputId) ?>" value="<?= $packageId ?>" <?= $isSelected ? 'checked' : '' ?> required>
+                            <label class="package-card" for="<?= Helpers::sanitize($packageInputId) ?>">
+                                <div class="package-card-header">
+                                    <div>
+                                        <span class="package-name"><?= Helpers::sanitize($package['name']) ?></span>
+                                        <?php if (!empty($package['description'])): ?>
+                                            <p class="package-description mb-0"><?= Helpers::sanitize($package['description']) ?></p>
+                                        <?php endif; ?>
+                                    </div>
+                                    <span class="package-price"><?= Helpers::sanitize(Helpers::formatCurrency((float)$package['price'])) ?></span>
+                                </div>
+                                <?php if ($features): ?>
+                                    <ul class="package-feature-list">
+                                        <?php foreach ($features as $feature): ?>
+                                            <li><?= Helpers::sanitize($feature) ?></li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                <?php endif; ?>
+                                <div class="package-footer d-flex justify-content-between align-items-center">
+                                    <span class="badge bg-light text-dark">Başlangıç Bakiyesi: <?= Helpers::sanitize(Helpers::formatCurrency((float)$package['initial_balance'])) ?></span>
+                                    <span class="package-tag">ID #<?= $packageId ?></span>
+                                </div>
+                            </label>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <div class="alert alert-warning">Şu anda başvuruya açık paket bulunmuyor. Lütfen daha sonra tekrar deneyin.</div>
+                <?php endif; ?>
             </div>
             <?php if ($paymentTestMode): ?>
                 <div class="col-12">
@@ -281,22 +466,45 @@ include __DIR__ . '/templates/auth-header.php';
                 <div class="col-12">
                     <label class="form-label">Ödeme Sağlayıcısı</label>
                     <?php foreach ($gateways as $identifier => $gateway): ?>
-                        <?php
-                        $checked = '';
-                        if (isset($_POST['payment_provider'])) {
-                            if ($_POST['payment_provider'] === $identifier) {
-                                $checked = 'checked';
-                            }
-                        } elseif ($identifier === $defaultGateway) {
-                            $checked = 'checked';
-                        }
-                        ?>
+                        <?php $checked = $selectedGateway === $identifier ? 'checked' : ''; ?>
                         <div class="form-check">
                             <input class="form-check-input" type="radio" name="payment_provider" id="package-gateway-<?= Helpers::sanitize($identifier) ?>" value="<?= Helpers::sanitize($identifier) ?>" <?= $checked ?>>
                             <label class="form-check-label" for="package-gateway-<?= Helpers::sanitize($identifier) ?>"><?= Helpers::sanitize($gateway['label']) ?></label>
                         </div>
                     <?php endforeach; ?>
                 </div>
+                <?php if ($bankTransferSummary): ?>
+                    <div class="col-12">
+                        <div class="alert alert-secondary small mb-0">
+                            <strong>Banka Havalesi Talimatı</strong>
+                            <ul class="mb-0">
+                                <?php foreach ($bankTransferSummary as $line): ?>
+                                    <li><?= Helpers::sanitize($line) ?></li>
+                                <?php endforeach; ?>
+                            </ul>
+                        </div>
+                    </div>
+                <?php endif; ?>
+                <?php if (isset($gateways['bank-transfer'])): ?>
+                    <div class="col-12" id="bank-transfer-fields" <?= $selectedGateway === 'bank-transfer' ? '' : 'style="display:none;"' ?>>
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body">
+                                <h6 class="card-title mb-3">Ödeme Bildirimi</h6>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Dekont / Referans Numarası</label>
+                                        <input type="text" class="form-control" name="payment_reference" value="<?= Helpers::sanitize($paymentReferenceInput) ?>" placeholder="Örn. EFT referansı">
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Ödeme Açıklaması <span class="text-danger">*</span></label>
+                                        <textarea class="form-control" name="payment_notice" rows="3" placeholder="Havale bilgilerinizi paylaşın" <?= $selectedGateway === 'bank-transfer' ? 'required' : '' ?>><?= Helpers::sanitize($paymentNoticeInput) ?></textarea>
+                                        <small class="text-muted">Hangi bankadan, hangi adla ve ne zaman gönderim yaptığınızı belirtmeniz değerlendirmeyi hızlandırır.</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                <?php endif; ?>
             <?php endif; ?>
             <div class="col-md-6">
                 <label class="form-label">Ad Soyad</label>
@@ -325,6 +533,34 @@ include __DIR__ . '/templates/auth-header.php';
                 <a href="/" class="small">Giriş sayfasına dön</a>
             </div>
         </form>
-    </div>
 </div>
-<?php include __DIR__ . '/templates/auth-footer.php';
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var gatewayInputs = document.querySelectorAll('input[name="payment_provider"]');
+    var bankFields = document.getElementById('bank-transfer-fields');
+    var noticeField = bankFields ? bankFields.querySelector('textarea[name="payment_notice"]') : null;
+
+    function toggleBankFields() {
+        if (!bankFields) {
+            return;
+        }
+
+        var selected = document.querySelector('input[name="payment_provider"]:checked');
+        var isBankTransfer = selected && selected.value === 'bank-transfer';
+
+        bankFields.style.display = isBankTransfer ? '' : 'none';
+
+        if (noticeField) {
+            noticeField.required = !!isBankTransfer;
+        }
+    }
+
+    gatewayInputs.forEach(function (input) {
+        input.addEventListener('change', toggleBankFields);
+    });
+
+    toggleBankFields();
+});
+</script>
+<?php Helpers::includeTemplate('auth-footer.php'); ?>

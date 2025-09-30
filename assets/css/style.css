@@ -176,6 +176,113 @@ body {
     max-width: 430px;
 }
 
+.package-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.25rem;
+}
+
+.package-card {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.25rem;
+    border: 1px solid #e0e6f5;
+    border-radius: 18px;
+    background: #fff;
+    box-shadow: 0 12px 24px rgba(23, 43, 77, 0.07);
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.package-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 32px rgba(23, 43, 77, 0.12);
+}
+
+.btn-check:checked + .package-card {
+    border-color: #1f3c88;
+    box-shadow: 0 18px 36px rgba(31, 60, 136, 0.18);
+}
+
+.package-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.package-name {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: #1f2a44;
+}
+
+.package-description {
+    font-size: 0.85rem;
+    color: #5c6c87;
+    margin-top: 0.35rem;
+}
+
+.package-price {
+    font-weight: 700;
+    color: #1f3c88;
+    font-size: 1.15rem;
+    white-space: nowrap;
+}
+
+.package-feature-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.package-feature-list li {
+    position: relative;
+    padding-left: 1.5rem;
+    font-size: 0.9rem;
+    color: #445267;
+}
+
+.package-feature-list li::before {
+    content: '\2713';
+    position: absolute;
+    left: 0;
+    top: 0;
+    color: #1f3c88;
+    font-weight: 700;
+}
+
+.package-footer {
+    font-size: 0.8rem;
+    color: #5c6c87;
+}
+
+.package-tag {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #9aa5b8;
+}
+
+@media (max-width: 576px) {
+    .package-card {
+        padding: 1rem;
+    }
+
+    .package-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .package-price {
+        font-size: 1rem;
+    }
+}
+
 .auth-card .brand {
     font-size: 1.75rem;
     font-weight: 700;
