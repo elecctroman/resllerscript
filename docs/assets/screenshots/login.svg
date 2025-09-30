@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e3a8a"/>
+    </linearGradient>
+  </defs>
+  <rect width="1440" height="900" fill="url(#bg)"/>
+  <text x="720" y="180" text-anchor="middle" fill="#e2e8f0" font-size="48" font-family="Inter" font-weight="600">Giriş Ekranı (Demo)</text>
+  <rect x="520" y="240" width="400" height="420" rx="32" fill="rgba(15,23,42,0.55)" stroke="#38bdf8" stroke-width="2"/>
+  <text x="720" y="310" text-anchor="middle" fill="#f8fafc" font-size="28" font-family="Inter" font-weight="600">ResellerScript</text>
+  <rect x="580" y="360" width="280" height="56" rx="14" fill="#1e293b" opacity="0.85"/>
+  <rect x="580" y="440" width="280" height="56" rx="14" fill="#1e293b" opacity="0.85"/>
+  <rect x="580" y="520" width="280" height="56" rx="14" fill="#2563eb" opacity="0.85"/>
+  <text x="720" y="556" text-anchor="middle" fill="#f8fafc" font-size="20" font-family="Inter">Giriş Yap</text>
+  <text x="720" y="620" text-anchor="middle" fill="#94a3b8" font-size="16" font-family="Inter">demo / demo123!</text>
+</svg>

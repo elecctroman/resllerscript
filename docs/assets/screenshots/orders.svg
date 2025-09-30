@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900">
+  <rect width="1440" height="900" fill="#0b1120"/>
+  <rect x="0" y="0" width="280" height="900" fill="#0f172a"/>
+  <text x="140" y="120" text-anchor="middle" fill="#38bdf8" font-size="26" font-family="Inter" font-weight="600">Siparişler</text>
+  <rect x="320" y="60" width="1040" height="80" rx="18" fill="#1f2937"/>
+  <rect x="320" y="180" width="1040" height="560" rx="24" fill="#111827"/>
+  <g fill="#1e3a8a">
+    <rect x="340" y="220" width="1000" height="64" rx="16"/>
+    <rect x="340" y="304" width="1000" height="64" rx="16" fill="#1d4ed8"/>
+    <rect x="340" y="388" width="1000" height="64" rx="16" fill="#1f2937"/>
+    <rect x="340" y="472" width="1000" height="64" rx="16" fill="#1d4ed8" opacity="0.75"/>
+    <rect x="340" y="556" width="1000" height="64" rx="16" fill="#1f2937"/>
+  </g>
+  <text x="840" y="780" text-anchor="middle" fill="#94a3b8" font-size="18" font-family="Inter">Durum, tarih, müşteri, tutar kolonları</text>
+</svg>

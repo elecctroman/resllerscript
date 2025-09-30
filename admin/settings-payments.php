@@ -30,6 +30,11 @@ $settingKeys = [
     'heleket_success_url',
     'heleket_fail_url',
     'heleket_description',
+    'bank_transfer_enabled',
+    'bank_transfer_bank_name',
+    'bank_transfer_account_name',
+    'bank_transfer_iban',
+    'bank_transfer_instructions',
 ];
 
 $currentValues = Settings::getMany($settingKeys);
@@ -69,6 +74,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Heleket entegrasyonunu aktifleştirmek için Proje ID ve API anahtarı zorunludur.';
     }
 
+    $bankTransferEnabled = isset($_POST['bank_transfer_enabled']) ? '1' : '0';
+    $bankTransferBank = isset($_POST['bank_transfer_bank_name']) ? trim($_POST['bank_transfer_bank_name']) : '';
+    $bankTransferAccount = isset($_POST['bank_transfer_account_name']) ? trim($_POST['bank_transfer_account_name']) : '';
+    $bankTransferIban = isset($_POST['bank_transfer_iban']) ? trim($_POST['bank_transfer_iban']) : '';
+    $bankTransferInstructions = isset($_POST['bank_transfer_instructions']) ? trim($_POST['bank_transfer_instructions']) : '';
+
+    if ($bankTransferEnabled === '1' && ($bankTransferBank === '' || $bankTransferAccount === '' || $bankTransferIban === '')) {
+        $errors[] = 'Banka havalesi yöntemini aktifleştirmek için banka adı, hesap sahibi ve IBAN bilgileri zorunludur.';
+    }
+
     if (!$errors) {
         Settings::set('payment_test_mode', $testMode);
         Settings::set('pricing_commission_rate', (string)$commissionRate);
@@ -89,6 +104,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         Settings::set('heleket_success_url', $heleketSuccess ?: null);
         Settings::set('heleket_fail_url', $heleketFail ?: null);
         Settings::set('heleket_description', $heleketDescription ?: null);
+
+        Settings::set('bank_transfer_enabled', $bankTransferEnabled);
+        Settings::set('bank_transfer_bank_name', $bankTransferBank ?: null);
+        Settings::set('bank_transfer_account_name', $bankTransferAccount ?: null);
+        Settings::set('bank_transfer_iban', $bankTransferIban ?: null);
+        Settings::set('bank_transfer_instructions', $bankTransferInstructions ?: null);
 
         $success = 'Ödeme ayarları güncellendi.';
         AuditLog::record(
@@ -192,21 +213,21 @@ include __DIR__ . '/../templates/header.php';
                         <label class="form-label">Ödeme Açıklaması</label>
                         <textarea name="cryptomus_description" class="form-control" rows="3" placeholder="Fatura açıklaması olarak görüntülenecek metin."><?= Helpers::sanitize(isset($currentValues['cryptomus_description']) ? $currentValues['cryptomus_description'] : '') ?></textarea>
                     </div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-0">Heleket</h5>
+                    <small class="text-muted">Sanal POS ve alternatif ödeme yöntemleriyle tahsilat yapın.</small>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="heleketEnabled" name="heleket_enabled" <?= isset($currentValues['heleket_enabled']) && $currentValues['heleket_enabled'] === '1' ? 'checked' : '' ?>>
+                    <label class="form-check-label" for="heleketEnabled">Aktif</label>
                 </div>
             </div>
-
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                    <div>
-                        <h5 class="mb-0">Heleket</h5>
-                        <small class="text-muted">Sanal POS ve alternatif ödeme yöntemleriyle tahsilat yapın.</small>
-                    </div>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="heleketEnabled" name="heleket_enabled" <?= isset($currentValues['heleket_enabled']) && $currentValues['heleket_enabled'] === '1' ? 'checked' : '' ?>>
-                        <label class="form-check-label" for="heleketEnabled">Aktif</label>
-                    </div>
-                </div>
-                <div class="card-body row g-3">
+            <div class="card-body row g-3">
                     <div class="col-12">
                         <div class="alert alert-info small mb-0">
                             <strong>Callback URL:</strong>
@@ -237,6 +258,38 @@ include __DIR__ . '/../templates/header.php';
                     <div class="col-12">
                         <label class="form-label">Ödeme Açıklaması</label>
                         <textarea name="heleket_description" class="form-control" rows="3" placeholder="Heleket faturasında gösterilecek açıklama."><?= Helpers::sanitize(isset($currentValues['heleket_description']) ? $currentValues['heleket_description'] : '') ?></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">Banka Havalesi / EFT</h5>
+                        <small class="text-muted">Offline ödemelerde müşterilerinize havale talimatı sunun.</small>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="bankTransferEnabled" name="bank_transfer_enabled" <?= isset($currentValues['bank_transfer_enabled']) && $currentValues['bank_transfer_enabled'] === '1' ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="bankTransferEnabled">Aktif</label>
+                    </div>
+                </div>
+                <div class="card-body row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Banka Adı</label>
+                        <input type="text" name="bank_transfer_bank_name" class="form-control" value="<?= Helpers::sanitize(isset($currentValues['bank_transfer_bank_name']) ? $currentValues['bank_transfer_bank_name'] : '') ?>" placeholder="Örn. Ziraat Bankası">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Hesap Sahibi</label>
+                        <input type="text" name="bank_transfer_account_name" class="form-control" value="<?= Helpers::sanitize(isset($currentValues['bank_transfer_account_name']) ? $currentValues['bank_transfer_account_name'] : '') ?>" placeholder="Firma veya kişi adı">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">IBAN</label>
+                        <input type="text" name="bank_transfer_iban" class="form-control" value="<?= Helpers::sanitize(isset($currentValues['bank_transfer_iban']) ? $currentValues['bank_transfer_iban'] : '') ?>" placeholder="TR..">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Talimat / Açıklama</label>
+                        <textarea name="bank_transfer_instructions" class="form-control" rows="3" placeholder="Dekont gönderim adresi, çalışma saatleri vb."><?= Helpers::sanitize(isset($currentValues['bank_transfer_instructions']) ? $currentValues['bank_transfer_instructions'] : '') ?></textarea>
+                        <small class="text-muted">Bu bilgiler bayi paneli ve başvuru formunda görüntülenir.</small>
                     </div>
                 </div>
             </div>

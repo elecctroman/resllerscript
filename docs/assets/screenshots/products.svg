@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900">
+  <rect width="1440" height="900" fill="#0f172a"/>
+  <rect x="0" y="0" width="280" height="900" fill="#111827"/>
+  <text x="140" y="120" text-anchor="middle" fill="#f8fafc" font-size="26" font-family="Inter" font-weight="600">Ürünler</text>
+  <rect x="320" y="60" width="1040" height="80" rx="16" fill="#1e293b"/>
+  <text x="340" y="110" fill="#cbd5f5" font-family="Inter" font-size="20">Arama • Kategori • Fiyat Filtresi</text>
+  <rect x="320" y="180" width="1040" height="600" rx="24" fill="#1f2937"/>
+  <g fill="#334155">
+    <rect x="340" y="220" width="1000" height="48" rx="12"/>
+    <rect x="340" y="288" width="1000" height="48" rx="12"/>
+    <rect x="340" y="356" width="1000" height="48" rx="12"/>
+    <rect x="340" y="424" width="1000" height="48" rx="12"/>
+    <rect x="340" y="492" width="1000" height="48" rx="12"/>
+    <rect x="340" y="560" width="1000" height="48" rx="12"/>
+  </g>
+  <text x="840" y="780" text-anchor="middle" fill="#e2e8f0" font-size="18" font-family="Inter">Ürün listesi ve stok durumu</text>
+</svg>

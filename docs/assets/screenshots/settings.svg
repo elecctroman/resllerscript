@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900">
+  <rect width="1440" height="900" fill="#020617"/>
+  <rect x="0" y="0" width="320" height="900" fill="#0b1120"/>
+  <text x="160" y="120" text-anchor="middle" fill="#f8fafc" font-size="26" font-family="Inter" font-weight="600">Genel Ayarlar</text>
+  <rect x="360" y="60" width="1020" height="700" rx="32" fill="#0f172a"/>
+  <text x="380" y="120" fill="#38bdf8" font-size="24" font-family="Inter">Bakiye Politikası</text>
+  <rect x="380" y="150" width="980" height="70" rx="18" fill="#1e293b"/>
+  <text x="400" y="195" fill="#cbd5f5" font-size="20" font-family="Inter">Minimum Bakiye (USD)</text>
+  <rect x="380" y="240" width="980" height="70" rx="18" fill="#1e293b"/>
+  <text x="400" y="285" fill="#cbd5f5" font-size="20" font-family="Inter">Pasife Alma Süresi (Gün)</text>
+  <text x="380" y="360" fill="#38bdf8" font-size="24" font-family="Inter">Demo Modu</text>
+  <rect x="380" y="390" width="980" height="70" rx="18" fill="#1d4ed8" opacity="0.75"/>
+  <text x="400" y="435" fill="#f8fafc" font-size="20" font-family="Inter">Demo hesabını aktifleştir</text>
+</svg>

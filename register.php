@@ -16,6 +16,14 @@ $pdo = Database::connection();
 $packages = $pdo->query('SELECT * FROM packages WHERE is_active = 1 ORDER BY price ASC')->fetchAll();
 $errors = [];
 $selectedPackage = null;
+$flashSuccess = isset($_SESSION['flash_success']) ? $_SESSION['flash_success'] : '';
+if ($flashSuccess !== '') {
+    unset($_SESSION['flash_success']);
+}
+$registerBankNotice = isset($_SESSION['register_bank_transfer_notice']) && is_array($_SESSION['register_bank_transfer_notice']) ? $_SESSION['register_bank_transfer_notice'] : array();
+if ($registerBankNotice) {
+    unset($_SESSION['register_bank_transfer_notice']);
+}
 $paymentTestMode = Settings::get('payment_test_mode') === '1';
 $gateways = PaymentGatewayManager::getActiveGateways();
 $hasLiveGateway = !empty($gateways);
@@ -27,8 +35,31 @@ if ($hasLiveGateway) {
     }
 }
 
+$bankTransferDetails = PaymentGatewayManager::getBankTransferDetails();
+$bankTransferSummary = array();
+if (isset($gateways['bank-transfer'])) {
+    if (!empty($bankTransferDetails['bank_name'])) {
+        $bankTransferSummary[] = 'Banka: ' . $bankTransferDetails['bank_name'];
+    }
+    if (!empty($bankTransferDetails['account_name'])) {
+        $bankTransferSummary[] = 'Hesap Sahibi: ' . $bankTransferDetails['account_name'];
+    }
+    if (!empty($bankTransferDetails['iban'])) {
+        $bankTransferSummary[] = 'IBAN: ' . $bankTransferDetails['iban'];
+    }
+    if (!empty($bankTransferDetails['instructions'])) {
+        $lines = preg_split('/\r\n|\r|\n/', $bankTransferDetails['instructions']);
+        foreach ($lines as $line) {
+            $trimmed = trim($line);
+            if ($trimmed !== '') {
+                $bankTransferSummary[] = $trimmed;
+            }
+        }
+    }
+}
+
 if (!Helpers::featureEnabled('packages')) {
-    include __DIR__ . '/templates/auth-header.php';
+    Helpers::includeTemplate('auth-header.php');
     ?>
     <div class="auth-wrapper">
         <div class="auth-card">
@@ -40,7 +71,7 @@ if (!Helpers::featureEnabled('packages')) {
         </div>
     </div>
     <?php
-    include __DIR__ . '/templates/auth-footer.php';
+    Helpers::includeTemplate('auth-footer.php');
     exit;
 }
 
@@ -82,6 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!$errors) {
+        $methodLabel = $paymentTestMode ? 'Test Modu' : PaymentGatewayManager::getLabel($selectedGateway);
         $pdo->beginTransaction();
         try {
             $stmt = $pdo->prepare('INSERT INTO package_orders (package_id, name, email, phone, company, notes, form_data, status, total_amount, created_at) VALUES (:package_id, :name, :email, :phone, :company, :notes, :form_data, :status, :total_amount, NOW())');
@@ -138,6 +170,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $_SESSION['flash_success'] = 'Test modu aktif olduğu için başvurunuz otomatik onaylandı. Giriş bilgileri e-posta ile gönderildi.';
                 Helpers::redirect('/index.php');
+            }
+
+            if ($selectedGateway === 'bank-transfer') {
+                $pdo->prepare('UPDATE package_orders SET payment_provider = :provider, payment_reference = :reference WHERE id = :id')
+                    ->execute([
+                        'provider' => $selectedGateway,
+                        'reference' => $displayReference,
+                        'id' => $orderId,
+                    ]);
+
+                $pdo->commit();
+
+                $adminEmails = $pdo->query("SELECT email FROM users WHERE role IN ('super_admin','admin','finance') AND status = 'active'")->fetchAll(\PDO::FETCH_COLUMN);
+                $message = "Yeni bir bayilik başvurusu alındı.\n\n" .
+                    "Başvuru Sahibi: $name\n" .
+                    "E-posta: $email\n" .
+                    "Paket: {$selectedPackage['name']}\n" .
+                    "Tutar: " . Helpers::formatCurrency((float)$selectedPackage['price'], 'USD') . "\n" .
+                    "Ödeme Yöntemi: " . $methodLabel . "\n";
+
+                foreach ($adminEmails as $adminEmail) {
+                    Mailer::send($adminEmail, 'Yeni Bayilik Başvurusu', $message);
+                }
+
+                $noticeLines = array();
+                if (!empty($bankTransferDetails['bank_name'])) {
+                    $noticeLines[] = 'Banka: ' . $bankTransferDetails['bank_name'];
+                }
+                if (!empty($bankTransferDetails['account_name'])) {
+                    $noticeLines[] = 'Hesap Sahibi: ' . $bankTransferDetails['account_name'];
+                }
+                if (!empty($bankTransferDetails['iban'])) {
+                    $noticeLines[] = 'IBAN: ' . $bankTransferDetails['iban'];
+                }
+                $noticeLines[] = 'Tutar: ' . Helpers::formatCurrency((float)$selectedPackage['price']);
+                $noticeLines[] = 'Başvuru No: ' . $displayReference;
+                if (!empty($bankTransferDetails['instructions'])) {
+                    $lines = preg_split('/\r\n|\r|\n/', $bankTransferDetails['instructions']);
+                    foreach ($lines as $line) {
+                        $trimmed = trim($line);
+                        if ($trimmed !== '') {
+                            $noticeLines[] = $trimmed;
+                        }
+                    }
+                }
+
+                $customerMessage = "Bayilik başvurunuz alındı. Havale/EFT bilgileri aşağıdadır:\n\n" . implode("\n", $noticeLines) . "\n\nÖdemenizi tamamladıktan sonra dekontu paylaşmayı unutmayın.";
+                Mailer::send($email, 'Bayilik Başvurusu Ödeme Talimatı', $customerMessage);
+
+                Telegram::notify(sprintf(
+                    "🧾 Yeni bayilik başvurusu alındı!\nAd: %s\nE-posta: %s\nPaket: %s\nTutar: %s\nBaşvuru No: %s",
+                    $name,
+                    $email,
+                    $selectedPackage['name'],
+                    Helpers::formatCurrency((float)$selectedPackage['price'], 'USD'),
+                    $displayReference
+                ));
+
+                $_SESSION['flash_success'] = 'Başvurunuz alındı. Banka havalesi talimatları e-posta adresinize gönderildi.';
+                $_SESSION['register_bank_transfer_notice'] = $noticeLines;
+
+                Helpers::redirect('/register.php');
             }
 
             $pdo->commit();
@@ -199,7 +293,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 "E-posta: $email\n" .
                 "Paket: {$selectedPackage['name']}\n" .
                 "Tutar: " . Helpers::formatCurrency((float)$selectedPackage['price'], 'USD') . "\n" .
-                "Ödeme Yöntemi: " . PaymentGatewayManager::getLabel($selectedGateway) . "\n";
+                "Ödeme Yöntemi: " . $methodLabel . "\n";
 
             foreach ($adminEmails as $adminEmail) {
                 Mailer::send($adminEmail, 'Yeni Bayilik Başvurusu', $message);
@@ -231,7 +325,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-include __DIR__ . '/templates/auth-header.php';
+Helpers::includeTemplate('auth-header.php');
 ?>
 <div class="auth-wrapper">
     <div class="auth-card" style="max-width: 720px;">
@@ -239,6 +333,21 @@ include __DIR__ . '/templates/auth-header.php';
             <div class="brand">Bayi Başvurusu</div>
             <p class="text-muted">Aşağıdan uygun paketi seçerek başvurunuzu iletebilirsiniz.</p>
         </div>
+
+        <?php if ($flashSuccess): ?>
+            <div class="alert alert-success"><?= Helpers::sanitize($flashSuccess) ?></div>
+        <?php endif; ?>
+
+        <?php if ($registerBankNotice): ?>
+            <div class="alert alert-info">
+                <h6 class="mb-2">Banka Havalesi Talimatı</h6>
+                <ul class="mb-0">
+                    <?php foreach ($registerBankNotice as $line): ?>
+                        <li><?= Helpers::sanitize($line) ?></li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+        <?php endif; ?>
 
         <?php if (!$paymentTestMode && !$hasLiveGateway): ?>
             <div class="alert alert-warning">
@@ -297,6 +406,18 @@ include __DIR__ . '/templates/auth-header.php';
                         </div>
                     <?php endforeach; ?>
                 </div>
+                <?php if ($bankTransferSummary): ?>
+                    <div class="col-12">
+                        <div class="alert alert-secondary small mb-0">
+                            <strong>Banka Havalesi Talimatı</strong>
+                            <ul class="mb-0">
+                                <?php foreach ($bankTransferSummary as $line): ?>
+                                    <li><?= Helpers::sanitize($line) ?></li>
+                                <?php endforeach; ?>
+                            </ul>
+                        </div>
+                    </div>
+                <?php endif; ?>
             <?php endif; ?>
             <div class="col-md-6">
                 <label class="form-label">Ad Soyad</label>
@@ -327,4 +448,4 @@ include __DIR__ . '/templates/auth-header.php';
         </form>
     </div>
 </div>
-<?php include __DIR__ . '/templates/auth-footer.php';
+<?php Helpers::includeTemplate('auth-footer.php'); ?>
