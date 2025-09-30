@@ -17,7 +17,7 @@ class Auth
         'support' => 'Destek',
         'content' => 'İçerik',
         'reseller' => 'Bayi',
-        'demo' => 'Yönetici (Demo)',
+
     );
 
     /**
