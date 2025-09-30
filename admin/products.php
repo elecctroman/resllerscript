@@ -234,7 +234,7 @@ include __DIR__ . '/../templates/header.php';
                 <?php endif; ?>
 
                 <?php if (!$flattenedCategories): ?>
-                    <div class="alert alert-warning">Ürün ekleyebilmek için önce <a href="/admin/categories.php" class="alert-link">kategori oluşturmanız</a> gerekir.</div>
+                    <div class="alert alert-warning">Ürün ekleyebilmek için önce <a href="<?= Helpers::url('admin/categories.php') ?>" class="alert-link">kategori oluşturmanız</a> gerekir.</div>
                 <?php endif; ?>
 
                 <form method="post" class="vstack gap-3">
@@ -284,7 +284,7 @@ include __DIR__ . '/../templates/header.php';
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">Ürün Listesi</h5>
-                <a href="/admin/categories.php" class="btn btn-sm btn-outline-secondary">Kategorileri Yönet</a>
+                <a href="<?= Helpers::url('admin/categories.php') ?>" class="btn btn-sm btn-outline-secondary">Kategorileri Yönet</a>
             </div>
             <div class="card-body">
                 <?php if (!$products): ?>

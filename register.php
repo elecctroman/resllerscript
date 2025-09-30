@@ -322,7 +322,7 @@ include __DIR__ . '/templates/auth-header.php';
                 <button type="submit" class="btn btn-primary w-100" <?= (!$packages || (!$paymentTestMode && !$hasLiveGateway)) ? 'disabled' : '' ?>>Ödemeyi Tamamla</button>
             </div>
             <div class="col-12 text-center">
-                <a href="/" class="small">Giriş sayfasına dön</a>
+                <a href="<?= Helpers::url('index.php') ?>" class="small">Giriş sayfasına dön</a>
             </div>
         </form>
     </div>
