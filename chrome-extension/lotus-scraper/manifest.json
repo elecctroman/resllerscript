@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Lotus Ürün Aktarıcı",
+  "description": "Lotus Partner panelindeki tüm kategori ve alt kategorilerdeki ürünleri dolaşarak isim ve fiyatlarını CSV olarak indirir.",
+  "version": "1.0.0",
+  "permissions": [
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://partner.lotuslisans.com.tr/*"
+  ],
+  "action": {
+    "default_title": "Lotus Ürün Aktarıcı",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://partner.lotuslisans.com.tr/*"],
+      "js": ["content-script.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
