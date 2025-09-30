@@ -195,28 +195,28 @@ include __DIR__ . '/../templates/header.php';
             <div class="card-body">
                 <div class="row g-3">
                     <div class="col-sm-6 col-xl-3">
-                        <a href="/admin/packages.php" class="btn btn-outline-primary w-100">Paketleri Yönet</a>
+                        <a href="<?= Helpers::url('admin/packages.php') ?>" class="btn btn-outline-primary w-100">Paketleri Yönet</a>
                     </div>
                     <div class="col-sm-6 col-xl-3">
-                        <a href="/admin/orders.php" class="btn btn-outline-primary w-100">Paket Siparişleri</a>
+                        <a href="<?= Helpers::url('admin/orders.php') ?>" class="btn btn-outline-primary w-100">Paket Siparişleri</a>
                     </div>
                     <div class="col-sm-6 col-xl-3">
-                        <a href="/admin/product-orders.php" class="btn btn-outline-primary w-100">Ürün Siparişleri</a>
+                        <a href="<?= Helpers::url('admin/product-orders.php') ?>" class="btn btn-outline-primary w-100">Ürün Siparişleri</a>
                     </div>
                     <div class="col-sm-6 col-xl-3">
-                        <a href="/admin/users.php" class="btn btn-outline-primary w-100">Bayiler</a>
+                        <a href="<?= Helpers::url('admin/users.php') ?>" class="btn btn-outline-primary w-100">Bayiler</a>
                     </div>
                     <div class="col-sm-6 col-xl-3">
-                        <a href="/admin/products.php" class="btn btn-outline-primary w-100">Ürünler &amp; Kategoriler</a>
+                        <a href="<?= Helpers::url('admin/products.php') ?>" class="btn btn-outline-primary w-100">Ürünler &amp; Kategoriler</a>
                     </div>
                     <div class="col-sm-6 col-xl-3">
-                        <a href="/admin/balances.php" class="btn btn-outline-primary w-100">Bakiyeler</a>
+                        <a href="<?= Helpers::url('admin/balances.php') ?>" class="btn btn-outline-primary w-100">Bakiyeler</a>
                     </div>
                     <div class="col-sm-6 col-xl-3">
-                        <a href="/admin/woocommerce-import.php" class="btn btn-outline-primary w-100">WooCommerce CSV</a>
+                        <a href="<?= Helpers::url('admin/woocommerce-import.php') ?>" class="btn btn-outline-primary w-100">WooCommerce CSV</a>
                     </div>
                     <div class="col-sm-6 col-xl-3">
-                        <a href="/admin/reports.php" class="btn btn-outline-primary w-100">Raporlar</a>
+                        <a href="<?= Helpers::url('admin/reports.php') ?>" class="btn btn-outline-primary w-100">Raporlar</a>
                     </div>
                 </div>
             </div>

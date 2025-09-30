@@ -37,7 +37,7 @@ if (isset($_GET['token'])) {
         }
     }
 
-    include __DIR__ . '/templates/auth-header.php';
+    Helpers::includeTemplate('auth-header.php');
     ?>
     <div class="auth-wrapper">
         <div class="auth-card">
@@ -48,7 +48,7 @@ if (isset($_GET['token'])) {
 
             <?php if ($successMessage): ?>
                 <div class="alert alert-success"><?= Helpers::sanitize($successMessage) ?></div>
-                <a href="/" class="btn btn-primary w-100">Girişe Dön</a>
+                <a href="<?= Helpers::url('index.php') ?>" class="btn btn-primary w-100">Girişe Dön</a>
             <?php else: ?>
                 <?php if ($errors): ?>
                     <div class="alert alert-danger">
@@ -71,14 +71,14 @@ if (isset($_GET['token'])) {
                     </div>
                     <button type="submit" class="btn btn-primary w-100">Şifremi Güncelle</button>
                     <div class="text-center mt-3">
-                        <a href="/" class="small">Giriş sayfasına dön</a>
+                        <a href="<?= Helpers::url('index.php') ?>" class="small">Giriş sayfasına dön</a>
                     </div>
                 </form>
             <?php endif; ?>
         </div>
     </div>
     <?php
-    include __DIR__ . '/templates/auth-footer.php';
+    Helpers::includeTemplate('auth-footer.php');
     exit;
 }
 
@@ -97,7 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-include __DIR__ . '/templates/auth-header.php';
+Helpers::includeTemplate('auth-header.php');
 ?>
 <div class="auth-wrapper">
     <div class="auth-card">
@@ -127,9 +127,9 @@ include __DIR__ . '/templates/auth-header.php';
             </div>
             <button type="submit" class="btn btn-primary w-100">Bağlantı Gönder</button>
             <div class="text-center mt-3">
-                <a href="/" class="small">Giriş sayfasına dön</a>
+                <a href="<?= Helpers::url('index.php') ?>" class="small">Giriş sayfasına dön</a>
             </div>
         </form>
     </div>
 </div>
-<?php include __DIR__ . '/templates/auth-footer.php';
+<?php Helpers::includeTemplate('auth-footer.php'); ?>
