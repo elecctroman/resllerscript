@@ -24,15 +24,10 @@ spl_autoload_register(function ($class) {
 });
 
 $configPath = __DIR__ . '/config/config.php';
-$installerPath = __DIR__ . '/install.php';
 
 if (!file_exists($configPath)) {
-    if (file_exists($installerPath)) {
-        header('Location: /install.php');
-        exit;
-    }
 
-    include __DIR__ . '/templates/auth-header.php';
+    App\Helpers::includeTemplate('auth-header.php');
     ?>
     <div class="auth-wrapper">
         <div class="auth-card">
@@ -55,7 +50,7 @@ if (!file_exists($configPath)) {
         </div>
     </div>
     <?php
-    include __DIR__ . '/templates/auth-footer.php';
+    App\Helpers::includeTemplate('auth-footer.php');
     exit;
 }
 
@@ -69,7 +64,7 @@ try {
         'password' => DB_PASSWORD,
     ]);
 } catch (\PDOException $exception) {
-    include __DIR__ . '/templates/auth-header.php';
+    App\Helpers::includeTemplate('auth-header.php');
     ?>
     <div class="auth-wrapper">
         <div class="auth-card">
@@ -85,7 +80,7 @@ try {
         </div>
     </div>
     <?php
-    include __DIR__ . '/templates/auth-footer.php';
+    App\Helpers::includeTemplate('auth-footer.php');
     exit;
 }
 
