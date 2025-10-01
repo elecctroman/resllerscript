@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\WhatsApp;
 
 use App\Environment;
+use App\Logger;
 use DateTimeImmutable;
 use Facebook\WebDriver\Chrome\ChromeOptions;
 use Facebook\WebDriver\Exception\NoSuchElementException;
@@ -14,7 +15,6 @@ use Facebook\WebDriver\Remote\RemoteWebDriver;
 use Facebook\WebDriver\WebDriverBy;
 use Facebook\WebDriver\WebDriverExpectedCondition as ExpectedCondition;
 use Facebook\WebDriver\WebDriverWait;
-use Monolog\Logger;
 use PDO;
 use RuntimeException;
 
@@ -120,6 +120,10 @@ class Gateway
     {
         if ($this->driver instanceof RemoteWebDriver) {
             return $this->driver;
+        }
+
+        if (!class_exists(RemoteWebDriver::class) || !class_exists(ChromeOptions::class)) {
+            throw new RuntimeException('WhatsApp gateway için facebook/webdriver paketinin kurulması gerekiyor.');
         }
 
         $seleniumHost = Environment::get('SELENIUM_HOST', 'http://selenium:4444/wd/hub') ?? 'http://selenium:4444/wd/hub';

@@ -2,6 +2,38 @@
 
 namespace App;
 
+if (!function_exists(__NAMESPACE__ . '\\mail')) {
+    /**
+     * Safe wrapper for PHP's global mail() so namespaced calls do not fatal out
+     * when the function is disabled.
+     */
+    function mail(
+        string $to,
+        string $subject,
+        string $message,
+        $additionalHeaders = '',
+        $additionalParameters = ''
+    ): bool {
+        if (!\function_exists('mail')) {
+            error_log('PHP mail() fonksiyonu bu sunucuda kullanılamıyor veya başarısız oldu.');
+            return false;
+        }
+
+        try {
+            $result = \mail($to, $subject, $message, $additionalHeaders, $additionalParameters);
+        } catch (\Throwable $exception) {
+            error_log('PHP mail() fonksiyonu gönderim sırasında hata verdi: ' . $exception->getMessage());
+            return false;
+        }
+
+        if ($result !== true) {
+            error_log('PHP mail() fonksiyonu bu sunucuda kullanılamıyor veya başarısız oldu.');
+        }
+
+        return (bool) $result;
+    }
+}
+
 class Helpers
 {
 

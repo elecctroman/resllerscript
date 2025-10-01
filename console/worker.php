@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use App\Container;
 use App\Environment;
+use App\RedisAdapterInterface;
 use App\WhatsApp\Gateway;
-use Predis\Client as RedisClient;
 
 require __DIR__ . '/../app/bootstrap.php';
 
@@ -100,7 +100,7 @@ function findConnectedSession(\PDO $pdo): ?array
     return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
 }
 
-function promoteDelayedJobs(RedisClient $redis): void
+function promoteDelayedJobs(RedisAdapterInterface $redis): void
 {
     $now = time();
     $due = $redis->zrangebyscore('whatsapp:retry', '-inf', (string) $now, ['limit' => [0, 10]]);
@@ -110,7 +110,7 @@ function promoteDelayedJobs(RedisClient $redis): void
     }
 }
 
-function scheduleRetry(RedisClient $redis, array $payload, int $delay): void
+function scheduleRetry(RedisAdapterInterface $redis, array $payload, int $delay): void
 {
     $runAt = time() + $delay;
     try {

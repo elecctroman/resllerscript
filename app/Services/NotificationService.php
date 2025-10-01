@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Logger;
 use App\Notifications\Template;
+use App\RedisAdapterInterface;
 use InvalidArgumentException;
-use Monolog\Logger;
 use PDO;
-use Predis\Client as RedisClient;
 
 class NotificationService
 {
     private PDO $db;
-    private RedisClient $redis;
+    private RedisAdapterInterface $redis;
     private Logger $logger;
 
     /** @var array<string,string> */
@@ -26,7 +26,7 @@ class NotificationService
         'test' => 'Test mesajı: {{message}}',
     ];
 
-    public function __construct(PDO $db, RedisClient $redis, Logger $logger)
+    public function __construct(PDO $db, RedisAdapterInterface $redis, Logger $logger)
     {
         $this->db = $db;
         $this->redis = $redis;
