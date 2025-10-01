@@ -6,6 +6,7 @@ use App\AuditLog;
 use App\Database;
 use App\Helpers;
 use App\Mailer;
+use App\Services\PackageOrderService;
 use App\Telegram;
 
 Auth::requireRoles(array('super_admin', 'admin', 'finance'));
@@ -20,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $status = isset($_POST['status']) ? $_POST['status'] : '';
     $adminNote = isset($_POST['admin_note']) ? trim($_POST['admin_note']) : '';
 
-    $stmt = $pdo->prepare('SELECT br.*, u.name, u.email FROM balance_requests br INNER JOIN users u ON br.user_id = u.id WHERE br.id = :id');
+    $stmt = $pdo->prepare('SELECT br.*, u.name AS user_name, u.email AS user_email, po.name AS applicant_name, po.email AS applicant_email, po.phone AS applicant_phone, po.company AS applicant_company, po.notes AS applicant_notes, po.status AS package_status, po.id AS order_id, p.name AS package_name FROM balance_requests br LEFT JOIN users u ON br.user_id = u.id LEFT JOIN package_orders po ON br.package_order_id = po.id LEFT JOIN packages p ON po.package_id = p.id WHERE br.id = :id');
     $stmt->execute(['id' => $requestId]);
     $request = $stmt->fetch();
 
@@ -31,6 +32,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($request['status'] !== 'pending') {
         $errors[] = 'Yalnızca bekleyen talepler güncellenebilir.';
     } else {
+        $displayName = isset($request['user_name']) && $request['user_name'] !== null
+            ? $request['user_name']
+            : (isset($request['applicant_name']) ? $request['applicant_name'] : '');
+        $displayEmail = isset($request['user_email']) && $request['user_email'] !== null
+            ? $request['user_email']
+            : (isset($request['applicant_email']) ? $request['applicant_email'] : '');
+
+        $isPackageOrder = !empty($request['package_order_id']);
+        $order = null;
+        $fulfillmentResult = null;
+
         try {
             $pdo->beginTransaction();
 
@@ -43,19 +55,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
 
             if ($status === 'approved') {
-                $pdo->prepare('INSERT INTO balance_transactions (user_id, amount, type, description, created_at) VALUES (:user_id, :amount, :type, :description, NOW())')
-                    ->execute([
-                        'user_id' => $request['user_id'],
-                        'amount' => $request['amount'],
-                        'type' => 'credit',
-                        'description' => 'Bakiye yükleme onayı',
-                    ]);
+                if ($isPackageOrder) {
+                    $order = PackageOrderService::loadOrder((int)$request['package_order_id']);
 
-                $pdo->prepare('UPDATE users SET balance = balance + :amount WHERE id = :id')
-                    ->execute([
-                        'amount' => $request['amount'],
-                        'id' => $request['user_id'],
-                    ]);
+                    if (!$order) {
+                        throw new \RuntimeException('İlgili paket siparişi bulunamadı.');
+                    }
+
+                    if ($order['status'] !== 'completed') {
+                        $fulfillmentResult = PackageOrderService::fulfill($order);
+                        PackageOrderService::markCompleted((int)$request['package_order_id'], $order, $adminNote);
+
+                        if ($fulfillmentResult && isset($fulfillmentResult['user_id'])) {
+                            $pdo->prepare('UPDATE balance_requests SET user_id = :user_id WHERE id = :id')
+                                ->execute([
+                                    'user_id' => $fulfillmentResult['user_id'],
+                                    'id' => $requestId,
+                                ]);
+                        }
+                    }
+                } else {
+                    $pdo->prepare('INSERT INTO balance_transactions (user_id, amount, type, description, created_at) VALUES (:user_id, :amount, :type, :description, NOW())')
+                        ->execute([
+                            'user_id' => $request['user_id'],
+                            'amount' => $request['amount'],
+                            'type' => 'credit',
+                            'description' => 'Bakiye yükleme onayı',
+                        ]);
+
+                    $pdo->prepare('UPDATE users SET balance = balance + :amount WHERE id = :id')
+                        ->execute([
+                            'amount' => $request['amount'],
+                            'id' => $request['user_id'],
+                        ]);
+                }
             }
 
             $pdo->commit();
@@ -63,21 +96,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $success = 'Bakiye talebi güncellendi.';
 
             $message = $status === 'approved'
-                ? "Bakiye yükleme talebiniz onaylandı. Toplam: " . Helpers::formatCurrency((float)$request['amount'], 'USD')
+                ? ($isPackageOrder
+                    ? "Bayilik başvurunuz onaylandı. Giriş bilgileriniz e-posta adresinize gönderildi."
+                    : "Bakiye yükleme talebiniz onaylandı. Toplam: " . Helpers::formatCurrency((float)$request['amount'], 'USD'))
                 : "Bakiye yükleme talebiniz reddedildi.";
 
             if ($adminNote) {
                 $message .= "\nAçıklama: $adminNote";
             }
 
-            Mailer::send($request['email'], 'Bakiye Talebiniz Güncellendi', $message);
+            if ($displayEmail !== '') {
+                Mailer::send($displayEmail, $isPackageOrder ? 'Bayilik Başvurusu Güncellendi' : 'Bakiye Talebiniz Güncellendi', $message);
+            }
 
             if ($status === 'approved') {
-                Telegram::notify(sprintf(
-                    "Yeni bakiye yüklemesi tamamlandı!\nBayi: %s\nTutar: %s",
-                    $request['name'],
-                    Helpers::formatCurrency((float)$request['amount'], 'USD')
-                ));
+                if ($isPackageOrder) {
+                    Telegram::notify(sprintf(
+                        "Yeni bayilik başvurusu onaylandı!\nBayi: %s\nPaket: %s\nTutar: %s",
+                        $displayName !== '' ? $displayName : 'Bilinmiyor',
+                        isset($request['package_name']) ? $request['package_name'] : '-',
+                        Helpers::formatCurrency((float)$request['amount'], 'USD')
+                    ));
+                } else {
+                    Telegram::notify(sprintf(
+                        "Yeni bakiye yüklemesi tamamlandı!\nBayi: %s\nTutar: %s",
+                        $displayName !== '' ? $displayName : 'Bilinmiyor',
+                        Helpers::formatCurrency((float)$request['amount'], 'USD')
+                    ));
+                }
             }
 
             AuditLog::record(
@@ -94,11 +140,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$pendingStmt = $pdo->prepare('SELECT br.*, u.name, u.email FROM balance_requests br INNER JOIN users u ON br.user_id = u.id WHERE br.status = :status ORDER BY br.created_at ASC');
+$pendingStmt = $pdo->prepare('SELECT br.*, u.name AS user_name, u.email AS user_email, po.name AS applicant_name, po.email AS applicant_email, po.phone AS applicant_phone, p.name AS package_name FROM balance_requests br LEFT JOIN users u ON br.user_id = u.id LEFT JOIN package_orders po ON br.package_order_id = po.id LEFT JOIN packages p ON po.package_id = p.id WHERE br.status = :status ORDER BY br.created_at ASC');
 $pendingStmt->execute(['status' => 'pending']);
 $pending = $pendingStmt->fetchAll();
 
-$historyStmt = $pdo->prepare('SELECT br.*, u.name FROM balance_requests br INNER JOIN users u ON br.user_id = u.id WHERE br.status != :status ORDER BY br.created_at DESC LIMIT 50');
+$historyStmt = $pdo->prepare('SELECT br.*, u.name AS user_name, po.name AS applicant_name FROM balance_requests br LEFT JOIN users u ON br.user_id = u.id LEFT JOIN package_orders po ON br.package_order_id = po.id WHERE br.status != :status ORDER BY br.created_at DESC LIMIT 50');
 $historyStmt->execute(['status' => 'pending']);
 $history = $historyStmt->fetchAll();
 
@@ -135,23 +181,36 @@ include __DIR__ . '/../templates/header.php';
                             <thead>
                             <tr>
                                 <th>Tarih</th>
-                                <th>Bayi</th>
+                                <th>Bayi / Aday</th>
                                 <th>Tutar</th>
                                 <th>Yöntem</th>
+                                <th>Tür</th>
                                 <th>Referans</th>
                                 <th class="text-end">İşlem</th>
                             </tr>
                             </thead>
                             <tbody>
                             <?php foreach ($pending as $request): ?>
+                                <?php
+                                $displayName = isset($request['user_name']) && $request['user_name'] !== null
+                                    ? $request['user_name']
+                                    : (isset($request['applicant_name']) ? $request['applicant_name'] : '-');
+                                $displayEmail = isset($request['user_email']) && $request['user_email'] !== null
+                                    ? $request['user_email']
+                                    : (isset($request['applicant_email']) ? $request['applicant_email'] : '-');
+                                $isPackageOrder = !empty($request['package_order_id']);
+                                $typeLabel = $isPackageOrder ? 'Bayilik Başvurusu' : 'Bakiye Talebi';
+                                $typeClass = $isPackageOrder ? 'bg-info' : 'bg-secondary';
+                                ?>
                                 <tr>
                                     <td><?= date('d.m.Y H:i', strtotime($request['created_at'])) ?></td>
                                     <td>
-                                        <strong><?= Helpers::sanitize($request['name']) ?></strong><br>
-                                        <small class="text-muted"><?= Helpers::sanitize($request['email']) ?></small>
+                                        <strong><?= Helpers::sanitize($displayName) ?></strong><br>
+                                        <small class="text-muted"><?= Helpers::sanitize($displayEmail) ?></small>
                                     </td>
                                     <td><?= Helpers::sanitize(Helpers::formatCurrency((float)$request['amount'])) ?></td>
                                     <td><?= Helpers::sanitize($request['payment_method']) ?></td>
+                                    <td><span class="badge <?= $typeClass ?> text-uppercase" style="font-size: 0.7rem; letter-spacing: .08em;"><?= Helpers::sanitize($typeLabel) ?></span></td>
                                     <?php
                                     $displayReference = '-';
                                     if (!empty($request['payment_reference'])) {
@@ -176,6 +235,29 @@ include __DIR__ . '/../templates/header.php';
                                                 </div>
                                                 <div class="modal-body">
                                                     <input type="hidden" name="request_id" value="<?= (int)$request['id'] ?>">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Talep Özeti</label>
+                                                        <div class="small bg-light border rounded p-3">
+                                                            <div class="mb-2"><strong><?= Helpers::sanitize($displayName) ?></strong></div>
+                                                            <div class="mb-2">
+                                                                <div><?= Helpers::sanitize($displayEmail) ?></div>
+                                                                <?php if (!empty($request['applicant_phone'])): ?>
+                                                                    <div><?= Helpers::sanitize($request['applicant_phone']) ?></div>
+                                                                <?php endif; ?>
+                                                                <?php if (!empty($request['package_name'])): ?>
+                                                                    <div><span class="fw-semibold">Paket:</span> <?= Helpers::sanitize($request['package_name']) ?></div>
+                                                                <?php endif; ?>
+                                                            </div>
+                                                            <div><span class="fw-semibold">Tutar:</span> <?= Helpers::sanitize(Helpers::formatCurrency((float)$request['amount'])) ?></div>
+                                                            <div><span class="fw-semibold">Ödeme Yöntemi:</span> <?= Helpers::sanitize($request['payment_method']) ?></div>
+                                                            <?php if (!empty($request['notes'])): ?>
+                                                                <div class="mt-2">
+                                                                    <span class="fw-semibold d-block">Ödeme Bildirimi</span>
+                                                                    <div class="text-muted"><?= nl2br(Helpers::sanitize($request['notes'])) ?></div>
+                                                                </div>
+                                                            <?php endif; ?>
+                                                        </div>
+                                                    </div>
                                                     <div class="mb-3">
                                                         <label class="form-label">Durum</label>
                                                         <select name="status" class="form-select">
@@ -229,7 +311,12 @@ include __DIR__ . '/../templates/header.php';
                             <?php foreach ($history as $item): ?>
                                 <tr>
                                     <td><?= date('d.m.Y H:i', strtotime(isset($item['processed_at']) ? $item['processed_at'] : $item['created_at'])) ?></td>
-                                    <td><?= Helpers::sanitize($item['name']) ?></td>
+                                    <?php
+                                    $historyName = isset($item['user_name']) && $item['user_name'] !== null
+                                        ? $item['user_name']
+                                        : (isset($item['applicant_name']) ? $item['applicant_name'] : '-');
+                                    ?>
+                                    <td><?= Helpers::sanitize($historyName) ?></td>
                                     <td><?= Helpers::sanitize(Helpers::formatCurrency((float)$item['amount'])) ?></td>
                                     <td><span class="badge-status <?= Helpers::sanitize($item['status']) ?>"><?= strtoupper(Helpers::sanitize($item['status'])) ?></span></td>
                                     <td><?= Helpers::sanitize(isset($item['admin_note']) ? $item['admin_note'] : '-') ?></td>

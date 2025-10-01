@@ -30,6 +30,10 @@ $flashSuccess = isset($_SESSION['flash_success']) ? $_SESSION['flash_success'] :
 if ($flashSuccess !== '') {
     unset($_SESSION['flash_success']);
 }
+$bankTransferNotice = isset($_SESSION['bank_transfer_notice']) && is_array($_SESSION['bank_transfer_notice']) ? $_SESSION['bank_transfer_notice'] : array();
+if ($bankTransferNotice) {
+    unset($_SESSION['bank_transfer_notice']);
+}
 
 $paymentTestMode = Settings::get('payment_test_mode') === '1';
 $gateways = PaymentGatewayManager::getActiveGateways();
@@ -39,6 +43,29 @@ if ($hasLiveGateway) {
     foreach ($gateways as $identifier => $info) {
         $defaultGateway = $identifier;
         break;
+    }
+}
+
+$bankTransferDetails = PaymentGatewayManager::getBankTransferDetails();
+$bankTransferSummary = array();
+if (isset($gateways['bank-transfer'])) {
+    if (!empty($bankTransferDetails['bank_name'])) {
+        $bankTransferSummary[] = 'Banka: ' . $bankTransferDetails['bank_name'];
+    }
+    if (!empty($bankTransferDetails['account_name'])) {
+        $bankTransferSummary[] = 'Hesap Sahibi: ' . $bankTransferDetails['account_name'];
+    }
+    if (!empty($bankTransferDetails['iban'])) {
+        $bankTransferSummary[] = 'IBAN: ' . $bankTransferDetails['iban'];
+    }
+    if (!empty($bankTransferDetails['instructions'])) {
+        $lines = preg_split('/\r\n|\r|\n/', $bankTransferDetails['instructions']);
+        foreach ($lines as $line) {
+            $trimmed = trim($line);
+            if ($trimmed !== '') {
+                $bankTransferSummary[] = $trimmed;
+            }
+        }
     }
 }
 
@@ -63,9 +90,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->beginTransaction();
         try {
             $methodLabel = $paymentTestMode ? 'Test Modu' : PaymentGatewayManager::getLabel($selectedGateway);
-            $stmt = $pdo->prepare('INSERT INTO balance_requests (user_id, amount, payment_method, notes, status, created_at) VALUES (:user_id, :amount, :payment_method, :notes, :status, NOW())');
+            $stmt = $pdo->prepare('INSERT INTO balance_requests (user_id, package_order_id, amount, payment_method, notes, status, created_at) VALUES (:user_id, :package_order_id, :amount, :payment_method, :notes, :status, NOW())');
             $stmt->execute([
                 'user_id' => $user['id'],
+                'package_order_id' => null,
                 'amount' => $amount,
                 'payment_method' => $methodLabel,
                 'notes' => $notes ?: null,
@@ -119,6 +147,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $displayReference
                 ));
                 $_SESSION['flash_success'] = 'Test modu aktif olduğu için bakiye yüklemesi otomatik onaylandı.';
+                Helpers::redirect('/balance.php');
+            }
+
+            if ($selectedGateway === 'bank-transfer') {
+                $pdo->prepare('UPDATE balance_requests SET payment_provider = :provider, reference = :display_reference WHERE id = :id')
+                    ->execute([
+                        'provider' => $selectedGateway,
+                        'display_reference' => $displayReference,
+                        'id' => $requestId,
+                    ]);
+
+                $pdo->commit();
+
+                $adminEmails = $pdo->query("SELECT email FROM users WHERE role IN ('super_admin','admin','finance') AND status = 'active'")->fetchAll(\PDO::FETCH_COLUMN);
+                $message = "Yeni bir bakiye yükleme talebi oluşturuldu.\n\n" .
+                    "Bayi: {$user['name']}\n" .
+                    "E-posta: {$user['email']}\n" .
+                    "Tutar: " . Helpers::formatCurrency($amount, 'USD') . "\n" .
+                    "Ödeme Yöntemi: " . $methodLabel . "\n";
+
+                foreach ($adminEmails as $adminEmail) {
+                    Mailer::send($adminEmail, 'Yeni Bakiye Talebi', $message);
+                }
+
+                $noticeLines = array();
+                if (!empty($bankTransferDetails['bank_name'])) {
+                    $noticeLines[] = 'Banka: ' . $bankTransferDetails['bank_name'];
+                }
+                if (!empty($bankTransferDetails['account_name'])) {
+                    $noticeLines[] = 'Hesap Sahibi: ' . $bankTransferDetails['account_name'];
+                }
+                if (!empty($bankTransferDetails['iban'])) {
+                    $noticeLines[] = 'IBAN: ' . $bankTransferDetails['iban'];
+                }
+                $noticeLines[] = 'Tutar: ' . Helpers::formatCurrency($amount);
+                $noticeLines[] = 'Talep No: ' . $displayReference;
+                if (!empty($bankTransferDetails['instructions'])) {
+                    $lines = preg_split('/\r\n|\r|\n/', $bankTransferDetails['instructions']);
+                    foreach ($lines as $line) {
+                        $trimmed = trim($line);
+                        if ($trimmed !== '') {
+                            $noticeLines[] = $trimmed;
+                        }
+                    }
+                }
+
+                $customerMessage = "Bakiye yükleme talebiniz oluşturuldu. Havale/EFT bilgileri aşağıdadır:\n\n" . implode("\n", $noticeLines) . "\n\nÖdemenizi tamamladıktan sonra dekontu paylaşmayı unutmayın.";
+                Mailer::send($user['email'], 'Bakiye Yükleme Talimatı', $customerMessage);
+
+                Telegram::notify(sprintf(
+                    "💳 Yeni bakiye talebi alındı!\nBayi: %s\nTutar: %s\nYöntem: %s\nTalep No: %s",
+                    $user['name'],
+                    Helpers::formatCurrency($amount, 'USD'),
+                    $methodLabel,
+                    $displayReference
+                ));
+
+                $_SESSION['flash_success'] = 'Bakiye talebiniz oluşturuldu. Banka havalesi talimatları e-posta adresinize gönderildi.';
+                $_SESSION['bank_transfer_notice'] = $noticeLines;
+
                 Helpers::redirect('/balance.php');
             }
 
@@ -237,6 +325,16 @@ include __DIR__ . '/templates/header.php';
                 <?php if ($flashSuccess): ?>
                     <div class="alert alert-success"><?= Helpers::sanitize($flashSuccess) ?></div>
                 <?php endif; ?>
+                <?php if ($bankTransferNotice): ?>
+                    <div class="alert alert-info">
+                        <h6 class="mb-2">Banka Havalesi Talimatı</h6>
+                        <ul class="mb-0">
+                            <?php foreach ($bankTransferNotice as $line): ?>
+                                <li><?= Helpers::sanitize($line) ?></li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
+                <?php endif; ?>
 
                 <?php if ($errors): ?>
                     <div class="alert alert-danger">
@@ -280,6 +378,16 @@ include __DIR__ . '/templates/header.php';
                                 </div>
                             <?php endforeach; ?>
                         </div>
+                        <?php if ($bankTransferSummary): ?>
+                            <div class="alert alert-secondary small">
+                                <strong>Banka Havalesi Talimatı</strong>
+                                <ul class="mb-0">
+                                    <?php foreach ($bankTransferSummary as $line): ?>
+                                        <li><?= Helpers::sanitize($line) ?></li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            </div>
+                        <?php endif; ?>
                     <?php endif; ?>
                     <div>
                         <label class="form-label">Açıklama</label>
