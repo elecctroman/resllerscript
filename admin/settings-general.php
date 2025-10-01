@@ -154,6 +154,16 @@ include __DIR__ . '/../templates/header.php';
                     <div class="alert alert-success"><?= Helpers::sanitize($success) ?></div>
                 <?php endif; ?>
 
+                <div class="alert alert-info d-flex flex-column flex-md-row align-items-md-center gap-3">
+                    <div>
+                        <strong>WhatsApp Gateway Hızlı Erişim</strong>
+                        <div class="small text-muted">QR kodunu görüntülemek ve oturum durumunu kontrol etmek için WhatsApp yönetim ekranını kullanabilirsiniz.</div>
+                    </div>
+                    <div class="ms-md-auto">
+                        <a href="/admin/whatsapp.php" class="btn btn-success">QR Kodunu Aç</a>
+                    </div>
+                </div>
+
                 <form method="post" class="vstack gap-4">
                     <input type="hidden" name="action" value="save_general">
                     <input type="hidden" name="csrf_token" value="<?= Helpers::sanitize(Helpers::csrfToken()) ?>">
