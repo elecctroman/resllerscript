@@ -49,6 +49,15 @@ class Mailer
         }
         $headers .= 'X-Mailer: PHP/' . phpversion();
 
-        @mail($to, $subject, $message, $headers);
+        if (function_exists('mail')) {
+            try {
+                @call_user_func('\\mail', $to, $subject, $message, $headers);
+                return;
+            } catch (\Throwable $exception) {
+                error_log('PHP mail() fallback failed: ' . $exception->getMessage());
+            }
+        }
+
+        error_log('PHP mail() fonksiyonu bu sunucuda kullanılamıyor veya başarısız oldu.');
     }
 }
