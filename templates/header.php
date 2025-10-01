@@ -5,6 +5,7 @@ use App\Helpers;
 use App\Database;
 use App\Lang;
 use App\FeatureToggle;
+use App\ResellerPolicy;
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
@@ -20,6 +21,11 @@ $siteTagline = Helpers::siteTagline();
 $metaDescription = Helpers::seoDescription();
 $metaKeywords = Helpers::seoKeywords();
 
+$lowBalanceNotice = null;
+if ($user) {
+    $lowBalanceNotice = ResellerPolicy::lowBalanceNotice($user);
+}
+
 if (!isset($GLOBALS['app_lang_buffer_started'])) {
     $GLOBALS['app_lang_buffer_started'] = true;
     ob_start(function ($buffer) {
@@ -29,12 +35,12 @@ if (!isset($GLOBALS['app_lang_buffer_started'])) {
 
 $menuSections = array();
 $menuBadges = array();
-$currentScript = isset($_SERVER['SCRIPT_NAME']) ? $_SERVER['SCRIPT_NAME'] : '';
+$currentPath = Helpers::currentPath();
 $isAdminArea = false;
 $isAdminRole = $user ? Auth::isAdminRole($user['role']) : false;
 
 if ($isAdminRole) {
-    $isAdminArea = strpos($currentScript, '/admin/') === 0;
+    $isAdminArea = strpos($currentPath, '/admin/') === 0;
 
     try {
         $sidebarPdo = Database::connection();
@@ -231,3 +237,48 @@ if ($user) {
             </header>
         <?php endif; ?>
         <main class="app-content flex-grow-1 container-fluid">
+            <?php if ($lowBalanceNotice): ?>
+                <div class="alert alert-warning shadow-sm border-0 rounded-3 p-4 mb-4 d-flex flex-column flex-lg-row align-items-lg-center gap-3">
+                    <div class="low-balance-icon text-warning display-6">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h5 class="mb-2 fw-semibold">Bakiyeniz minimum seviyenin altında</h5>
+                        <?php
+                        $remainingLabel = $lowBalanceNotice['remaining_days'] > 0
+                            ? $lowBalanceNotice['remaining_days'] . ' gün'
+                            : ($lowBalanceNotice['remaining_hours'] > 0 ? $lowBalanceNotice['remaining_hours'] . ' saat' : 'Son saatler');
+                        ?>
+                        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                            <span class="badge bg-warning-subtle text-warning px-3 py-2">
+                                Kalan süre: <?= Helpers::sanitize($remainingLabel) ?>
+                            </span>
+                            <span class="badge bg-light text-dark px-3 py-2">
+                                Son tarih: <?= Helpers::sanitize($lowBalanceNotice['deadline']) ?>
+                            </span>
+                            <span class="badge bg-light text-dark px-3 py-2">
+                                Minimum bakiye: <?= Helpers::sanitize(Helpers::formatCurrency($lowBalanceNotice['threshold'])) ?>
+                            </span>
+                        </div>
+                        <p class="mb-2">
+                            Bakiyeniz minimum tutarın altına düştüğü için hesabınız <?= Helpers::sanitize((string)$lowBalanceNotice['grace_days']) ?> gün içinde
+                            (<?= Helpers::sanitize($lowBalanceNotice['deadline']) ?>) yeterli bakiye yüklenmezse otomatik olarak pasife alınacaktır.
+                        </p>
+                        <?php if ($lowBalanceNotice['deficit'] > 0): ?>
+                            <p class="mb-0">
+                                Eksik tutar: <strong><?= Helpers::sanitize(Helpers::formatCurrency($lowBalanceNotice['deficit'])) ?></strong>.
+                                Bayiliğinizi korumak için bakiyenizi en kısa sürede tamamlayın.
+                            </p>
+                        <?php else: ?>
+                            <p class="mb-0">Bayiliğinize devam etmek için minimum bakiye tutarını yüklemeniz gerekmektedir.</p>
+                        <?php endif; ?>
+                    </div>
+                    <?php if (Helpers::featureEnabled('balance')): ?>
+                        <div class="flex-shrink-0">
+                            <a href="/balance.php" class="btn btn-warning fw-semibold">
+                                <i class="bi bi-wallet2 me-2"></i> Bakiye Yükle
+                            </a>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
