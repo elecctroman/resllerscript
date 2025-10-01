@@ -1,0 +1,87 @@
+version: '3.9'
+
+services:
+  app:
+    build: .
+    container_name: whatsapp-app
+    volumes:
+      - .:/var/www/html
+      - sessions:/var/www/html/storage/sessions
+      - logs:/var/www/html/storage/logs
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: db
+      DB_NAME: whatsapp
+      DB_USER: whatsapp
+      DB_PASS: secret
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      SELENIUM_HOST: http://selenium:4444/wd/hub
+      APP_GATEWAY_KEY: supersecretkey
+      WHATSAPP_SESSION_DIR_BASE: /var/www/html/storage/sessions
+      LOG_DIR: /var/www/html/storage/logs
+    depends_on:
+      - db
+      - redis
+      - selenium
+
+  php-worker:
+    build: .
+    container_name: whatsapp-worker
+    command: ["php", "console/worker.php"]
+    volumes:
+      - .:/var/www/html
+      - sessions:/var/www/html/storage/sessions
+      - logs:/var/www/html/storage/logs
+    environment:
+      DB_HOST: db
+      DB_NAME: whatsapp
+      DB_USER: whatsapp
+      DB_PASS: secret
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      SELENIUM_HOST: http://selenium:4444/wd/hub
+      APP_GATEWAY_KEY: supersecretkey
+      WHATSAPP_SESSION_DIR_BASE: /var/www/html/storage/sessions
+      LOG_DIR: /var/www/html/storage/logs
+      WORKER_MAX_ATTEMPTS: 5
+    depends_on:
+      - db
+      - redis
+      - selenium
+
+  selenium:
+    image: selenium/standalone-chrome:latest
+    container_name: whatsapp-selenium
+    shm_size: 2gb
+    environment:
+      - SE_NODE_MAX_SESSIONS=1
+      - SE_NODE_SESSION_TIMEOUT=300
+    volumes:
+      - sessions:/var/www/html/storage/sessions
+
+  redis:
+    image: redis:7
+    container_name: whatsapp-redis
+    ports:
+      - "6379:6379"
+
+  db:
+    image: mysql:8
+    container_name: whatsapp-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: whatsapp
+      MYSQL_USER: whatsapp
+      MYSQL_PASSWORD: secret
+      MYSQL_ROOT_PASSWORD: rootsecret
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+
+volumes:
+  sessions:
+  logs:
+  db_data:

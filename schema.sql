@@ -6,6 +6,11 @@ CREATE TABLE IF NOT EXISTS users (
     role ENUM('super_admin','admin','finance','support','content','reseller') NOT NULL DEFAULT 'reseller',
     balance DECIMAL(12,2) NOT NULL DEFAULT 0,
     status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    telegram_bot_token VARCHAR(255) NULL,
+    telegram_chat_id VARCHAR(191) NULL,
+    notify_order_completed TINYINT(1) NOT NULL DEFAULT 1,
+    notify_balance_approved TINYINT(1) NOT NULL DEFAULT 1,
+    notify_support_replied TINYINT(1) NOT NULL DEFAULT 1,
     low_balance_since DATETIME NULL DEFAULT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
@@ -37,6 +42,7 @@ CREATE TABLE IF NOT EXISTS packages (
 CREATE TABLE IF NOT EXISTS package_orders (
     id INT AUTO_INCREMENT PRIMARY KEY,
     package_id INT NOT NULL,
+    user_id INT NULL,
     name VARCHAR(150) NOT NULL,
     email VARCHAR(150) NOT NULL,
     phone VARCHAR(100) NULL,
@@ -51,7 +57,8 @@ CREATE TABLE IF NOT EXISTS package_orders (
     total_amount DECIMAL(12,2) NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (package_id) REFERENCES packages(id)
+    FOREIGN KEY (package_id) REFERENCES packages(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS categories (
@@ -131,7 +138,8 @@ CREATE TABLE IF NOT EXISTS balance_transactions (
 
 CREATE TABLE IF NOT EXISTS balance_requests (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
+    user_id INT NULL,
+    package_order_id INT NULL,
     amount DECIMAL(12,2) NOT NULL,
     payment_method VARCHAR(150) NOT NULL,
     payment_provider VARCHAR(100) NULL,
@@ -146,6 +154,7 @@ CREATE TABLE IF NOT EXISTS balance_requests (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (package_order_id) REFERENCES package_orders(id),
     FOREIGN KEY (processed_by) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -179,6 +188,50 @@ CREATE TABLE IF NOT EXISTS admin_activity_logs (
     INDEX idx_user_created_at (user_id, created_at),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS whatsapp_sessions (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    label VARCHAR(191) NOT NULL,
+    client_id VARCHAR(191) NOT NULL,
+    status ENUM('pending', 'connected', 'disconnected') NOT NULL DEFAULT 'pending',
+    last_seen DATETIME NULL,
+    session_dir VARCHAR(255) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS notification_subscriptions (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    reseller_id INT UNSIGNED NOT NULL,
+    phone_number VARCHAR(32) NOT NULL,
+    channel ENUM('whatsapp') NOT NULL DEFAULT 'whatsapp',
+    events JSON NOT NULL,
+    enabled TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    subscription_id INT UNSIGNED NULL,
+    event_type VARCHAR(64) NOT NULL,
+    payload JSON NOT NULL,
+    attempts INT NOT NULL DEFAULT 0,
+    status ENUM('pending', 'sent', 'failed') NOT NULL DEFAULT 'pending',
+    last_error TEXT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    sent_at DATETIME NULL,
+    INDEX idx_notifications_subscription (subscription_id),
+    CONSTRAINT fk_notifications_subscription FOREIGN KEY (subscription_id)
+        REFERENCES notification_subscriptions(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS api_keys (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(191) NOT NULL,
+    api_key VARCHAR(191) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_api_key (api_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO users (id, name, email, password_hash, role, balance, status, created_at)
 VALUES (

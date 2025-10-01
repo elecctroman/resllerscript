@@ -2,8 +2,41 @@
 
 namespace App;
 
+if (!function_exists(__NAMESPACE__ . '\\mail')) {
+    /**
+     * Safe wrapper for PHP's global mail() so namespaced calls do not fatal out
+     * when the function is disabled.
+     */
+    function mail(
+        string $to,
+        string $subject,
+        string $message,
+        $additionalHeaders = '',
+        $additionalParameters = ''
+    ): bool {
+        if (!\function_exists('mail')) {
+            error_log('PHP mail() fonksiyonu bu sunucuda kullanılamıyor veya başarısız oldu.');
+            return false;
+        }
+
+        try {
+            $result = \mail($to, $subject, $message, $additionalHeaders, $additionalParameters);
+        } catch (\Throwable $exception) {
+            error_log('PHP mail() fonksiyonu gönderim sırasında hata verdi: ' . $exception->getMessage());
+            return false;
+        }
+
+        if ($result !== true) {
+            error_log('PHP mail() fonksiyonu bu sunucuda kullanılamıyor veya başarısız oldu.');
+        }
+
+        return (bool) $result;
+    }
+}
+
 class Helpers
 {
+
     /**
      * @return string
      */
@@ -95,6 +128,59 @@ class Helpers
         $value = $value !== null ? trim($value) : '';
 
         return $value !== '' ? $value : 'reseller panel, smm panel, automation';
+    }
+
+    /**
+     * Legacy stub kept for backwards compatibility.
+     *
+     * @param string $path
+     * @param bool $absolute
+     * @return string
+     */
+    public static function url($path = '', $absolute = false)
+    {
+        $relative = $path !== '' ? '/' . ltrim((string)$path, '/') : '';
+
+        if ($absolute) {
+            $scheme = (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off') ? 'https' : 'http';
+            $host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'localhost';
+
+            return $scheme . '://' . $host . ($relative !== '' ? $relative : '/');
+        }
+
+        return $relative !== '' ? $relative : '/';
+    }
+
+    /**
+     * Safely include a template from the templates directory.
+     *
+     * @param string $template
+     * @param array<string,mixed> $data
+     * @return void
+     */
+    public static function includeTemplate($template, array $data = [])
+    {
+        $cleanTemplate = ltrim((string)$template, '/');
+        $cleanTemplate = str_replace(['..', '\\'], '', $cleanTemplate);
+
+        $path = dirname(__DIR__) . '/templates/' . $cleanTemplate;
+
+        if (!is_file($path)) {
+            $message = sprintf('Template not found: %s', $cleanTemplate);
+            error_log('[Template] ' . $message);
+
+            if (PHP_SAPI !== 'cli') {
+                echo '<!-- ' . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . ' -->';
+            }
+
+            return;
+        }
+
+        if ($data) {
+            extract($data, EXTR_SKIP);
+        }
+
+        include $path;
     }
 
     /**
