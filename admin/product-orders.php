@@ -6,7 +6,7 @@ use App\AuditLog;
 use App\Helpers;
 use App\Database;
 use App\Telegram;
-use App\Mailer;
+use App\Notifications\ResellerNotifier;
 use App\ApiToken;
 
 Auth::requireRoles(array('super_admin', 'admin', 'support'));
@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $pdo->beginTransaction();
 
-            $orderStmt = $pdo->prepare('SELECT po.*, u.name AS user_name, u.email AS user_email, u.id AS owner_id, p.name AS product_name, p.sku, c.name AS category_name FROM product_orders po INNER JOIN users u ON po.user_id = u.id INNER JOIN products p ON po.product_id = p.id LEFT JOIN categories c ON p.category_id = c.id WHERE po.id = :id FOR UPDATE');
+            $orderStmt = $pdo->prepare('SELECT po.*, u.name AS user_name, u.email AS user_email, u.id AS owner_id, u.notify_order_completed, u.telegram_bot_token, u.telegram_chat_id, p.name AS product_name, p.sku, c.name AS category_name FROM product_orders po INNER JOIN users u ON po.user_id = u.id INNER JOIN products p ON po.product_id = p.id LEFT JOIN categories c ON p.category_id = c.id WHERE po.id = :id FOR UPDATE');
             $orderStmt->execute(array('id' => $orderId));
             $order = $orderStmt->fetch();
 
@@ -102,8 +102,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $pdo->commit();
 
                             if ($newStatus === 'completed') {
-                                $message = "Merhaba {$order['user_name']}, siparişini verdiğiniz {$order['product_name']} ürününün teslimatı tamamlandı.";
-                                Mailer::send($order['user_email'], 'Ürün Siparişiniz Tamamlandı', $message);
+                                $orderPayload = array(
+                                    'id' => $orderId,
+                                    'product_name' => isset($order['product_name']) ? $order['product_name'] : null,
+                                    'quantity' => isset($order['quantity']) ? (int)$order['quantity'] : 1,
+                                    'price' => isset($order['price']) ? $order['price'] : null,
+                                );
+
+                                $userPayload = array(
+                                    'email' => $order['user_email'],
+                                    'name' => isset($order['user_name']) ? $order['user_name'] : null,
+                                    'notify_order_completed' => isset($order['notify_order_completed']) ? $order['notify_order_completed'] : null,
+                                    'telegram_bot_token' => isset($order['telegram_bot_token']) ? $order['telegram_bot_token'] : null,
+                                    'telegram_chat_id' => isset($order['telegram_chat_id']) ? $order['telegram_chat_id'] : null,
+                                );
+
+                                ResellerNotifier::sendOrderCompleted($orderPayload, $userPayload);
 
                                 Telegram::notify(sprintf(
                                     "Ürün siparişi tamamlandı!\nBayi: %s\nÜrün: %s\nSipariş No: #%d",
