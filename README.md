@@ -1,62 +1,60 @@
-# Bayi Yönetim Sistemi
+# ResellerScript Platform
 
-Profesyonel bayilik yönetim süreçlerinizi uçtan uca yönetebilmeniz için geliştirilen PHP tabanlı bir yönetim panelidir. Sistem, klasik paylaşımlı hosting ortamlarında sorunsuz şekilde çalışacak şekilde tasarlanmıştır ve MySQL/MariaDB altyapısını kullanır.
+ResellerScript; bayileri, paket siparişlerini ve destek süreçlerini tek panelde toplamak için geliştirilmiş PHP tabanlı bir yönetim uygulamasıdır. Yönetici ekibi siparişleri takip ederken bayiler Telegram üzerinden bildirim alır, bakiye yüklemelerini bildirir ve mobil uyumlu arayüz üzerinden işlemlerini tamamlar.
 
-## Özellikler
-- Güvenli oturum açma sistemi ve şifre sıfırlama akışı
-- Paket yönetimi: sınırsız sayıda paket ekleme, düzenleme, silme ve aktif/pasif durumu değiştirme
-- Ücretli bayilik başvuru formu: paket seçimi, başvuru kaydı, otomatik admin bilgilendirmesi
-- Sipariş yönetimi: başvuruları onaylama, ödeme/tamamlanma durumları, otomatik bayi hesabı oluşturma
-- Ürün ve kategori yönetimi: ayrılmış kategori konsolu, alt kategori desteği ve alış fiyatına göre otomatik USD satış fiyatı hesaplama
-- Bakiye yönetimi: bayi talep/approval akışı, otomatik bakiye hareketleri ve işlem kayıtları
-- Ödeme entegrasyonları: Cryptomus ve Heleket desteği, test modu sayesinde sandbox senaryolarında otomatik onay
-- Destek sistemi: bayi tarafı destek talepleri, admin panelinden yanıt ve durum takibi
-- WooCommerce CSV araçları: ayrı içe aktarma ve dışa aktarma ekranları, WooCommerce ile tam uyumlu dosya üretimi
-- Genel ayarlar ve SEO: site adı/sloganı, meta etiketleri, modül bazlı aç/kapa anahtarları ve otomatik kur yenileme
-- Bayi profil yönetimi: bayi kullanıcıları kendi bilgilerini ve şifrelerini güncelleyebilir
-- WooCommerce API entegrasyonu: otomatik sipariş aktarımı ve durum senkronizasyonu için REST tabanlı uç noktalar
-- Telegram bildirimi: teslim edilen siparişlerde ve bakiye onaylarında otomatik Telegram uyarısı (opsiyonel)
-- Mail ayarları: yönetici panelinden gönderen kimliği, alt metin ve SMTP sunucu yapılandırması
-- Çok dilli arayüz: kullanıcı ve yönetici panelleri Türkçe/İngilizce arasında geçiş yapabilir
-- Dinamik para birimi: İngilizce görünümde USD, Türkçe görünümde güncel kurla TL gösterimi ve otomatik dönüşüm
-- Otomatik bayi pasifleştirme: minimum bakiye ve süre tanımlayarak bayiliği pasife alma politikasını yürütün
-- Modern sol menülü Bootstrap 5 arayüzü ve responsive tasarım
-
-## Kurulum
-1. Proje dosyalarını sunucunuza yükleyin ve web sunucusunun kök dizinini bu klasöre yönlendirin.
-2. `config/config.sample.php` dosyasını `config/config.php` olarak kopyalayın, MySQL/MariaDB bağlantı bilgilerinizi ve varsayılan dili (`DEFAULT_LANGUAGE`) güncelleyin.
-3. Veritabanınızı oluşturun ve `schema.sql` dosyasındaki tabloları içeri aktarın. Kurulum skripti varsayılan olarak aşağıdaki yönetici hesabını oluşturur:
-
-   | Kullanıcı Adı | E-posta                | Şifre          |
-   |---------------|------------------------|----------------|
-   | `Muhammet`    | `muhammet@example.com` | `5806958477i.` |
-
-   İlk girişten sonra şifreyi güncellemeniz tavsiye edilir.
-4. Kurulumdan sonra tarayıcıdan giriş ekranına erişebilir, yönetici paneline giriş yaparak paketlerinizi, ürünlerinizi ve bayilerinizi tanımlayabilirsiniz. Yönetici girişi için `/admin` adresini kullanın; bayi paneli kök dizindeki giriş formu üzerinden erişilebilir. Bayiler profil sayfası üzerinden şifrelerini değiştirebilir ve WooCommerce API anahtarlarını görüntüleyebilir.
-
-## WooCommerce API ve WordPress Eklentisi
-
-- REST API kök adresi: `<kurulum>/api/v1/`
-    - `GET /api/v1/products.php` — Aktif ürün ve kategori listesini döndürür.
-    - `POST /api/v1/orders.php` — WooCommerce siparişlerini SKU bazlı olarak sisteme aktarır.
-    - `GET /api/v1/orders.php` — Dış referansa veya duruma göre siparişleri listeler.
-    - `POST /api/v1/token-webhook.php` — Webhook adresinizi kaydetmenizi sağlar.
-- API çağrılarında `Authorization: Bearer <API_KEY>` ve `X-Reseller-Email: <bayi e-postası>` başlıklarını gönderdiğinizden emin olun.
-- Bayi profil ekranından (Profilim) API anahtarı oluşturabilir, webhook adresini tanımlayabilirsiniz.
-- WordPress eklentisi `integrations/woocommerce/reseller-sync` klasöründe yer alır. Zip olarak paketleyip WordPress eklentisi olarak yükleyin ve WooCommerce → Reseller Sync menüsünden bayi e-posta adresinizi ve API anahtarınızı girin.
-- Panel alan adınız farklıysa eklenti içindeki `Reseller_Sync_Connector::API_BASE` sabitini veya `RESELLER_SYNC_API_BASE` tanımını güncelleyerek API uç noktasını özelleştirebilirsiniz.
-- Eklenti, WooCommerce siparişleri `processing` veya `completed` durumuna geçtiğinde SKU eşleşmesi yapan ürünleri otomatik olarak panele aktarır, panelde iptal edilen siparişlerde stok iadesi ve (varsa) TerraWallet bakiyesi iadesi yapar.
+## Başlıca Özellikler
+- **Bayi ve yönetici panelleri:** Paket/sipariş yönetimi, bakiye onayı, destek talepleri ve raporlar için ayrı ekranlar.
+- **Telegram entegrasyonu:** Bayilik onayı, sipariş tamamlanması, bakiye onayı ve destek yanıtları için otomatik bildirimler.
+- **Demo ve güvenlik kısıtları:** Yönetici tarafından açılıp kapatılabilen demo hesap, hata günlükleme ve zorunlu şifre/telefon doğrulamaları.
+- **Bankadan ödeme bildirimi:** Havale/EFT ile yapılan başvurular otomatik olarak bekleyen bakiye talebi oluşturur.
+- **Mobil uyum:** Navigasyon, tablolar ve modaller küçük ekranlarda kullanılabilir olacak şekilde yeniden düzenlendi.
 
 ## Gereksinimler
-- PHP 8.1 veya üzeri (PDO, cURL, OpenSSL, mbstring eklentileri aktif olmalıdır)
-- MySQL veya MariaDB
-- SMTP veya standart `mail()` fonksiyonunun çalışabildiği bir sunucu (e-posta gönderimleri için)
-- Telegram bildirimleri için bot token ve chat ID (opsiyonel)
+- PHP 8.0 veya üzeri (pdo_mysql, intl, zip, mbstring uzantıları ile)
+- MySQL 8.x
+- Composer (bağımlılık yönetimi için)
+- İsteğe bağlı: Docker ve Docker Compose
 
-## Geliştirme
-- Projede Composer kullanılmaz; tüm sınıflar basit bir autoloader ile yüklenir.
-- `config/config.php` dosyası git tarafından izlenmez; dağıtıma özel yapılandırmalar için bu dosya kullanılır.
-- Arayüz Bootstrap CDN üzerinden yüklenir. Ek CSS düzenlemeleri `assets/css/style.css` üzerinden yapılabilir.
+## Kurulum Adımları
+1. Depoyu sunucunuza klonlayın veya dosyaları kopyalayın.
+2. `config/config.sample.php` dosyasını `config/config.php` olarak kopyalayın ve veritabanı/Telegram ayarlarınızı girin.
+3. `composer install --no-dev` komutunu çalıştırarak autoloader oluşturun.
+4. Boş bir MySQL veritabanı oluşturun ve `schema.sql` dosyasındaki tabloları içeri aktarın.
+5. `storage/logs` dizininin yazılabilir olduğundan emin olun.
+6. Web sunucunuzu proje köküne yönlendirin (Apache/Nginx) veya yerel geliştirme için `php -S 0.0.0.0:8080` komutunu kullanın.
+
+## Ortam Değişkenleri
+`.env` dosyasıyla veya sistem değişkenleriyle aşağıdaki anahtarlar tanımlanabilir:
+
+| Değişken | Açıklama | Varsayılan |
+| --- | --- | --- |
+| `DB_HOST` | MySQL sunucusu | `127.0.0.1` |
+| `DB_NAME` | Veritabanı adı | `resellerscript` |
+| `DB_USER` | Veritabanı kullanıcısı | `root` |
+| `DB_PASS` | Veritabanı parolası | boş |
+| `LOG_DIR` | Uygulama log dizini | `storage/logs` |
+| `APP_TIMEZONE` | PHP varsayılan zaman dilimi | `UTC` |
+
+Telegram bildirimleri için `config/config.php` dosyasında `TELEGRAM_BOT_TOKEN` ve `TELEGRAM_CHAT_ID` değerlerini doldurmayı unutmayın.
+
+## Docker ile Hızlı Başlangıç (Opsiyonel)
+```bash
+docker-compose up --build
+```
+- Uygulama: `http://localhost:8080`
+- Veritabanı: `localhost:3306` (kullanıcı: `reseller`, parola: `secret`)
+
+İlk kurulumdan sonra `schema.sql` dosyasını konteyner içerisinden MySQL'e aktarmanız gerekir.
+
+## Günlükler
+`app/ErrorLogger` sınıfı tüm uyarı ve hataları `storage/logs/error.log` dosyasına yönlendirir. Uygulama günlükleri ise `storage/logs/app.log` dosyasında tutulur.
+
+## Hızlı Kontrol Listesi
+1. Veritabanı bağlantısı ve tablo oluşturma tamamlandı mı?
+2. Yönetici hesabıyla giriş yapılıyor mu?
+3. Paket siparişi oluşturulup banka havalesi talebi düşüyor mu?
+4. Telegram bildirimleri istenilen olaylar için ulaşıyor mu?
+5. Demo hesabı aktif/pasif geçişi çalışıyor mu?
 
 ## Lisans
-Bu proje MIT Lisansı ile lisanslanmıştır. Ayrıntılar için `LICENSE` dosyasına göz atın.
+Bu proje MIT lisansı ile dağıtılmaktadır. Detaylar için `LICENSE` dosyasına bakınız.
