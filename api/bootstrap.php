@@ -51,6 +51,8 @@ try {
     exit;
 }
 
+App\Notifications\PreferenceManager::ensureUserColumns();
+
 if (!App\FeatureToggle::isEnabled('api')) {
     http_response_code(503);
     echo json_encode(array(
@@ -121,13 +123,17 @@ function authenticate_token()
         }
     }
 
-    if ($email === '') {
-        json_response(array('success' => false, 'error' => 'E-posta adresi bulunamadı.'), 401);
+    $tokenRow = null;
+    if ($email !== '') {
+        $tokenRow = App\ApiToken::findActiveToken($token, $email);
     }
 
-    $tokenRow = App\ApiToken::findActiveToken($token, $email);
     if (!$tokenRow) {
-        json_response(array('success' => false, 'error' => 'API anahtarı veya e-posta doğrulanamadı.'), 401);
+        $tokenRow = App\ApiToken::findActiveToken($token);
+    }
+
+    if (!$tokenRow) {
+        json_response(array('success' => false, 'error' => 'API anahtarı doğrulanamadı.'), 401);
     }
 
     return $tokenRow;

@@ -37,7 +37,7 @@ if (isset($_GET['token'])) {
         }
     }
 
-    include __DIR__ . '/templates/auth-header.php';
+    Helpers::includeTemplate('auth-header.php');
     ?>
     <div class="auth-wrapper">
         <div class="auth-card">
@@ -78,7 +78,7 @@ if (isset($_GET['token'])) {
         </div>
     </div>
     <?php
-    include __DIR__ . '/templates/auth-footer.php';
+    Helpers::includeTemplate('auth-footer.php');
     exit;
 }
 
@@ -97,7 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-include __DIR__ . '/templates/auth-header.php';
+Helpers::includeTemplate('auth-header.php');
 ?>
 <div class="auth-wrapper">
     <div class="auth-card">
@@ -132,4 +132,4 @@ include __DIR__ . '/templates/auth-header.php';
         </form>
     </div>
 </div>
-<?php include __DIR__ . '/templates/auth-footer.php';
+<?php Helpers::includeTemplate('auth-footer.php'); ?>

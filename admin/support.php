@@ -5,6 +5,7 @@ use App\Auth;
 use App\AuditLog;
 use App\Helpers;
 use App\Database;
+use App\Notifications\ResellerMailer;
 
 Auth::requireRoles(array('super_admin', 'admin', 'support'));
 
@@ -23,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($ticketId <= 0 || !$message) {
             $errors[] = 'Mesaj boş olamaz.';
         } else {
-            $ticketStmt = $pdo->prepare('SELECT * FROM support_tickets WHERE id = :id');
+            $ticketStmt = $pdo->prepare('SELECT st.*, u.name AS user_name, u.email AS user_email, u.notify_support_replied FROM support_tickets st INNER JOIN users u ON st.user_id = u.id WHERE st.id = :id');
             $ticketStmt->execute(['id' => $ticketId]);
             $ticket = $ticketStmt->fetch();
 
@@ -46,6 +47,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $ticketId,
                     'Destek talebine yanıt verildi'
                 );
+
+                $customerEmail = isset($ticket['user_email']) ? (string)$ticket['user_email'] : '';
+                if ($customerEmail !== '') {
+                    $userPayload = array(
+                        'email' => $customerEmail,
+                        'name' => isset($ticket['user_name']) ? $ticket['user_name'] : null,
+                        'notify_support_replied' => isset($ticket['notify_support_replied']) ? $ticket['notify_support_replied'] : null,
+                    );
+
+                    $ticketPayload = array(
+                        'subject' => isset($ticket['subject']) ? $ticket['subject'] : '',
+                    );
+
+                    ResellerMailer::sendSupportReply($userPayload, $ticketPayload, $message);
+                }
             }
         }
     } elseif ($action === 'status') {

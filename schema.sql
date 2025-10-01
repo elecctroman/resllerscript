@@ -6,6 +6,9 @@ CREATE TABLE IF NOT EXISTS users (
     role ENUM('super_admin','admin','finance','support','content','reseller') NOT NULL DEFAULT 'reseller',
     balance DECIMAL(12,2) NOT NULL DEFAULT 0,
     status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    notify_order_completed TINYINT(1) NOT NULL DEFAULT 1,
+    notify_balance_approved TINYINT(1) NOT NULL DEFAULT 1,
+    notify_support_replied TINYINT(1) NOT NULL DEFAULT 1,
     low_balance_since DATETIME NULL DEFAULT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
@@ -131,7 +134,8 @@ CREATE TABLE IF NOT EXISTS balance_transactions (
 
 CREATE TABLE IF NOT EXISTS balance_requests (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
+    user_id INT NULL,
+    package_order_id INT NULL,
     amount DECIMAL(12,2) NOT NULL,
     payment_method VARCHAR(150) NOT NULL,
     payment_provider VARCHAR(100) NULL,
@@ -146,6 +150,7 @@ CREATE TABLE IF NOT EXISTS balance_requests (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (package_order_id) REFERENCES package_orders(id),
     FOREIGN KEY (processed_by) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
