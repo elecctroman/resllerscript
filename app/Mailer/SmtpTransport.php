@@ -63,7 +63,7 @@ class SmtpTransport
      * @param string|null $replyTo
      * @return void
      */
-    public function send($fromEmail, $fromName, $toEmail, $subject, $body, $replyTo = null)
+    public function send($fromEmail, $fromName, $toEmail, $subject, $body, $replyTo = null, array $options = array())
     {
         $remote = $this->host . ':' . $this->port;
         $cryptoTransport = null;
@@ -122,13 +122,31 @@ class SmtpTransport
         $headers[] = 'To: ' . (is_array($toEmail) ? implode(', ', $toEmail) : $toEmail);
         $headers[] = 'Subject: ' . $subject;
         $headers[] = 'Date: ' . date(DATE_RFC2822);
-        $headers[] = 'MIME-Version: 1.0';
-        $headers[] = 'Content-Type: text/plain; charset=UTF-8';
-        $headers[] = 'Content-Transfer-Encoding: 8bit';
-        $headers[] = 'X-Mailer: ResellerPanel';
 
         if ($replyTo) {
             $headers[] = 'Reply-To: ' . $replyTo;
+        }
+
+        $extra = isset($options['headers']) && is_array($options['headers']) ? $options['headers'] : array();
+        $mimeInjected = false;
+        $xMailerInjected = false;
+
+        foreach ($extra as $headerLine) {
+            if (stripos($headerLine, 'mime-version:') === 0) {
+                $mimeInjected = true;
+            }
+            if (stripos($headerLine, 'x-mailer:') === 0) {
+                $xMailerInjected = true;
+            }
+            $headers[] = $headerLine;
+        }
+
+        if (!$mimeInjected) {
+            $headers[] = 'MIME-Version: 1.0';
+        }
+
+        if (!$xMailerInjected) {
+            $headers[] = 'X-Mailer: ResellerPanel';
         }
 
         $messageData = implode("\r\n", $headers) . "\r\n\r\n" . $body;

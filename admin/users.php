@@ -45,27 +45,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if (!$errors) {
-            $userId = Auth::createUser($name, $email, $password, $role, $balance);
-
-            if ($balance > 0) {
-                $pdo->prepare('INSERT INTO balance_transactions (user_id, amount, type, description, created_at) VALUES (:user_id, :amount, :type, :description, NOW())')->execute([
-                    'user_id' => $userId,
-                    'amount' => $balance,
-                    'type' => 'credit',
-                    'description' => 'Başlangıç bakiyesi',
-                ]);
+            $userId = null;
+            try {
+                $userId = Auth::createUser($name, $email, $password, $role, $balance);
+            } catch (\Throwable $exception) {
+                $errors[] = 'Bayi hesabı oluşturulurken bir hata oluştu. Lütfen daha sonra tekrar deneyin.';
+                error_log('Bayi oluşturma hatası: ' . $exception->getMessage());
             }
 
-            Mailer::send($email, 'Bayi Hesabınız Oluşturuldu', "Merhaba $name,\n\nBayi hesabınız oluşturulmuştur.\nKullanıcı adı: $email\nŞifre: $password\n\nPanele giriş yaparak işlemlerinize başlayabilirsiniz.");
-            $success = 'Bayi hesabı oluşturuldu ve bilgilendirme e-postası gönderildi.';
+            if (!$errors && $userId !== null) {
+                if ($balance > 0) {
+                    try {
+                        $pdo->prepare('INSERT INTO balance_transactions (user_id, amount, type, description, created_at) VALUES (:user_id, :amount, :type, :description, NOW())')->execute([
+                            'user_id' => $userId,
+                            'amount' => $balance,
+                            'type' => 'credit',
+                            'description' => 'Başlangıç bakiyesi',
+                        ]);
+                    } catch (\Throwable $exception) {
+                        error_log('Başlangıç bakiyesi kaydedilemedi: ' . $exception->getMessage());
+                    }
+                }
 
-            AuditLog::record(
-                $currentUser['id'],
-                'user.create',
-                'user',
-                $userId,
-                sprintf('Yeni kullanıcı: %s (%s)', $email, $role)
-            );
+                $emailSent = true;
+                try {
+                    Mailer::send($email, 'Bayi Hesabınız Oluşturuldu', "Merhaba $name,\n\nBayi hesabınız oluşturulmuştur.\nKullanıcı adı: $email\nŞifre: $password\n\nPanele giriş yaparak işlemlerinize başlayabilirsiniz.");
+                } catch (\Throwable $exception) {
+                    error_log('Bayi oluşturma e-postası gönderilemedi: ' . $exception->getMessage());
+                    $emailSent = false;
+                }
+
+                $success = $emailSent
+                    ? 'Bayi hesabı oluşturuldu ve bilgilendirme e-postası gönderildi.'
+                    : 'Bayi hesabı oluşturuldu ancak bilgilendirme e-postası gönderilemedi.';
+
+                AuditLog::record(
+                    $currentUser['id'],
+                    'user.create',
+                    'user',
+                    $userId,
+                    sprintf('Yeni kullanıcı: %s (%s)', $email, $role)
+                );
+            }
         }
     } elseif ($action === 'balance') {
         $userId = isset($_POST['user_id']) ? (int)$_POST['user_id'] : 0;

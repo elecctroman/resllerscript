@@ -4,6 +4,8 @@ require __DIR__ . '/../bootstrap.php';
 use App\Auth;
 use App\AuditLog;
 use App\Helpers;
+use App\Mailer;
+use App\Notifications\EmailTemplate;
 use App\Settings;
 
 Auth::requireRoles(array('super_admin', 'admin'));
@@ -24,13 +26,43 @@ $current = Settings::getMany([
     'smtp_password',
     'smtp_encryption',
     'smtp_timeout',
+    'mail_notify_order_completed',
+    'mail_notify_balance_approved',
+    'mail_notify_support_replied',
 ]);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $fromName = isset($_POST['mail_from_name']) ? trim($_POST['mail_from_name']) : '';
-    $fromAddress = isset($_POST['mail_from_address']) ? trim($_POST['mail_from_address']) : '';
-    $replyTo = isset($_POST['mail_reply_to']) ? trim($_POST['mail_reply_to']) : '';
-    $footer = isset($_POST['mail_footer']) ? trim($_POST['mail_footer']) : '';
+    $action = isset($_POST['action']) ? $_POST['action'] : 'save_settings';
+
+    if ($action === 'test_smtp') {
+        $testEmail = isset($_POST['test_email']) ? trim($_POST['test_email']) : '';
+
+        if ($testEmail === '' || !filter_var($testEmail, FILTER_VALIDATE_EMAIL)) {
+            $errors[] = 'Geçerli bir test e-posta adresi girin.';
+        }
+
+        if (!$errors) {
+            $sampleItems = array(
+                array('label' => 'Sunucu', 'value' => Settings::get('smtp_host', 'localhost')),
+                array('label' => 'Gönderen', 'value' => Settings::get('mail_from_address', 'no-reply@example.com')),
+            );
+
+            $html = EmailTemplate::render('SMTP Test Mesajı', 'SMTP ayarlarınız başarıyla kaydedildi. Bu mesaj bağlantıyı doğrulamak için gönderildi.', $sampleItems);
+            $plain = EmailTemplate::renderPlain('SMTP Test Mesajı', 'SMTP ayarlarınız başarıyla kaydedildi. Bu mesaj bağlantıyı doğrulamak için gönderildi.', $sampleItems);
+
+            $result = Mailer::send($testEmail, 'SMTP Test Mesajı', $html, array('is_html' => true, 'alt_body' => $plain));
+
+            if ($result) {
+                $success = 'Test e-postası gönderildi. Lütfen gelen kutunuzu kontrol edin.';
+            } else {
+                $errors[] = 'Test e-postası gönderilemedi. Lütfen error.log kaydını inceleyin.';
+            }
+        }
+    } else {
+        $fromName = isset($_POST['mail_from_name']) ? trim($_POST['mail_from_name']) : '';
+        $fromAddress = isset($_POST['mail_from_address']) ? trim($_POST['mail_from_address']) : '';
+        $replyTo = isset($_POST['mail_reply_to']) ? trim($_POST['mail_reply_to']) : '';
+        $footer = isset($_POST['mail_footer']) ? trim($_POST['mail_footer']) : '';
 
     if ($fromName === '') {
         $errors[] = 'Gönderen adı zorunludur.';
@@ -70,7 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    if (!$errors) {
+    if ($action !== 'test_smtp' && !$errors) {
         Settings::set('mail_from_name', $fromName);
         Settings::set('mail_from_address', $fromAddress);
         Settings::set('mail_reply_to', $replyTo !== '' ? $replyTo : null);
@@ -83,6 +115,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         Settings::set('smtp_password', $smtpPassword !== '' ? $smtpPassword : null);
         Settings::set('smtp_encryption', $smtpEncryption !== '' ? $smtpEncryption : 'tls');
         Settings::set('smtp_timeout', (string)$smtpTimeout);
+
+        $notifyOrder = isset($_POST['mail_notify_order_completed']) ? '1' : '0';
+        $notifyBalance = isset($_POST['mail_notify_balance_approved']) ? '1' : '0';
+        $notifySupport = isset($_POST['mail_notify_support_replied']) ? '1' : '0';
+
+        Settings::set('mail_notify_order_completed', $notifyOrder);
+        Settings::set('mail_notify_balance_approved', $notifyBalance);
+        Settings::set('mail_notify_support_replied', $notifySupport);
 
         $success = 'Mail ayarları kaydedildi.';
         AuditLog::record(
@@ -104,8 +144,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'smtp_password' => $smtpPassword,
             'smtp_encryption' => $smtpEncryption,
             'smtp_timeout' => (string)$smtpTimeout,
+            'mail_notify_order_completed' => $notifyOrder,
+            'mail_notify_balance_approved' => $notifyBalance,
+            'mail_notify_support_replied' => $notifySupport,
         ];
     }
+}
 }
 
 $pageTitle = 'Mail Ayarları';
@@ -115,6 +159,7 @@ include __DIR__ . '/../templates/header.php';
 <div class="row justify-content-center">
     <div class="col-12 col-lg-10 col-xxl-8">
         <form method="post" class="vstack gap-4">
+            <input type="hidden" name="action" value="save_settings">
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white">
                     <h5 class="mb-0">Bildirim E-postaları</h5>
@@ -153,6 +198,22 @@ include __DIR__ . '/../templates/header.php';
                             <label class="form-label">E-posta Alt Metni</label>
                             <textarea name="mail_footer" class="form-control" rows="4" placeholder="İsteğe bağlı kapanış mesaj."><?= Helpers::sanitize(isset($current['mail_footer']) ? $current['mail_footer'] : '') ?></textarea>
                             <small class="text-muted">Bu alan tüm sistem e-postalarının sonuna eklenir.</small>
+                        </div>
+                        <div class="col-12">
+                            <hr>
+                            <h6 class="text-uppercase text-muted small">Bayi Bildirimleri</h6>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="mailNotifyOrder" name="mail_notify_order_completed" <?= !isset($current['mail_notify_order_completed']) || $current['mail_notify_order_completed'] !== '0' ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="mailNotifyOrder">Sipariş tamamlandığında bayilere e-posta gönder</label>
+                            </div>
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" id="mailNotifyBalance" name="mail_notify_balance_approved" <?= !isset($current['mail_notify_balance_approved']) || $current['mail_notify_balance_approved'] !== '0' ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="mailNotifyBalance">Bakiye yüklemeleri onaylandığında bayilere e-posta gönder</label>
+                            </div>
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" id="mailNotifySupport" name="mail_notify_support_replied" <?= !isset($current['mail_notify_support_replied']) || $current['mail_notify_support_replied'] !== '0' ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="mailNotifySupport">Destek yanıtlarında bayilere e-posta gönder</label>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -215,6 +276,24 @@ include __DIR__ . '/../templates/header.php';
                 <button type="submit" class="btn btn-primary">Ayarları Kaydet</button>
             </div>
         </form>
+        <div class="card border-0 shadow-sm mt-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">SMTP Bağlantı Testi</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" class="row g-3 align-items-end">
+                    <input type="hidden" name="action" value="test_smtp">
+                    <div class="col-12 col-md-8">
+                        <label class="form-label">Test E-postası</label>
+                        <input type="email" name="test_email" class="form-control" placeholder="test@example.com" required>
+                    </div>
+                    <div class="col-12 col-md-4 text-md-end">
+                        <button type="submit" class="btn btn-outline-primary mt-3 mt-md-0">Test Mesajı Gönder</button>
+                    </div>
+                </form>
+                <small class="text-muted d-block mt-3">Bu test yalnızca SMTP ayarlarının e-posta gönderimini desteklediğini doğrular.</small>
+            </div>
+        </div>
     </div>
 </div>
 <?php include __DIR__ . '/../templates/footer.php';

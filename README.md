@@ -41,10 +41,10 @@ Profesyonel bayilik yönetim süreçlerinizi uçtan uca yönetebilmeniz için ge
     - `POST /api/v1/orders.php` — WooCommerce siparişlerini SKU bazlı olarak sisteme aktarır.
     - `GET /api/v1/orders.php` — Dış referansa veya duruma göre siparişleri listeler.
     - `POST /api/v1/token-webhook.php` — Webhook adresinizi kaydetmenizi sağlar.
-- API çağrılarında `Authorization: Bearer <API_KEY>` ve `X-Reseller-Email: <bayi e-postası>` başlıklarını gönderdiğinizden emin olun.
+- API çağrılarında `Authorization: Bearer <API_KEY>` başlığını gönderdiğinizden emin olun.
 - Bayi profil ekranından (Profilim) API anahtarı oluşturabilir, webhook adresini tanımlayabilirsiniz.
-- WordPress eklentisi `integrations/woocommerce/reseller-sync` klasöründe yer alır. Zip olarak paketleyip WordPress eklentisi olarak yükleyin ve WooCommerce → Reseller Sync menüsünden bayi e-posta adresinizi ve API anahtarınızı girin.
-- Panel alan adınız farklıysa eklenti içindeki `Reseller_Sync_Connector::API_BASE` sabitini veya `RESELLER_SYNC_API_BASE` tanımını güncelleyerek API uç noktasını özelleştirebilirsiniz.
+- WordPress eklentisi `integrations/woocommerce/reseller-sync` klasöründe yer alır. Zip olarak paketleyip WordPress eklentisi olarak yükleyin ve WooCommerce → Reseller Sync menüsünden bayi panelinizde gösterilen API adresi ile API anahtarını girin.
+- Panel alan adınız farklıysa eklenti ayarlarında API adresi alanını güncelleyerek WooCommerce ile panel arasındaki bağlantıyı özelleştirebilirsiniz.
 - Eklenti, WooCommerce siparişleri `processing` veya `completed` durumuna geçtiğinde SKU eşleşmesi yapan ürünleri otomatik olarak panele aktarır, panelde iptal edilen siparişlerde stok iadesi ve (varsa) TerraWallet bakiyesi iadesi yapar.
 
 ## Gereksinimler
