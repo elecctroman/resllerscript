@@ -6,7 +6,11 @@ use App\AuditLog;
 use App\Currency;
 use App\FeatureToggle;
 use App\Helpers;
+use App\Integrations\ProviderClient;
 use App\Settings;
+
+$providerErrors = array();
+$providerSuccess = '';
 
 Auth::requireRoles(array('super_admin', 'admin'));
 
@@ -23,6 +27,8 @@ $current = Settings::getMany(array(
     'reseller_auto_suspend_enabled',
     'reseller_auto_suspend_threshold',
     'reseller_auto_suspend_days',
+    'provider_api_url',
+    'provider_api_key',
 ));
 
 $featureLabels = array(
@@ -32,6 +38,7 @@ $featureLabels = array(
     'support' => 'Destek talepleri',
     'packages' => 'Bayilik paketleri başvurusu',
     'api' => 'API erişimi',
+    'premium_modules' => 'Premium modül pazarı',
 );
 
 $featureStates = FeatureToggle::all();
@@ -49,6 +56,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $success = 'Kur bilgisi başarıyla güncellendi.';
             } else {
                 $errors[] = 'Kur servisine ulaşılamadığı için güncelleme yapılamadı.';
+            }
+        } elseif ($action === 'save_provider' || $action === 'test_provider') {
+            $apiUrlInput = isset($_POST['provider_api_url']) ? trim($_POST['provider_api_url']) : (isset($current['provider_api_url']) ? $current['provider_api_url'] : '');
+            $apiKeyInput = isset($_POST['provider_api_key']) ? trim($_POST['provider_api_key']) : (isset($current['provider_api_key']) ? $current['provider_api_key'] : '');
+
+            if ($apiUrlInput !== '' && !filter_var($apiUrlInput, FILTER_VALIDATE_URL)) {
+                $providerErrors[] = 'Geçerli bir API adresi girmeniz gerekiyor.';
+            }
+
+            if ($action === 'save_provider' && !$providerErrors) {
+                $normalizedUrl = $apiUrlInput !== '' ? rtrim($apiUrlInput, '/') : null;
+                Settings::set('provider_api_url', $normalizedUrl);
+                Settings::set('provider_api_key', $apiKeyInput !== '' ? $apiKeyInput : null);
+                $providerSuccess = 'Sağlayıcı API bilgileri kaydedildi.';
+
+                $current['provider_api_url'] = $normalizedUrl;
+                $current['provider_api_key'] = $apiKeyInput !== '' ? $apiKeyInput : null;
+            } elseif ($action === 'test_provider' && !$providerErrors) {
+                if ($apiUrlInput === '' || $apiKeyInput === '') {
+                    $providerErrors[] = 'API adresi ve anahtarı zorunludur.';
+                } else {
+                    try {
+                        $client = new ProviderClient($apiUrlInput, $apiKeyInput);
+                        $testResponse = $client->testConnection();
+
+                        if (isset($testResponse['success']) && $testResponse['success']) {
+                            $providerSuccess = 'API bağlantısı doğrulandı.';
+                        } else {
+                            $providerErrors[] = 'API yanıtı doğrulanamadı. Lütfen bilgileri kontrol edin.';
+                        }
+                    } catch (\RuntimeException $exception) {
+                        $providerErrors[] = 'API testi başarısız oldu: ' . $exception->getMessage();
+                    }
+                }
             }
         } else {
             $siteName = isset($_POST['site_name']) ? trim($_POST['site_name']) : '';
@@ -119,6 +160,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'reseller_auto_suspend_enabled',
                     'reseller_auto_suspend_threshold',
                     'reseller_auto_suspend_days',
+                    'provider_api_url',
+                    'provider_api_key',
                 ));
             }
         }
@@ -238,9 +281,52 @@ include __DIR__ . '/../templates/header.php';
                         </div>
                     </div>
 
-                    <div class="d-flex justify-content-end">
-                        <button type="submit" class="btn btn-primary">Ayarları Kaydet</button>
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-primary">Ayarları Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Sağlayıcı API</h5>
+                <span class="text-muted small">Lotus Lisans entegrasyonu</span>
+            </div>
+            <div class="card-body">
+                <?php if ($providerErrors): ?>
+                    <div class="alert alert-danger">
+                        <ul class="mb-0">
+                            <?php foreach ($providerErrors as $error): ?>
+                                <li><?= Helpers::sanitize($error) ?></li>
+                            <?php endforeach; ?>
+                        </ul>
                     </div>
+                <?php endif; ?>
+
+                <?php if ($providerSuccess): ?>
+                    <div class="alert alert-success"><?= Helpers::sanitize($providerSuccess) ?></div>
+                <?php endif; ?>
+
+                <form method="post" class="vstack gap-3">
+                    <input type="hidden" name="csrf_token" value="<?= Helpers::sanitize(Helpers::csrfToken()) ?>">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">API Adresi</label>
+                            <input type="url" name="provider_api_url" class="form-control" placeholder="https://partner.example.com" value="<?= Helpers::sanitize(isset($current['provider_api_url']) ? $current['provider_api_url'] : '') ?>">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">API Anahtarı</label>
+                            <input type="text" name="provider_api_key" class="form-control" placeholder="API anahtarınızı girin" value="<?= Helpers::sanitize(isset($current['provider_api_key']) ? $current['provider_api_key'] : '') ?>">
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-column flex-sm-row gap-2">
+                        <button type="submit" name="action" value="save_provider" class="btn btn-primary">Ayarları Kaydet</button>
+                        <button type="submit" name="action" value="test_provider" class="btn btn-outline-secondary">Bağlantıyı Test Et</button>
+                        <a href="/admin/providers.php" class="btn btn-outline-primary">Sağlayıcıyı Görüntüle</a>
+                    </div>
+                    <p class="text-muted small mb-0">Sağlayıcı API bilgilerini kaydettikten sonra, ürünlerinizde "Lotus" sağlayıcısını seçerek siparişlerin otomatik iletilmesini sağlayabilirsiniz.</p>
                 </form>
             </div>
         </div>
