@@ -77,6 +77,37 @@ include __DIR__ . '/templates/header.php';
                             </thead>
                             <tbody>
                             <?php foreach ($productOrders as $order): ?>
+                                <?php
+                                $lotusDeliveries = array();
+                                if (!empty($order['external_metadata'])) {
+                                    $decodedMetadata = json_decode($order['external_metadata'], true);
+                                    if (json_last_error() === JSON_ERROR_NONE && is_array($decodedMetadata)) {
+                                        $lotusMeta = isset($decodedMetadata['lotus']) && is_array($decodedMetadata['lotus']) ? $decodedMetadata['lotus'] : array();
+                                        if (isset($lotusMeta['orders']) && is_array($lotusMeta['orders'])) {
+                                            foreach ($lotusMeta['orders'] as $lotusOrder) {
+                                                if (!is_array($lotusOrder)) {
+                                                    continue;
+                                                }
+                                                $orderData = isset($lotusOrder['data']) && is_array($lotusOrder['data']) ? $lotusOrder['data'] : array();
+                                                $content = isset($orderData['content']) ? (string)$orderData['content'] : '';
+                                                if ($content === '') {
+                                                    continue;
+                                                }
+                                                $remoteId = null;
+                                                if (isset($orderData['order_id'])) {
+                                                    $remoteId = (string)$orderData['order_id'];
+                                                } elseif (isset($orderData['id'])) {
+                                                    $remoteId = (string)$orderData['id'];
+                                                }
+                                                $lotusDeliveries[] = array(
+                                                    'content' => $content,
+                                                    'order_id' => $remoteId,
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+                                ?>
                                 <tr>
                                     <td><?= (int)$order['id'] ?></td>
                                     <td>
@@ -87,6 +118,18 @@ include __DIR__ . '/templates/header.php';
                                         <?php endif; ?>
                                         <?php if (!empty($order['admin_note'])): ?>
                                             <div class="text-muted small">Yönetici Notu: <?= Helpers::sanitize($order['admin_note']) ?></div>
+                                        <?php endif; ?>
+                                        <?php if ($lotusDeliveries): ?>
+                                            <div class="mt-3">
+                                                <?php foreach ($lotusDeliveries as $delivery): ?>
+                                                    <div class="border rounded bg-light-subtle p-2 mb-2">
+                                                        <?php if (!empty($delivery['order_id'])): ?>
+                                                            <div class="small text-muted mb-1">Lotus Sipariş ID: <?= Helpers::sanitize($delivery['order_id']) ?></div>
+                                                        <?php endif; ?>
+                                                        <pre class="mb-0 small"><?= Helpers::sanitize($delivery['content']) ?></pre>
+                                                    </div>
+                                                <?php endforeach; ?>
+                                            </div>
                                         <?php endif; ?>
                                     </td>
                                     <td><?= Helpers::sanitize($order['category_name']) ?></td>

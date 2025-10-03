@@ -80,6 +80,12 @@ if ($user) {
                 ),
             ),
             array(
+                'heading' => 'Sağlayıcılar',
+                'items' => array(
+                    array('label' => 'Lotus Lisans', 'href' => '/admin/providers-lotus.php', 'pattern' => '/admin/providers-lotus.php', 'icon' => 'bi-hdd-network', 'roles' => array('super_admin', 'admin')),
+                ),
+            ),
+            array(
                 'heading' => 'WooCommerce',
                 'items' => array(
                     array('label' => 'İçe Aktar', 'href' => '/admin/woocommerce-import.php', 'pattern' => '/admin/woocommerce-import.php', 'icon' => 'bi-file-arrow-up', 'roles' => array('super_admin', 'admin', 'content')),

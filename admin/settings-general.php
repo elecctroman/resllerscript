@@ -8,6 +8,8 @@ use App\DemoMode;
 use App\FeatureToggle;
 use App\Helpers;
 use App\Settings;
+use App\Services\LotusPartnerApi;
+use Lotus\Exceptions\ApiError;
 
 Auth::requireRoles(array('super_admin', 'admin'));
 
@@ -25,7 +27,17 @@ $current = Settings::getMany(array(
     'reseller_auto_suspend_threshold',
     'reseller_auto_suspend_days',
     'demo_mode_enabled',
+    'lotus_api_enabled',
+    'lotus_api_key',
+    'lotus_base_url',
+    'lotus_use_query_api_key',
+    'lotus_timeout',
 ));
+
+$defaultLotusBaseUrl = 'https://partner.lotuslisans.com.tr';
+if (!isset($current['lotus_base_url']) || $current['lotus_base_url'] === null || $current['lotus_base_url'] === '') {
+    $current['lotus_base_url'] = $defaultLotusBaseUrl;
+}
 
 $featureLabels = array(
     'products' => 'Ürün kataloğu ve sipariş verme',
@@ -66,10 +78,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $autoSuspendEnabled = isset($_POST['reseller_auto_suspend_enabled']) ? '1' : '0';
             $autoThresholdInput = isset($_POST['reseller_auto_suspend_threshold']) ? str_replace(',', '.', trim($_POST['reseller_auto_suspend_threshold'])) : '0';
             $autoThreshold = (float)$autoThresholdInput;
+            $lotusEnabled = isset($_POST['lotus_api_enabled']) ? '1' : '0';
+            $lotusApiKey = isset($_POST['lotus_api_key']) ? trim($_POST['lotus_api_key']) : '';
+            $lotusBaseUrlInput = isset($_POST['lotus_base_url']) ? trim($_POST['lotus_base_url']) : '';
+            $lotusUseQuery = isset($_POST['lotus_use_query_api_key']) ? '1' : '0';
+            $lotusTimeoutRaw = isset($_POST['lotus_timeout']) ? trim($_POST['lotus_timeout']) : '';
+            $lotusBaseUrl = $lotusBaseUrlInput !== '' ? $lotusBaseUrlInput : $defaultLotusBaseUrl;
+            $lotusTimeout = null;
+            if ($lotusTimeoutRaw !== '') {
+                $lotusTimeout = (float) str_replace(',', '.', $lotusTimeoutRaw);
+                if ($lotusTimeout <= 0) {
+                    $errors[] = 'Lotus API zaman aşımı pozitif olmalıdır.';
+                }
+            }
+
             $autoDays = isset($_POST['reseller_auto_suspend_days']) ? (int)$_POST['reseller_auto_suspend_days'] : 0;
 
             if ($siteName === '') {
                 $errors[] = 'Site adı zorunludur.';
+            }
+
+            if (($lotusEnabled === '1' || $action === 'test_lotus') && $lotusApiKey === '') {
+                $errors[] = 'Lotus API anahtarı zorunludur.';
             }
 
             if ($autoSuspendEnabled === '1') {
@@ -81,56 +111,138 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
+            $current['site_name'] = $siteName;
+            $current['site_tagline'] = $siteTagline !== '' ? $siteTagline : null;
+            $current['seo_meta_description'] = $metaDescription !== '' ? $metaDescription : null;
+            $current['seo_meta_keywords'] = $metaKeywords !== '' ? $metaKeywords : null;
+            $current['pricing_commission_rate'] = (string)$commissionRate;
+            $current['reseller_auto_suspend_enabled'] = $autoSuspendEnabled;
+            $current['reseller_auto_suspend_threshold'] = $autoSuspendEnabled === '1' ? number_format($autoThreshold, 2, '.', '') : null;
+            $current['reseller_auto_suspend_days'] = $autoSuspendEnabled === '1' ? (string)$autoDays : null;
+            $current['lotus_api_enabled'] = $lotusEnabled;
+            $current['lotus_api_key'] = $lotusApiKey;
+            $current['lotus_base_url'] = $lotusBaseUrl;
+            $current['lotus_use_query_api_key'] = $lotusUseQuery;
+            $current['lotus_timeout'] = $lotusTimeoutRaw;
+            $current['demo_mode_enabled'] = isset($_POST['demo_mode_enabled']) ? '1' : '0';
+
+            foreach ($featureLabels as $key => $label) {
+                $featureStates[$key] = isset($_POST['features'][$key]);
+            }
+
             if (!$errors) {
-                Settings::set('site_name', $siteName);
-                Settings::set('site_tagline', $siteTagline !== '' ? $siteTagline : null);
-                Settings::set('seo_meta_description', $metaDescription !== '' ? $metaDescription : null);
-                Settings::set('seo_meta_keywords', $metaKeywords !== '' ? $metaKeywords : null);
-                Settings::set('pricing_commission_rate', (string)$commissionRate);
+                if ($action === 'save_general') {
+                    Settings::set('site_name', $siteName);
+                    Settings::set('site_tagline', $siteTagline !== '' ? $siteTagline : null);
+                    Settings::set('seo_meta_description', $metaDescription !== '' ? $metaDescription : null);
+                    Settings::set('seo_meta_keywords', $metaKeywords !== '' ? $metaKeywords : null);
+                    Settings::set('pricing_commission_rate', (string)$commissionRate);
 
-                foreach ($featureLabels as $key => $label) {
-                    $enabled = isset($_POST['features'][$key]);
-                    FeatureToggle::setEnabled($key, $enabled);
-                    $featureStates[$key] = $enabled;
+                    foreach ($featureLabels as $key => $label) {
+                        $enabled = isset($_POST['features'][$key]);
+                        FeatureToggle::setEnabled($key, $enabled);
+                        $featureStates[$key] = $enabled;
+                    }
+
+                    Settings::set('lotus_api_enabled', $lotusEnabled);
+                    Settings::set('lotus_api_key', $lotusEnabled === '1' ? $lotusApiKey : null);
+                    Settings::set('lotus_base_url', $lotusEnabled === '1' ? $lotusBaseUrl : null);
+                    Settings::set('lotus_use_query_api_key', $lotusEnabled === '1' ? $lotusUseQuery : '0');
+                    if ($lotusEnabled === '1' && $lotusTimeout !== null && $lotusTimeout > 0) {
+                        Settings::set('lotus_timeout', number_format($lotusTimeout, 2, '.', ''));
+                    } else {
+                        Settings::set('lotus_timeout', null);
+                    }
+
+                    Settings::set('reseller_auto_suspend_enabled', $autoSuspendEnabled);
+                    if ($autoSuspendEnabled === '1') {
+                        Settings::set('reseller_auto_suspend_threshold', number_format($autoThreshold, 2, '.', ''));
+                        Settings::set('reseller_auto_suspend_days', (string)$autoDays);
+                    } else {
+                        Settings::set('reseller_auto_suspend_threshold', null);
+                        Settings::set('reseller_auto_suspend_days', null);
+                    }
+
+                    $demoModeEnabled = isset($_POST['demo_mode_enabled']) ? '1' : '0';
+                    Settings::set('demo_mode_enabled', $demoModeEnabled);
+                    if ($demoModeEnabled === '1') {
+                        DemoMode::ensureUser();
+                    } else {
+                        DemoMode::disableUser();
+                    }
+
+                    $success = 'Genel ayarlar kaydedildi.';
+                    AuditLog::record(
+                        $currentUser['id'],
+                        'settings.general.update',
+                        'settings',
+                        null,
+                        'Genel ayarlar güncellendi'
+                    );
+
+                    $current = Settings::getMany(array(
+                        'site_name',
+                        'site_tagline',
+                        'seo_meta_description',
+                        'seo_meta_keywords',
+                        'pricing_commission_rate',
+                        'reseller_auto_suspend_enabled',
+                        'reseller_auto_suspend_threshold',
+                        'reseller_auto_suspend_days',
+                        'demo_mode_enabled',
+                        'lotus_api_enabled',
+                        'lotus_api_key',
+                        'lotus_base_url',
+                        'lotus_use_query_api_key',
+                        'lotus_timeout',
+                    ));
+
+                    if (!isset($current['lotus_base_url']) || $current['lotus_base_url'] === null || $current['lotus_base_url'] === '') {
+                        $current['lotus_base_url'] = $defaultLotusBaseUrl;
+                    }
+                } elseif ($action === 'test_lotus') {
+                    try {
+                        $testConfig = [
+                            'apiKey' => $lotusApiKey,
+                            'baseUrl' => $lotusBaseUrlInput,
+                            'useQueryApiKey' => $lotusUseQuery === '1',
+                        ];
+                        if ($lotusTimeout !== null && $lotusTimeout > 0) {
+                            $testConfig['timeout'] = $lotusTimeout;
+                        }
+
+                        $testResult = LotusPartnerApi::testConnection($testConfig);
+                        $userData = isset($testResult['response']['data']) && is_array($testResult['response']['data'])
+                            ? $testResult['response']['data']
+                            : array();
+
+                        $details = array();
+                        if (isset($userData['credit'])) {
+                            $creditValue = $userData['credit'];
+                            if (is_numeric($creditValue)) {
+                                $creditValue = number_format((float) $creditValue, 2, ',', '.');
+                            }
+                            $details[] = 'Güncel kredi: ' . $creditValue;
+                        }
+                        if (isset($userData['nickname']) && $userData['nickname'] !== '') {
+                            $details[] = 'Kullanıcı: ' . $userData['nickname'];
+                        }
+                        if (!empty($testResult['request_id'])) {
+                            $details[] = 'X-Request-Id: ' . $testResult['request_id'];
+                        }
+
+                        $success = 'Lotus API bağlantısı doğrulandı.';
+                        if ($details) {
+                            $success .= ' ' . implode(' | ', $details);
+                        }
+                    } catch (ApiError $apiError) {
+                        $errors[] = 'Lotus API testi başarısız: ' . $apiError->getMessage();
+                        $success = '';
+                    } catch (\Throwable $testException) {
+                        $errors[] = 'Lotus API testi tamamlanamadı: ' . $testException->getMessage();
+                        $success = '';
+                    }
                 }
-
-                Settings::set('reseller_auto_suspend_enabled', $autoSuspendEnabled);
-                if ($autoSuspendEnabled === '1') {
-                    Settings::set('reseller_auto_suspend_threshold', number_format($autoThreshold, 2, '.', ''));
-                    Settings::set('reseller_auto_suspend_days', (string)$autoDays);
-                } else {
-                    Settings::set('reseller_auto_suspend_threshold', null);
-                    Settings::set('reseller_auto_suspend_days', null);
-                }
-
-                $demoModeEnabled = isset($_POST['demo_mode_enabled']) ? '1' : '0';
-                Settings::set('demo_mode_enabled', $demoModeEnabled);
-                if ($demoModeEnabled === '1') {
-                    DemoMode::ensureUser();
-                } else {
-                    DemoMode::disableUser();
-                }
-
-                $success = 'Genel ayarlar kaydedildi.';
-                AuditLog::record(
-                    $currentUser['id'],
-                    'settings.general.update',
-                    'settings',
-                    null,
-                    'Genel ayarlar güncellendi'
-                );
-
-                $current = Settings::getMany(array(
-                    'site_name',
-                    'site_tagline',
-                    'seo_meta_description',
-                    'seo_meta_keywords',
-                    'pricing_commission_rate',
-                    'reseller_auto_suspend_enabled',
-                    'reseller_auto_suspend_threshold',
-                    'reseller_auto_suspend_days',
-                    'demo_mode_enabled',
-                ));
             }
         }
     }
@@ -139,6 +251,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $rate = Currency::getRate('TRY', 'USD');
 $tryPerUsd = $rate > 0 ? 1 / $rate : null;
 $rateUpdatedAt = Settings::get('currency_rate_TRY_USD_updated');
+
+$lotusEnabledCurrent = isset($current['lotus_api_enabled']) && $current['lotus_api_enabled'] === '1';
+$lotusUseQueryCurrent = isset($current['lotus_use_query_api_key']) && $current['lotus_use_query_api_key'] === '1';
+$lotusTimeoutValue = isset($current['lotus_timeout']) ? $current['lotus_timeout'] : '';
 
 $pageTitle = 'Genel Ayarlar';
 
@@ -166,7 +282,6 @@ include __DIR__ . '/../templates/header.php';
                 <?php endif; ?>
 
                 <form method="post" class="vstack gap-4">
-                    <input type="hidden" name="action" value="save_general">
                     <input type="hidden" name="csrf_token" value="<?= Helpers::sanitize(Helpers::csrfToken()) ?>">
 
                     <div class="row g-3">
@@ -249,6 +364,45 @@ include __DIR__ . '/../templates/header.php';
                         </div>
                     </div>
 
+                    <hr>
+
+                    <div class="p-3 border rounded bg-light-subtle" id="lotus-settings">
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="lotusApiEnabled" name="lotus_api_enabled"<?= $lotusEnabledCurrent ? ' checked' : '' ?>>
+                            <label class="form-check-label" for="lotusApiEnabled">Lotus Lisans Partner API entegrasyonunu etkinleştir</label>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">API Anahtarı</label>
+                                <input type="text" name="lotus_api_key" class="form-control" value="<?= Helpers::sanitize(isset($current['lotus_api_key']) ? $current['lotus_api_key'] : '') ?>">
+                                <div class="form-text">Anahtar, tüm sipariş isteklerinde X-API-Key olarak kullanılacak.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Temel API URL'si</label>
+                                <input type="text" name="lotus_base_url" class="form-control" value="<?= Helpers::sanitize(isset($current['lotus_base_url']) ? $current['lotus_base_url'] : $defaultLotusBaseUrl) ?>">
+                                <div class="form-text">Varsayılan: <?= Helpers::sanitize($defaultLotusBaseUrl) ?></div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">İstek Zaman Aşımı (sn)</label>
+                                <input type="number" step="0.1" min="1" name="lotus_timeout" class="form-control" value="<?= Helpers::sanitize($lotusTimeoutValue !== '' ? $lotusTimeoutValue : '') ?>" placeholder="20">
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check form-switch mt-4 pt-1">
+                                    <input class="form-check-input" type="checkbox" id="lotusUseQuery" name="lotus_use_query_api_key"<?= $lotusUseQueryCurrent ? ' checked' : '' ?>>
+                                    <label class="form-check-label" for="lotusUseQuery">API anahtarını query parametresiyle gönder</label>
+                                </div>
+                                <div class="form-text">Güvenlik için mümkünse header kullanımını tercih edin.</div>
+                            </div>
+                        </div>
+                        <div class="alert alert-info mt-3 mb-0 small">
+                            Siparişler otomatik olarak Lotus API'ye iletilir. Ürün eşlemesi için SKU alanına Lotus ürün ID'sini (yalnızca rakam) girmeniz gerekir.
+                        </div>
+                        <div class="d-flex flex-column flex-md-row align-items-md-center gap-2 mt-3">
+                            <button type="submit" name="action" value="test_lotus" class="btn btn-outline-secondary" formnovalidate>API Bağlantısını Test Et</button>
+                            <small class="text-muted">Test, Lotus API üzerinden /api/user isteği gerçekleştirerek kimlik bilgilerinizi doğrular.</small>
+                        </div>
+                    </div>
+
                     <div class="p-3 border rounded bg-light-subtle">
                         <div class="form-check form-switch mb-3">
                             <input class="form-check-input" type="checkbox" id="demoMode" name="demo_mode_enabled" <?= isset($current['demo_mode_enabled']) && $current['demo_mode_enabled'] === '1' ? 'checked' : '' ?>>
@@ -262,7 +416,7 @@ include __DIR__ . '/../templates/header.php';
                         </ul>
                     </div>
                     <div class="d-flex justify-content-end">
-                        <button type="submit" class="btn btn-primary">Ayarları Kaydet</button>
+                        <button type="submit" name="action" value="save_general" class="btn btn-primary">Ayarları Kaydet</button>
                     </div>
                 </form>
             </div>

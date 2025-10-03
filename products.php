@@ -5,6 +5,8 @@ use App\Auth;
 use App\Database;
 use App\Helpers;
 use App\Telegram;
+use App\Services\LotusPartnerApi;
+use Lotus\Exceptions\ApiError as LotusApiError;
 
 if (empty($_SESSION['user'])) {
     Helpers::redirect('/');
@@ -72,6 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if (!$errors) {
+            $lotusIntegrationEnabled = LotusPartnerApi::isEnabled();
             try {
                 $pdo->beginTransaction();
 
@@ -126,6 +129,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 'description' => 'Ürün siparişi: ' . $product['name'],
                             ]);
 
+                            $orderStatus = 'pending';
+                            $externalReference = null;
+                            $externalMetadata = null;
+
+                            if ($lotusIntegrationEnabled) {
+                                $lotusResult = LotusPartnerApi::submitProductOrder($product, 1, $note !== '' ? $note : null);
+                                $orderStatus = isset($lotusResult['status']) && $lotusResult['status'] !== '' ? $lotusResult['status'] : 'processing';
+                                $externalReference = isset($lotusResult['external_reference']) ? $lotusResult['external_reference'] : null;
+                                $externalMetadata = LotusPartnerApi::encodeMetadata($lotusResult['metadata']);
+
+                                $updateStmt = $pdo->prepare('UPDATE product_orders SET status = :status, external_reference = :external_reference, external_metadata = :external_metadata, updated_at = NOW() WHERE id = :id');
+                                $updateStmt->execute([
+                                    'status' => $orderStatus,
+                                    'external_reference' => $externalReference,
+                                    'external_metadata' => $externalMetadata,
+                                    'id' => $orderId,
+                                ]);
+                            }
+
                             $pdo->commit();
 
                             Telegram::notify(sprintf(
@@ -151,11 +173,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                     }
                 }
+            } catch (LotusApiError $exception) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                $errors[] = 'Lotus Lisans API hatası: ' . $exception->getMessage();
             } catch (\PDOException $exception) {
                 if ($pdo->inTransaction()) {
                     $pdo->rollBack();
                 }
                 $errors[] = 'Sipariş talebiniz kaydedilirken bir veritabanı hatası oluştu. Lütfen daha sonra tekrar deneyin.';
+            } catch (\RuntimeException $exception) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                $errors[] = $exception->getMessage();
+            } catch (\Throwable $exception) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                $errors[] = 'Sipariş talebiniz işlenirken beklenmedik bir hata oluştu. Lütfen daha sonra tekrar deneyin.';
             }
         }
     }

@@ -89,6 +89,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $orderInsert = $pdo->prepare('INSERT INTO product_orders (product_id, user_id, api_token_id, quantity, note, price, status, source, external_reference, external_metadata, created_at) VALUES (:product_id, :user_id, :api_token_id, :quantity, :note, :price, :status, :source, :external_reference, :external_metadata, NOW())');
         $transactionInsert = $pdo->prepare('INSERT INTO balance_transactions (user_id, amount, type, description, created_at) VALUES (:user_id, :amount, :type, :description, NOW())');
 
+        $lotusIntegrationEnabled = \App\Services\LotusPartnerApi::isEnabled();
+        $orderUpdate = null;
+        if ($lotusIntegrationEnabled) {
+            $orderUpdate = $pdo->prepare('UPDATE product_orders SET status = :status, external_reference = :external_reference, external_metadata = :external_metadata, updated_at = NOW() WHERE id = :id');
+        }
+
         foreach ($lineDetails as $detail) {
             $product = $detail['product'];
             $line = $detail['line'];
@@ -122,6 +128,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $orderId = (int)$pdo->lastInsertId();
             $orderIds[] = $orderId;
+
+            if ($lotusIntegrationEnabled && $orderUpdate) {
+                try {
+                    $lotusResult = \App\Services\LotusPartnerApi::submitProductOrder(
+                        $product,
+                        (int)$line['quantity'],
+                        $line['note'] !== '' ? $line['note'] : null
+                    );
+                    if (isset($lotusResult['metadata']['lotus'])) {
+                        $metadata['lotus'] = $lotusResult['metadata']['lotus'];
+                    }
+                    $statusValue = isset($lotusResult['status']) && $lotusResult['status'] !== '' ? $lotusResult['status'] : 'processing';
+                    $externalReferenceValue = $orderReference;
+                    if (!empty($lotusResult['external_reference'])) {
+                        $externalReferenceValue = $lotusResult['external_reference'] . ' / ' . $orderReference;
+                    }
+                    $orderUpdate->execute(array(
+                        'status' => $statusValue,
+                        'external_reference' => $externalReferenceValue,
+                        'external_metadata' => \App\Services\LotusPartnerApi::encodeMetadata($metadata),
+                        'id' => $orderId,
+                    ));
+                } catch (\Lotus\Exceptions\ApiError $exception) {
+                    $pdo->rollBack();
+                    json_response(array('success' => false, 'error' => 'Lotus Lisans API hatası: ' . $exception->getMessage()), 502);
+                } catch (\RuntimeException $exception) {
+                    $pdo->rollBack();
+                    json_response(array('success' => false, 'error' => $exception->getMessage()), 422);
+                } catch (\Throwable $exception) {
+                    $pdo->rollBack();
+                    json_response(array('success' => false, 'error' => 'Lotus API yanıtı işlenemedi: ' . $exception->getMessage()), 500);
+                }
+            }
 
             $transactionInsert->execute(array(
                 'user_id' => $token['user_id'],
