@@ -3,7 +3,7 @@ require __DIR__ . '/../bootstrap.php';
 
 use App\Database;
 use App\Helpers;
-use App\Mailer;
+use App\Notifications\ResellerNotifier;
 use App\Payments\HeleketClient;
 use App\Services\PackageOrderService;
 use App\Telegram;
@@ -103,7 +103,7 @@ if (strpos($orderReference, 'PKG-') === 0) {
 
 if (strpos($orderReference, 'BAL-') === 0) {
     $requestId = (int)substr($orderReference, 4);
-    $stmt = $pdo->prepare('SELECT br.*, u.name, u.email FROM balance_requests br INNER JOIN users u ON br.user_id = u.id WHERE br.id = :id LIMIT 1');
+    $stmt = $pdo->prepare('SELECT br.*, u.name, u.email, u.telegram_bot_token, u.telegram_chat_id, u.notify_balance_approved FROM balance_requests br INNER JOIN users u ON br.user_id = u.id WHERE br.id = :id LIMIT 1');
     $stmt->execute(['id' => $requestId]);
     $request = $stmt->fetch();
 
@@ -153,8 +153,12 @@ if (strpos($orderReference, 'BAL-') === 0) {
         exit;
     }
 
-    $message = "Bakiye yükleme talebiniz başarıyla tamamlandı.\nTutar: " . Helpers::formatCurrency((float)$request['amount'], 'USD');
-    Mailer::send($request['email'], 'Bakiye Yükleme Onayı', $message);
+    $requestPayload = array(
+        'amount' => (float)$request['amount'],
+        'payment_method' => 'Heleket',
+        'reference' => isset($data['payment_id']) ? $data['payment_id'] : $orderReference,
+    );
+    ResellerNotifier::sendBalanceApproved($request, $requestPayload, 'Ödeme sağlayıcısı tarafından onaylandı.');
 
     Telegram::notify(sprintf(
         "Heleket üzerinden yeni bakiye yüklemesi tamamlandı!\nBayi: %s\nTutar: %s",

@@ -19,6 +19,7 @@ class FeatureToggle
         'support' => true,
         'balance' => true,
         'api' => true,
+        'premium_modules' => true,
     );
 
     /**
