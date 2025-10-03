@@ -2,6 +2,7 @@
 
 namespace App;
 
+use App\Notifications\ResellerNotifier;
 use PDO;
 
 class ResellerPolicy
@@ -55,7 +56,7 @@ class ResellerPolicy
         }
 
         try {
-            $selectStmt = $pdo->prepare("SELECT id, low_balance_since FROM users WHERE role = 'reseller' AND status = 'active' AND balance < :threshold");
+            $selectStmt = $pdo->prepare("SELECT id, name, email, balance, low_balance_since FROM users WHERE role = 'reseller' AND status = 'active' AND balance < :threshold");
             $selectStmt->execute(array('threshold' => $threshold));
         } catch (\Throwable $exception) {
             return;
@@ -75,6 +76,31 @@ class ResellerPolicy
             if ($since === null) {
                 $markStmt = $pdo->prepare('UPDATE users SET low_balance_since = NOW() WHERE id = :id');
                 $markStmt->execute(array('id' => $userId));
+
+                if ($markStmt->rowCount() > 0) {
+                    $email = isset($row['email']) ? trim((string)$row['email']) : '';
+                    if ($email !== '') {
+                        $name = isset($row['name']) ? trim((string)$row['name']) : '';
+                        $balance = isset($row['balance']) ? (float)$row['balance'] : 0.0;
+                        $deficit = $threshold - $balance;
+                        if ($deficit < 0) {
+                            $deficit = 0.0;
+                        }
+
+                        $deadline = date('d.m.Y H:i', $now + $graceSeconds);
+                        $userRecord = Auth::findUser($userId);
+                        if ($userRecord) {
+                            ResellerNotifier::sendLowBalanceWarning(
+                                $userRecord,
+                                $threshold,
+                                $deadline,
+                                $deficit > 0 ? $deficit : $threshold,
+                                $graceDays
+                            );
+                        }
+                    }
+                }
+
                 continue;
             }
 
@@ -107,5 +133,64 @@ class ResellerPolicy
         }
 
         return self::$hasColumn;
+    }
+
+    /**
+     * @param array|null $user
+     * @return array|null
+     */
+    public static function lowBalanceNotice($user)
+    {
+        if (!$user || !is_array($user)) {
+            return null;
+        }
+
+        if (!isset($user['role']) || $user['role'] !== 'reseller') {
+            return null;
+        }
+
+        if (Settings::get('reseller_auto_suspend_enabled') !== '1') {
+            return null;
+        }
+
+        $threshold = (float)Settings::get('reseller_auto_suspend_threshold', '0');
+        $graceDays = (int)Settings::get('reseller_auto_suspend_days', '0');
+
+        if ($threshold <= 0 || $graceDays <= 0) {
+            return null;
+        }
+
+        $balance = isset($user['balance']) ? (float)$user['balance'] : 0.0;
+        if ($balance >= $threshold) {
+            return null;
+        }
+
+        $sinceRaw = isset($user['low_balance_since']) ? $user['low_balance_since'] : null;
+        $since = $sinceRaw ? strtotime($sinceRaw) : null;
+        if ($since === false) {
+            $since = null;
+        }
+
+        $graceSeconds = $graceDays * 86400;
+        $reference = $since ?: time();
+        $deadlineTs = $reference + $graceSeconds;
+        $remainingSeconds = $deadlineTs - time();
+        if ($remainingSeconds < 0) {
+            $remainingSeconds = 0;
+        }
+
+        $remainingDays = (int)ceil($remainingSeconds / 86400);
+        $remainingHours = (int)ceil($remainingSeconds / 3600);
+
+        return array(
+            'threshold' => $threshold,
+            'grace_days' => $graceDays,
+            'deadline_ts' => $deadlineTs,
+            'deadline' => date('d.m.Y H:i', $deadlineTs),
+            'remaining_days' => $remainingDays,
+            'remaining_hours' => $remainingHours,
+            'balance' => $balance,
+            'deficit' => max(0.0, $threshold - $balance),
+        );
     }
 }
