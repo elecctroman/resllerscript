@@ -30,32 +30,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (!in_array($newStatus, array('pending', 'paid', 'completed', 'cancelled'), true)) {
         $formErrors[] = 'Geçersiz durum seçildi.';
     } else {
-        $pdo->prepare('UPDATE package_orders SET status = :status, admin_note = :admin_note, updated_at = NOW() WHERE id = :id')->execute(array(
-            'status' => $newStatus,
-            'admin_note' => $statusNote !== '' ? $statusNote : null,
-            'id' => $orderId,
-        ));
+        $previousStatus = isset($order['status']) ? $order['status'] : 'unknown';
 
-        if ($newStatus === 'completed') {
-            PackageOrderService::fulfill($order);
-            PackageOrderService::markCompleted($orderId, $order);
-        } elseif ($newStatus === 'paid') {
-            $pdo->prepare('UPDATE package_orders SET payment_provider = :provider WHERE id = :id AND payment_provider IS NULL')
-                ->execute(array(
-                    'provider' => 'cryptomus',
-                    'id' => $orderId,
-                ));
+        try {
+            if ($newStatus === 'completed') {
+                $pdo->beginTransaction();
+                $fulfillment = PackageOrderService::fulfill($order);
+                PackageOrderService::markCompleted($orderId, $order, $statusNote);
+                $pdo->commit();
+
+                $successMessage = 'Sipariş tamamlandı ve bayi hesabı aktifleştirildi.';
+                if (is_array($fulfillment) && !empty($fulfillment['password'])) {
+                    $successMessage .= ' Geçici giriş bilgileri bayiye e-posta ile iletildi.';
+                } else {
+                    $successMessage .= ' Bayi mevcut şifresiyle giriş yapabilir.';
+                }
+            } else {
+                $pdo->prepare('UPDATE package_orders SET status = :status, admin_note = :admin_note, updated_at = NOW() WHERE id = :id')
+                    ->execute(array(
+                        'status' => $newStatus,
+                        'admin_note' => $statusNote !== '' ? $statusNote : null,
+                        'id' => $orderId,
+                    ));
+
+                if ($newStatus === 'paid') {
+                    $pdo->prepare('UPDATE package_orders SET payment_provider = :provider WHERE id = :id AND payment_provider IS NULL')
+                        ->execute(array(
+                            'provider' => 'cryptomus',
+                            'id' => $orderId,
+                        ));
+                }
+
+                $successMessage = 'Sipariş durumu güncellendi.';
+            }
+
+            AuditLog::record(
+                $currentUser['id'],
+                'package_order.status_change',
+                'package_order',
+                $orderId,
+                sprintf('Sipariş #%d durumu %s -> %s olarak güncellendi', $orderId, $previousStatus, $newStatus)
+            );
+
+            Helpers::redirectWithFlash($redirectPath, array('success' => $successMessage));
+        } catch (\Throwable $exception) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            error_log(sprintf('Package order #%d güncellenemedi: %s', $orderId, $exception->getMessage()));
+            $formErrors[] = 'Sipariş güncellenirken bir hata oluştu. Ayrıntılar error.log dosyasına kaydedildi.';
         }
-
-        AuditLog::record(
-            $currentUser['id'],
-            'package_order.status_change',
-            'package_order',
-            $orderId,
-            sprintf('Sipariş #%d durumu %s -> %s olarak güncellendi', $orderId, $order['status'], $newStatus)
-        );
-
-        Helpers::redirectWithFlash($redirectPath, array('success' => 'Sipariş durumu güncellendi.'));
     }
 
     if ($formErrors) {
