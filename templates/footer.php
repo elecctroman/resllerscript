@@ -19,6 +19,70 @@ $pageInlineScripts = isset($GLOBALS['pageInlineScripts']) && is_array($GLOBALS['
 <?php foreach ($pageInlineScripts as $inlineScript): ?>
     <script><?= $inlineScript ?></script>
 <?php endforeach; ?>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var sidebar = document.getElementById('appSidebar');
+        if (!sidebar) {
+            return;
+        }
+
+        var body = document.body;
+        var toggles = document.querySelectorAll('[data-sidebar-toggle]');
+        var closers = document.querySelectorAll('[data-sidebar-close]');
+        var sidebarLinks = sidebar.querySelectorAll('a');
+
+        var closeSidebar = function () {
+            if (!body.classList.contains('sidebar-open')) {
+                return;
+            }
+            body.classList.remove('sidebar-open');
+            toggles.forEach(function (toggle) {
+                toggle.setAttribute('aria-expanded', 'false');
+            });
+        };
+
+        var openSidebar = function (trigger) {
+            body.classList.add('sidebar-open');
+            toggles.forEach(function (toggle) {
+                toggle.setAttribute('aria-expanded', toggle === trigger ? 'true' : 'false');
+            });
+        };
+
+        toggles.forEach(function (toggle) {
+            toggle.addEventListener('click', function () {
+                if (body.classList.contains('sidebar-open')) {
+                    closeSidebar();
+                } else {
+                    openSidebar(toggle);
+                }
+            });
+        });
+
+        closers.forEach(function (closer) {
+            closer.addEventListener('click', closeSidebar);
+        });
+
+        sidebarLinks.forEach(function (link) {
+            link.addEventListener('click', function () {
+                if (window.innerWidth < 992) {
+                    closeSidebar();
+                }
+            });
+        });
+
+        document.addEventListener('keyup', function (event) {
+            if (event.key === 'Escape') {
+                closeSidebar();
+            }
+        });
+
+        window.addEventListener('resize', function () {
+            if (window.innerWidth >= 992) {
+                closeSidebar();
+            }
+        });
+    });
+</script>
 </body>
 </html>
 <?php
