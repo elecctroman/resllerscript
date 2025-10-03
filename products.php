@@ -4,6 +4,7 @@ require __DIR__ . '/bootstrap.php';
 use App\Auth;
 use App\Database;
 use App\Helpers;
+use App\Services\ProviderDispatchService;
 use App\Telegram;
 
 if (empty($_SESSION['user'])) {
@@ -137,6 +138,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             ));
 
                             $_SESSION['flash_success'] = 'Sipariş talebiniz alındı ve bakiyenizden düşüldü. Ürün teslimatı kısa süre içinde gerçekleştirilecektir.';
+
+                            $dispatchResult = ProviderDispatchService::dispatchProductOrder($orderId);
+                            if (is_array($dispatchResult)) {
+                                if (!empty($dispatchResult['success']) && !empty($dispatchResult['status']) && $dispatchResult['status'] === 'completed') {
+                                    $_SESSION['flash_success'] .= ' Teslimat tamamlandı, detayları siparişlerim bölümünde görüntüleyebilirsiniz.';
+                                } elseif (isset($dispatchResult['success']) && !$dispatchResult['success']) {
+                                    $_SESSION['flash_success'] .= ' Sağlayıcıya iletilirken bir sorun oluştu, siparişiniz yönetici tarafından incelenecektir.';
+                                }
+                            }
 
                             $queryParams = [];
                             if ($selectedCategoryId) {

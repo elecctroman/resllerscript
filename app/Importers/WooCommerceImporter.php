@@ -44,7 +44,7 @@ class WooCommerceImporter
             $delimiter = (substr_count((string)$firstLine, ';') > substr_count((string)$firstLine, ',')) ? ';' : ',';
             rewind($handle);
 
-            $headers = fgetcsv($handle, 0, $delimiter);
+            $headers = fgetcsv($handle, 0, $delimiter, '"', '\\');
             if (!$headers) {
                 throw new RuntimeException('CSV başlık bilgisi okunamadı.');
             }
@@ -58,7 +58,7 @@ class WooCommerceImporter
                 throw new RuntimeException('CSV dosyasında ürün adını içeren "Name" sütunu bulunamadı.');
             }
 
-            while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
+            while (($row = fgetcsv($handle, 0, $delimiter, '"', '\\')) !== false) {
                 if (!is_array($row) || !isset($row[$map['name']]) || trim((string)$row[$map['name']]) === '') {
                     continue;
                 }
