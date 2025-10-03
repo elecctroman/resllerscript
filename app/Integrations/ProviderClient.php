@@ -97,73 +97,51 @@ class ProviderClient
             $headers[] = 'Content-Type: application/json';
         }
 
-        $responseBody = false;
-        $status = 0;
+        $visited = array();
+        $attempts = 0;
 
-        if (function_exists('curl_init')) {
-            $ch = curl_init($url);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
-            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
-            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-
-            if ($body !== null) {
-                curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+        do {
+            if (isset($visited[$url])) {
+                $this->log('error', 'Sağlayıcı API yönlendirme döngüsü algılandı.', array('url' => $url));
+                throw new RuntimeException('Sağlayıcı API yönlendirme döngüsü algılandı. Lütfen temel URL ayarını kontrol edin.');
             }
 
-            $responseBody = curl_exec($ch);
-            $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $visited[$url] = true;
 
-            if ($responseBody === false) {
-                $error = curl_error($ch);
-                curl_close($ch);
-                $this->log('error', 'Sağlayıcı API isteği başarısız: ' . $error, array('url' => $url));
-                throw new RuntimeException('Sağlayıcı API isteği başarısız: ' . $error);
-            }
+            $result = $this->performRequest($url, $method, $headers, $body);
+            $status = $result['status'];
+            $responseBody = $result['body'];
+            $responseHeaders = $result['headers'];
 
-            curl_close($ch);
-        } else {
-            $contextOptions = array(
-                'http' => array(
-                    'method' => $method,
-                    'header' => implode("\r\n", $headers),
-                    'timeout' => $this->timeout,
-                    'ignore_errors' => true,
-                ),
-            );
-
-            if ($body !== null) {
-                $contextOptions['http']['content'] = $body;
-            }
-
-            $context = stream_context_create($contextOptions);
-            $responseBody = @file_get_contents($url, false, $context);
-
-            if (isset($http_response_header) && is_array($http_response_header)) {
-                foreach ($http_response_header as $headerLine) {
-                    if (stripos($headerLine, 'HTTP/') === 0) {
-                        $parts = explode(' ', $headerLine);
-                        if (isset($parts[1])) {
-                            $status = (int)$parts[1];
-                        }
-                        break;
-                    }
+            if ($status >= 300 && $status < 400) {
+                $location = $this->extractRedirectLocation($responseHeaders);
+                if ($location === null) {
+                    break;
                 }
+
+                $url = $this->resolveRedirectUrl($url, $location);
+                $attempts++;
+
+                if ($attempts >= 5) {
+                    $this->log('error', 'Sağlayıcı API çok fazla yönlendirme yaptı.', array('last_url' => $url, 'location' => $location));
+                    throw new RuntimeException('Sağlayıcı API çok fazla yönlendirme yaptı. Sağlayıcı adresini doğrulayın.');
+                }
+
+                continue;
             }
 
-            if ($responseBody === false) {
-                $this->log('error', 'Sağlayıcı API isteği okunamadı.', array('url' => $url));
-                throw new RuntimeException('Sağlayıcı API isteği okunamadı.');
-            }
-        }
+            break;
+        } while (true);
 
         $decoded = json_decode((string)$responseBody, true);
 
         if (!is_array($decoded)) {
-            $this->log('error', 'Sağlayıcı API geçersiz yanıt döndürdü.', array('url' => $url, 'status' => $status, 'body' => $responseBody));
-            throw new RuntimeException('Sağlayıcı API geçersiz yanıt döndürdü.');
+            $context = array('url' => $url, 'status' => $status);
+            if (is_string($responseBody) && stripos($responseBody, '<html') !== false) {
+                $context['hint'] = 'HTML yanıt alındı; muhtemelen sağlayıcı giriş sayfasına yönlendirildi.';
+            }
+            $this->log('error', 'Sağlayıcı API geçersiz yanıt döndürdü.', $context);
+            throw new RuntimeException('Sağlayıcı API geçersiz yanıt döndürdü. Sağlayıcı kimlik bilgilerini ve IP izinlerini kontrol edin.');
         }
 
         if ($status >= 400) {
@@ -207,5 +185,161 @@ class ProviderClient
             $line .= ' ' . json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         }
         error_log('[Provider] ' . $line);
+    }
+
+    /**
+     * @param string            $url
+     * @param string            $method
+     * @param array<int,string> $headers
+     * @param string|null       $body
+     * @return array{status:int,body:string,headers:array<string,string>}
+     */
+    private function performRequest(string $url, string $method, array $headers, ?string $body): array
+    {
+        $status = 0;
+        $responseBody = '';
+        $responseHeaders = array();
+
+        if (function_exists('curl_init')) {
+            $capturedHeaders = array();
+
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, array_merge($headers, array('User-Agent: ResellerScript-ProviderClient/1.0')));
+            curl_setopt($ch, CURLOPT_HEADERFUNCTION, static function ($chResource, $headerLine) use (&$capturedHeaders) {
+                $length = strlen($headerLine);
+                $headerLine = trim($headerLine);
+
+                if ($headerLine === '') {
+                    return $length;
+                }
+
+                if (stripos($headerLine, 'HTTP/') === 0) {
+                    $capturedHeaders['_status_line'] = $headerLine;
+                    return $length;
+                }
+
+                $parts = explode(':', $headerLine, 2);
+                if (count($parts) === 2) {
+                    $capturedHeaders[strtolower(trim($parts[0]))] = trim($parts[1]);
+                }
+
+                return $length;
+            });
+
+            if ($body !== null) {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+            }
+
+            $responseBody = curl_exec($ch);
+
+            if ($responseBody === false) {
+                $error = curl_error($ch);
+                curl_close($ch);
+                $this->log('error', 'Sağlayıcı API isteği başarısız: ' . $error, array('url' => $url));
+                throw new RuntimeException('Sağlayıcı API isteği başarısız: ' . $error);
+            }
+
+            $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            $responseHeaders = $capturedHeaders;
+        } else {
+            $contextOptions = array(
+                'http' => array(
+                    'method' => $method,
+                    'header' => implode("\r\n", array_merge($headers, array('User-Agent: ResellerScript-ProviderClient/1.0'))),
+                    'timeout' => $this->timeout,
+                    'ignore_errors' => true,
+                ),
+            );
+
+            if ($body !== null) {
+                $contextOptions['http']['content'] = $body;
+            }
+
+            $context = stream_context_create($contextOptions);
+            $stream = @fopen($url, 'r', false, $context);
+
+            if ($stream === false) {
+                $this->log('error', 'Sağlayıcı API isteği açılamadı.', array('url' => $url));
+                throw new RuntimeException('Sağlayıcı API isteği açılamadı.');
+            }
+
+            $metadata = stream_get_meta_data($stream);
+            $responseBody = stream_get_contents($stream) ?: '';
+            fclose($stream);
+
+            if (isset($metadata['wrapper_data']) && is_array($metadata['wrapper_data'])) {
+                foreach ($metadata['wrapper_data'] as $headerLine) {
+                    $headerLine = trim((string)$headerLine);
+                    if ($headerLine === '') {
+                        continue;
+                    }
+
+                    if (stripos($headerLine, 'HTTP/') === 0) {
+                        $responseHeaders['_status_line'] = $headerLine;
+                        $parts = explode(' ', $headerLine);
+                        if (isset($parts[1])) {
+                            $status = (int)$parts[1];
+                        }
+                        continue;
+                    }
+
+                    $parts = explode(':', $headerLine, 2);
+                    if (count($parts) === 2) {
+                        $responseHeaders[strtolower(trim($parts[0]))] = trim($parts[1]);
+                    }
+                }
+            }
+        }
+
+        return array(
+            'status' => $status,
+            'body' => (string)$responseBody,
+            'headers' => $responseHeaders,
+        );
+    }
+
+    /**
+     * @param array<string,string> $headers
+     */
+    private function extractRedirectLocation(array $headers): ?string
+    {
+        foreach ($headers as $key => $value) {
+            if ($key === 'location') {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveRedirectUrl(string $currentUrl, string $location): string
+    {
+        if (str_starts_with($location, 'http://') || str_starts_with($location, 'https://')) {
+            return $location;
+        }
+
+        $parsed = parse_url($currentUrl);
+        if ($parsed === false || !isset($parsed['scheme'], $parsed['host'])) {
+            return $location;
+        }
+
+        $scheme = $parsed['scheme'];
+        $host = $parsed['host'];
+        $port = isset($parsed['port']) ? ':' . $parsed['port'] : '';
+        $path = $location;
+
+        if (!str_starts_with($path, '/')) {
+            $basePath = isset($parsed['path']) ? $parsed['path'] : '/';
+            $dir = rtrim(dirname($basePath), '/');
+            $path = $dir . '/' . $path;
+        }
+
+        return $scheme . '://' . $host . $port . $path;
     }
 }
