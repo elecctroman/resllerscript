@@ -1,62 +1,58 @@
-# Bayi Yönetim Sistemi
+# Lotus API Düz PHP Entegrasyonu
 
-Profesyonel bayilik yönetim süreçlerinizi uçtan uca yönetebilmeniz için geliştirilen PHP tabanlı bir yönetim panelidir. Sistem, klasik paylaşımlı hosting ortamlarında sorunsuz şekilde çalışacak şekilde tasarlanmıştır ve MySQL/MariaDB altyapısını kullanır.
-
-## Özellikler
-- Güvenli oturum açma sistemi ve şifre sıfırlama akışı
-- Paket yönetimi: sınırsız sayıda paket ekleme, düzenleme, silme ve aktif/pasif durumu değiştirme
-- Ücretli bayilik başvuru formu: paket seçimi, başvuru kaydı, otomatik admin bilgilendirmesi
-- Sipariş yönetimi: başvuruları onaylama, ödeme/tamamlanma durumları, otomatik bayi hesabı oluşturma
-- Ürün ve kategori yönetimi: ayrılmış kategori konsolu, alt kategori desteği ve alış fiyatına göre otomatik USD satış fiyatı hesaplama
-- Bakiye yönetimi: bayi talep/approval akışı, otomatik bakiye hareketleri ve işlem kayıtları
-- Ödeme entegrasyonları: Cryptomus ve Heleket desteği, test modu sayesinde sandbox senaryolarında otomatik onay
-- Destek sistemi: bayi tarafı destek talepleri, admin panelinden yanıt ve durum takibi
-- WooCommerce CSV araçları: ayrı içe aktarma ve dışa aktarma ekranları, WooCommerce ile tam uyumlu dosya üretimi
-- Genel ayarlar ve SEO: site adı/sloganı, meta etiketleri, modül bazlı aç/kapa anahtarları ve otomatik kur yenileme
-- Bayi profil yönetimi: bayi kullanıcıları kendi bilgilerini ve şifrelerini güncelleyebilir
-- WooCommerce API entegrasyonu: otomatik sipariş aktarımı ve durum senkronizasyonu için REST tabanlı uç noktalar
-- Telegram bildirimi: teslim edilen siparişlerde ve bakiye onaylarında otomatik Telegram uyarısı (opsiyonel)
-- Mail ayarları: yönetici panelinden gönderen kimliği, alt metin ve SMTP sunucu yapılandırması
-- Çok dilli arayüz: kullanıcı ve yönetici panelleri Türkçe/İngilizce arasında geçiş yapabilir
-- Dinamik para birimi: İngilizce görünümde USD, Türkçe görünümde güncel kurla TL gösterimi ve otomatik dönüşüm
-- Otomatik bayi pasifleştirme: minimum bakiye ve süre tanımlayarak bayiliği pasife alma politikasını yürütün
-- Modern sol menülü Bootstrap 5 arayüzü ve responsive tasarım
+Bu paket, Lotus Lisans sağlayıcısının REST API'sini düz PHP 8.1+ ortamında kullanmak isteyen uygulamalar için hazırlanmış hafif bir entegrasyon katmanıdır. Proje; sipariş oluşturma sırasında idempotensi kontrolü, pending siparişlerin periyodik takibi, SQLite tabanlı kalıcılık ve dosya loglama yetenekleri ile birlikte gelir.
 
 ## Kurulum
-1. Proje dosyalarını sunucunuza yükleyin ve web sunucusunun kök dizinini bu klasöre yönlendirin.
-2. `config/config.sample.php` dosyasını `config/config.php` olarak kopyalayın, MySQL/MariaDB bağlantı bilgilerinizi ve varsayılan dili (`DEFAULT_LANGUAGE`) güncelleyin.
-3. Veritabanınızı oluşturun ve `schema.sql` dosyasındaki tabloları içeri aktarın. Kurulum skripti varsayılan olarak aşağıdaki yönetici hesabını oluşturur:
 
-   | Kullanıcı Adı | E-posta                | Şifre          |
-   |---------------|------------------------|----------------|
-   | `Muhammet`    | `muhammet@example.com` | `5806958477i.` |
+```bash
+composer install
+cp .env.example .env
+# .env içindeki LOTUS_API_KEY değerini doldurun
+php -S 0.0.0.0:8000 -t public
+```
 
-   İlk girişten sonra şifreyi güncellemeniz tavsiye edilir.
-4. Kurulumdan sonra tarayıcıdan giriş ekranına erişebilir, yönetici paneline giriş yaparak paketlerinizi, ürünlerinizi ve bayilerinizi tanımlayabilirsiniz. Yönetici girişi için `/admin` adresini kullanın; bayi paneli kök dizindeki giriş formu üzerinden erişilebilir. Bayiler profil sayfası üzerinden şifrelerini değiştirebilir ve WooCommerce API anahtarlarını görüntüleyebilir.
+## Yapı Taşları
 
-## WooCommerce API ve WordPress Eklentisi
+- `bootstrap.php`: Ortak bootstrap, `.env` yüklenmesi ve yardımcı fonksiyonlar.
+- `src/LotusClient.php`: Guzzle tabanlı HTTP istemcisi, retry/backoff mekanizması içerir.
+- `src/LotusOrderRepository.php`: SQLite üzerinde sipariş kayıtlarını saklar ve idempotensi sağlar.
+- `src/LotusOrderService.php`: Sipariş oluşturma ve pending siparişlerin güncellenmesi için iş mantığı katmanı.
+- `bin/lotus-poll.php`: Cron/CLI üzerinden pending siparişleri kontrol eden komut.
+- `example/order_callback.php`: Ödeme sonrası tetiklenebilecek basit örnek uç nokta.
+- `storage/`: Varsayılan olarak SQLite veritabanı ve log dosyasını barındırır (Git tarafından yok sayılır).
 
-- REST API kök adresi: `<kurulum>/api/v1/`
-    - `GET /api/v1/products.php` — Aktif ürün ve kategori listesini döndürür.
-    - `POST /api/v1/orders.php` — WooCommerce siparişlerini SKU bazlı olarak sisteme aktarır.
-    - `GET /api/v1/orders.php` — Dış referansa veya duruma göre siparişleri listeler.
-    - `POST /api/v1/token-webhook.php` — Webhook adresinizi kaydetmenizi sağlar.
-- API çağrılarında `Authorization: Bearer <API_KEY>` ve `X-Reseller-Email: <bayi e-postası>` başlıklarını gönderdiğinizden emin olun.
-- Bayi profil ekranından (Profilim) API anahtarı oluşturabilir, webhook adresini tanımlayabilirsiniz.
-- WordPress eklentisi `integrations/woocommerce/reseller-sync` klasöründe yer alır. Zip olarak paketleyip WordPress eklentisi olarak yükleyin ve WooCommerce → Reseller Sync menüsünden bayi e-posta adresinizi ve API anahtarınızı girin.
-- Panel alan adınız farklıysa eklenti içindeki `Reseller_Sync_Connector::API_BASE` sabitini veya `RESELLER_SYNC_API_BASE` tanımını güncelleyerek API uç noktasını özelleştirebilirsiniz.
-- Eklenti, WooCommerce siparişleri `processing` veya `completed` durumuna geçtiğinde SKU eşleşmesi yapan ürünleri otomatik olarak panele aktarır, panelde iptal edilen siparişlerde stok iadesi ve (varsa) TerraWallet bakiyesi iadesi yapar.
+## Ortam Değişkenleri
 
-## Gereksinimler
-- PHP 8.1 veya üzeri (PDO, cURL, OpenSSL, mbstring eklentileri aktif olmalıdır)
-- MySQL veya MariaDB
-- SMTP veya standart `mail()` fonksiyonunun çalışabildiği bir sunucu (e-posta gönderimleri için)
-- Telegram bildirimleri için bot token ve chat ID (opsiyonel)
+`.env` dosyasında yer alan değişkenler:
 
-## Geliştirme
-- Projede Composer kullanılmaz; tüm sınıflar basit bir autoloader ile yüklenir.
-- `config/config.php` dosyası git tarafından izlenmez; dağıtıma özel yapılandırmalar için bu dosya kullanılır.
-- Arayüz Bootstrap CDN üzerinden yüklenir. Ek CSS düzenlemeleri `assets/css/style.css` üzerinden yapılabilir.
+| Anahtar | Açıklama | Varsayılan |
+| --- | --- | --- |
+| `LOTUS_API_KEY` | Sağlayıcı tarafından verilen API anahtarı | - |
+| `LOTUS_BASE_URL` | Lotus API temel adresi | `https://partner.lotuslisans.com.tr` |
+| `LOTUS_TIMEOUT_MS` | HTTP isteği zaman aşımı (ms) | `20000` |
+| `LOTUS_CONNECT_TIMEOUT_MS` | Bağlantı zaman aşımı (ms) | `10000` |
+| `LOTUS_DB_PATH` | SQLite dosya yolu | `/storage/lotus.sqlite` |
+| `LOTUS_LOG_PATH` | Log dosyası | `/storage/lotus.log` |
+
+## Sipariş Akışı
+
+1. Ödeme tamamlandığında `example/order_callback.php` uç noktasına `local_order_id` ve `lotus_product_id` alanlarını içeren bir POST isteği gönderin.
+2. Uç nokta idempotent olarak Lotus API'sine sipariş aktarır ve sonucu JSON olarak döner.
+3. `bin/lotus-poll.php` komutunu cron veya supervisor ile çalıştırarak `pending` durumundaki siparişlerin durumunu güncel tutun.
+4. Sipariş `completed` olduğunda CLI çıktısında ve `storage/lotus.log` dosyasında içerik görüntülenir; kendi uygulama mantığınızı callback içerisinde genişletebilirsiniz.
+
+## Loglama
+
+Tüm HTTP hataları ve iş akışı mesajları `LOTUS_LOG_PATH` ile belirtilen dosyaya yazılır. Dosya yoksa otomatik oluşturulur.
+
+## Test / Kontrol Listesi
+
+1. `.env` dosyasına geçerli bir `LOTUS_API_KEY` girildi mi?
+2. `composer install` komutu sonrasında `vendor/` klasörü oluştu mu?
+3. `php example/order_callback.php` (CLI üzerinden) ile temel akış hatasız tetikleniyor mu?
+4. `bin/lotus-poll.php` çalıştırıldığında pending siparişler güncelleniyor mu?
+5. `storage/lotus.log` dosyasında HTTP hataları ve bilgilendirici loglar tutuluyor mu?
 
 ## Lisans
-Bu proje MIT Lisansı ile lisanslanmıştır. Ayrıntılar için `LICENSE` dosyasına göz atın.
+
+MIT lisansı altında dağıtılır.

@@ -133,6 +133,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $pdo->commit();
 
+        if ($orderIds) {
+            \App\Services\ProviderDispatchService::dispatchProductOrders($orderIds);
+        }
+
         $remaining = $currentBalance - $totalCost;
 
         json_response(array(
