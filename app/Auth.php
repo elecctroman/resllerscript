@@ -4,6 +4,7 @@ namespace App;
 
 use App\Database;
 use App\Helpers;
+use App\Notifications\ResellerNotifier;
 use PDO;
 use RuntimeException;
 
@@ -151,22 +152,51 @@ class Auth
      * @param float $balance
      * @return int
      */
-    public static function createUser($name, $email, $password, $role = 'reseller', $balance = 0)
+    public static function createUser($name, $email, $password, $role = 'reseller', $balance = 0, array $options = array())
     {
         if (!in_array($role, self::roles(), true)) {
             $role = 'reseller';
         }
 
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('INSERT INTO users (name, email, password_hash, role, balance, status, created_at) VALUES (:name, :email, :password_hash, :role, :balance, :status, NOW())');
-        $stmt->execute([
+        $status = isset($options['status']) && in_array($options['status'], array('active', 'inactive'), true)
+            ? $options['status']
+            : 'active';
+
+        $telegramBotToken = isset($options['telegram_bot_token']) ? trim((string)$options['telegram_bot_token']) : null;
+        $telegramChatId = isset($options['telegram_chat_id']) ? trim((string)$options['telegram_chat_id']) : null;
+
+        $columns = array('name', 'email', 'password_hash', 'role', 'balance', 'status', 'created_at');
+        $placeholders = array(':name', ':email', ':password_hash', ':role', ':balance', ':status', 'NOW()');
+        $params = array(
             'name' => $name,
             'email' => $email,
             'password_hash' => password_hash($password, PASSWORD_BCRYPT),
             'role' => $role,
             'balance' => $balance,
-            'status' => 'active'
-        ]);
+            'status' => $status,
+        );
+
+        if ($telegramBotToken !== null && $telegramBotToken !== '') {
+            $columns[] = 'telegram_bot_token';
+            $placeholders[] = ':telegram_bot_token';
+            $params['telegram_bot_token'] = $telegramBotToken;
+        }
+
+        if ($telegramChatId !== null && $telegramChatId !== '') {
+            $columns[] = 'telegram_chat_id';
+            $placeholders[] = ':telegram_chat_id';
+            $params['telegram_chat_id'] = $telegramChatId;
+        }
+
+        $sql = sprintf(
+            'INSERT INTO users (%s) VALUES (%s)',
+            implode(', ', $columns),
+            implode(', ', $placeholders)
+        );
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
 
         return (int)$pdo->lastInsertId();
     }
@@ -186,15 +216,40 @@ class Auth
 
     /**
      * @param string $email
+     * @return array|null
+     */
+    public static function findUserByEmail($email)
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT * FROM users WHERE email = :email LIMIT 1');
+        $stmt->execute(array('email' => $email));
+
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    /**
+     * @param string $email
      * @param string $token
      * @param string $resetUrl
      * @return void
      */
     public static function sendResetLink($email, $token, $resetUrl)
     {
-        $subject = 'Şifre Sıfırlama Talebi';
-        $message = "Merhaba,\n\nŞifrenizi sıfırlamak için lütfen aşağıdaki bağlantıya tıklayın:\n$resetUrl\n\nBu bağlantı 1 saat boyunca geçerlidir.\n\nSaygılarımızla.";
-        Mailer::send($email, $subject, $message);
+        $user = self::findUserByEmail($email);
+        if (!$user) {
+            return;
+        }
+
+        $message = implode("\n", array(
+            '🔐 <b>Şifre sıfırlama talebi</b>',
+            '',
+            'Panel şifrenizi sıfırlamak için aşağıdaki bağlantıyı kullanabilirsiniz:',
+            '<a href="' . htmlspecialchars($resetUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">Şifremi Sıfırla</a>',
+            '',
+            'Bu bağlantı 1 saat boyunca geçerlidir. Eğer bu talebi siz oluşturmadıysanız lütfen hesabınızı kontrol edin.',
+        ));
+
+        ResellerNotifier::sendDirect($user, $message);
     }
 
     /**
