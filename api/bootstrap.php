@@ -51,6 +51,8 @@ try {
     exit;
 }
 
+App\Notifications\PreferenceManager::ensureUserColumns();
+
 if (!App\FeatureToggle::isEnabled('api')) {
     http_response_code(503);
     echo json_encode(array(
@@ -86,15 +88,49 @@ function authenticate_token()
 {
     $token = '';
 
+    $authHeader = '';
+
     if (!empty($_SERVER['HTTP_AUTHORIZATION'])) {
-        $authHeader = trim($_SERVER['HTTP_AUTHORIZATION']);
+        $authHeader = (string)$_SERVER['HTTP_AUTHORIZATION'];
+    }
+
+    if ($authHeader === '' && !empty($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+        $authHeader = (string)$_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+    }
+
+    if ($authHeader === '' && function_exists('getallheaders')) {
+        $headers = getallheaders();
+        if (is_array($headers)) {
+            foreach ($headers as $name => $value) {
+                if (strcasecmp($name, 'Authorization') === 0) {
+                    $authHeader = (string)$value;
+                    break;
+                }
+            }
+        }
+    }
+
+    if ($authHeader !== '') {
+        $authHeader = trim($authHeader);
         if (stripos($authHeader, 'Bearer ') === 0) {
             $token = trim(substr($authHeader, 7));
         }
     }
 
     if ($token === '' && !empty($_SERVER['HTTP_X_API_KEY'])) {
-        $token = trim($_SERVER['HTTP_X_API_KEY']);
+        $token = trim((string)$_SERVER['HTTP_X_API_KEY']);
+    }
+
+    if ($token === '' && isset($_GET['api_key'])) {
+        $token = trim((string)$_GET['api_key']);
+    }
+
+    if ($token === '' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (!empty($_POST['api_key'])) {
+            $token = trim((string)$_POST['api_key']);
+        } elseif (!empty($_POST['token'])) {
+            $token = trim((string)$_POST['token']);
+        }
     }
 
     if ($token === '') {
@@ -121,13 +157,17 @@ function authenticate_token()
         }
     }
 
-    if ($email === '') {
-        json_response(array('success' => false, 'error' => 'E-posta adresi bulunamadı.'), 401);
+    $tokenRow = null;
+    if ($email !== '') {
+        $tokenRow = App\ApiToken::findActiveToken($token, $email);
     }
 
-    $tokenRow = App\ApiToken::findActiveToken($token, $email);
     if (!$tokenRow) {
-        json_response(array('success' => false, 'error' => 'API anahtarı veya e-posta doğrulanamadı.'), 401);
+        $tokenRow = App\ApiToken::findActiveToken($token);
+    }
+
+    if (!$tokenRow) {
+        json_response(array('success' => false, 'error' => 'API anahtarı doğrulanamadı.'), 401);
     }
 
     return $tokenRow;

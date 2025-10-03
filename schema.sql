@@ -6,6 +6,11 @@ CREATE TABLE IF NOT EXISTS users (
     role ENUM('super_admin','admin','finance','support','content','reseller') NOT NULL DEFAULT 'reseller',
     balance DECIMAL(12,2) NOT NULL DEFAULT 0,
     status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    telegram_bot_token VARCHAR(255) NULL,
+    telegram_chat_id VARCHAR(191) NULL,
+    notify_order_completed TINYINT(1) NOT NULL DEFAULT 1,
+    notify_balance_approved TINYINT(1) NOT NULL DEFAULT 1,
+    notify_support_replied TINYINT(1) NOT NULL DEFAULT 1,
     low_balance_since DATETIME NULL DEFAULT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
@@ -37,6 +42,7 @@ CREATE TABLE IF NOT EXISTS packages (
 CREATE TABLE IF NOT EXISTS package_orders (
     id INT AUTO_INCREMENT PRIMARY KEY,
     package_id INT NOT NULL,
+    user_id INT NULL,
     name VARCHAR(150) NOT NULL,
     email VARCHAR(150) NOT NULL,
     phone VARCHAR(100) NULL,
@@ -51,7 +57,8 @@ CREATE TABLE IF NOT EXISTS package_orders (
     total_amount DECIMAL(12,2) NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (package_id) REFERENCES packages(id)
+    FOREIGN KEY (package_id) REFERENCES packages(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS categories (
@@ -73,6 +80,8 @@ CREATE TABLE IF NOT EXISTS products (
     cost_price_try DECIMAL(12,2) NULL,
     price DECIMAL(12,2) NOT NULL DEFAULT 0,
     status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    provider_code VARCHAR(100) NULL,
+    provider_product_id VARCHAR(100) NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (category_id) REFERENCES categories(id)
@@ -131,7 +140,8 @@ CREATE TABLE IF NOT EXISTS balance_transactions (
 
 CREATE TABLE IF NOT EXISTS balance_requests (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
+    user_id INT NULL,
+    package_order_id INT NULL,
     amount DECIMAL(12,2) NOT NULL,
     payment_method VARCHAR(150) NOT NULL,
     payment_provider VARCHAR(100) NULL,
@@ -146,6 +156,7 @@ CREATE TABLE IF NOT EXISTS balance_requests (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (package_order_id) REFERENCES package_orders(id),
     FOREIGN KEY (processed_by) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -178,6 +189,29 @@ CREATE TABLE IF NOT EXISTS admin_activity_logs (
     INDEX idx_action_created_at (action, created_at),
     INDEX idx_user_created_at (user_id, created_at),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS premium_modules (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(191) NOT NULL,
+    description TEXT NOT NULL,
+    price DECIMAL(12,2) NOT NULL DEFAULT 0,
+    file_path VARCHAR(255) NOT NULL,
+    status TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS user_purchases (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    module_id INT NOT NULL,
+    payment_status VARCHAR(32) NOT NULL DEFAULT 'pending',
+    license_key VARCHAR(191) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (module_id) REFERENCES premium_modules(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO users (id, name, email, password_hash, role, balance, status, created_at)

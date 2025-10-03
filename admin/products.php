@@ -29,6 +29,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $sku = isset($_POST['sku']) ? trim($_POST['sku']) : '';
             $description = isset($_POST['description']) ? trim($_POST['description']) : '';
             $status = isset($_POST['status']) ? 'active' : 'inactive';
+            $providerCode = isset($_POST['provider_code']) ? strtolower(trim($_POST['provider_code'])) : '';
+            $providerProductId = isset($_POST['provider_product_id']) ? trim($_POST['provider_product_id']) : '';
 
             $costSanitized = preg_replace('/[^0-9.,-]/', '', $costInput);
             $costSanitized = str_replace(',', '.', (string)$costSanitized);
@@ -45,10 +47,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errors[] = 'Alış fiyatı 0’dan büyük olmalıdır.';
             }
 
+            if ($providerCode !== '' && $providerCode !== 'lotus') {
+                $errors[] = 'Desteklenmeyen sağlayıcı seçildi.';
+            }
+
+            if ($providerCode !== '' && $providerProductId === '') {
+                $errors[] = 'Sağlayıcı ürün kimliği zorunludur.';
+            }
+
             if (!$errors) {
                 $salePrice = Helpers::priceFromCostTry($costPriceTry);
 
-                $stmt = $pdo->prepare('INSERT INTO products (name, category_id, cost_price_try, price, description, sku, status, created_at) VALUES (:name, :category_id, :cost_price_try, :price, :description, :sku, :status, NOW())');
+                $stmt = $pdo->prepare('INSERT INTO products (name, category_id, cost_price_try, price, description, sku, status, provider_code, provider_product_id, created_at) VALUES (:name, :category_id, :cost_price_try, :price, :description, :sku, :status, :provider_code, :provider_product_id, NOW())');
                 $stmt->execute(array(
                     'name' => $name,
                     'category_id' => $categoryId,
@@ -57,6 +67,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'description' => $description !== '' ? $description : null,
                     'sku' => $sku !== '' ? $sku : null,
                     'status' => $status,
+                    'provider_code' => $providerCode !== '' ? $providerCode : null,
+                    'provider_product_id' => $providerProductId !== '' ? $providerProductId : null,
                 ));
 
                 $success = 'Ürün kaydedildi.';
@@ -77,6 +89,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $sku = isset($_POST['sku']) ? trim($_POST['sku']) : '';
             $description = isset($_POST['description']) ? trim($_POST['description']) : '';
             $status = isset($_POST['status']) ? 'active' : 'inactive';
+            $providerCode = isset($_POST['provider_code']) ? strtolower(trim($_POST['provider_code'])) : '';
+            $providerProductId = isset($_POST['provider_product_id']) ? trim($_POST['provider_product_id']) : '';
 
             $costSanitized = preg_replace('/[^0-9.,-]/', '', $costInput);
             $costSanitized = str_replace(',', '.', (string)$costSanitized);
@@ -93,10 +107,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errors[] = 'Alış fiyatı 0’dan büyük olmalıdır.';
             }
 
+            if ($providerCode !== '' && $providerCode !== 'lotus') {
+                $errors[] = 'Desteklenmeyen sağlayıcı seçildi.';
+            }
+
+            if ($providerCode !== '' && $providerProductId === '') {
+                $errors[] = 'Sağlayıcı ürün kimliği zorunludur.';
+            }
+
             if (!$errors) {
                 $salePrice = Helpers::priceFromCostTry($costPriceTry);
 
-                $stmt = $pdo->prepare('UPDATE products SET name = :name, category_id = :category_id, cost_price_try = :cost_price_try, price = :price, description = :description, sku = :sku, status = :status, updated_at = NOW() WHERE id = :id');
+                $stmt = $pdo->prepare('UPDATE products SET name = :name, category_id = :category_id, cost_price_try = :cost_price_try, price = :price, description = :description, sku = :sku, status = :status, provider_code = :provider_code, provider_product_id = :provider_product_id, updated_at = NOW() WHERE id = :id');
                 $stmt->execute(array(
                     'id' => $productId,
                     'name' => $name,
@@ -106,6 +128,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'description' => $description !== '' ? $description : null,
                     'sku' => $sku !== '' ? $sku : null,
                     'status' => $status,
+                    'provider_code' => $providerCode !== '' ? $providerCode : null,
+                    'provider_product_id' => $providerProductId !== '' ? $providerProductId : null,
                 ));
 
                 $success = 'Ürün güncellendi.';
@@ -261,6 +285,20 @@ include __DIR__ . '/../templates/header.php';
                         <label class="form-label">SKU</label>
                         <input type="text" name="sku" class="form-control" placeholder="Opsiyonel">
                     </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Sağlayıcı</label>
+                            <select name="provider_code" class="form-select">
+                                <option value="">Panel Yönetimi</option>
+                                <option value="lotus">Lotus Lisans</option>
+                            </select>
+                            <small class="text-muted">Lotus seçildiğinde siparişler otomatik olarak iletilir.</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Sağlayıcı Ürün ID</label>
+                            <input type="text" name="provider_product_id" class="form-control" placeholder="Örn: 57">
+                        </div>
+                    </div>
                     <div>
                         <label class="form-label">Açıklama</label>
                         <textarea name="description" class="form-control" rows="3" placeholder="Opsiyonel"></textarea>
@@ -310,6 +348,9 @@ include __DIR__ . '/../templates/header.php';
                                     <td>
                                         <strong><?= Helpers::sanitize($product['name']) ?></strong><br>
                                         <small class="text-muted">SKU: <?= Helpers::sanitize(isset($product['sku']) ? $product['sku'] : '-') ?></small>
+                                        <?php if (!empty($product['provider_code'])): ?>
+                                            <div class="text-muted small">Sağlayıcı: <?= Helpers::sanitize(strtoupper($product['provider_code'])) ?><?php if (!empty($product['provider_product_id'])): ?> #<?= Helpers::sanitize($product['provider_product_id']) ?><?php endif; ?></div>
+                                        <?php endif; ?>
                                     </td>
                                     <td><?= Helpers::sanitize($categoryPath((int)$product['category_id'])) ?></td>
                                     <td><?= isset($product['cost_price_try']) ? Helpers::sanitize(number_format((float)$product['cost_price_try'], 2, ',', '.')) : '-' ?></td>
@@ -365,6 +406,17 @@ include __DIR__ . '/../templates/header.php';
                                                         <div class="col-md-4">
                                                             <label class="form-label">SKU</label>
                                                             <input type="text" name="sku" class="form-control" value="<?= Helpers::sanitize(isset($product['sku']) ? $product['sku'] : '') ?>">
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <label class="form-label">Sağlayıcı</label>
+                                                            <select name="provider_code" class="form-select">
+                                                                <option value="">Panel Yönetimi</option>
+                                                                <option value="lotus" <?= isset($product['provider_code']) && $product['provider_code'] === 'lotus' ? 'selected' : '' ?>>Lotus Lisans</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <label class="form-label">Sağlayıcı Ürün ID</label>
+                                                            <input type="text" name="provider_product_id" class="form-control" value="<?= Helpers::sanitize(isset($product['provider_product_id']) ? $product['provider_product_id'] : '') ?>" placeholder="Örn: 57">
                                                         </div>
                                                         <div class="col-md-4">
                                                             <div class="form-check form-switch pt-4">

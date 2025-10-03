@@ -32,6 +32,7 @@ $featureLabels = array(
     'support' => 'Destek talepleri',
     'packages' => 'Bayilik paketleri başvurusu',
     'api' => 'API erişimi',
+    'premium_modules' => 'Premium modül pazarı',
 );
 
 $featureStates = FeatureToggle::all();
@@ -238,12 +239,13 @@ include __DIR__ . '/../templates/header.php';
                         </div>
                     </div>
 
-                    <div class="d-flex justify-content-end">
-                        <button type="submit" class="btn btn-primary">Ayarları Kaydet</button>
-                    </div>
-                </form>
-            </div>
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-primary">Ayarları Kaydet</button>
+                </div>
+            </form>
         </div>
+    </div>
+
     </div>
 </div>
 <?php include __DIR__ . '/../templates/footer.php';

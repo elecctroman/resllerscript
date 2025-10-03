@@ -1,112 +1,83 @@
-<?php
-session_start();
+<?php declare(strict_types=1);
 
-$autoloader = __DIR__ . '/vendor/autoload.php';
-if (file_exists($autoloader)) {
-    require_once $autoloader;
+$rootPath = __DIR__;
+
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
 }
 
-spl_autoload_register(function ($class) {
-    $prefix = 'App\\';
-    $baseDir = __DIR__ . '/app/';
-    $len = strlen($prefix);
+$composerAutoload = $rootPath . '/vendor/autoload.php';
+if (is_file($composerAutoload)) {
+    require_once $composerAutoload;
+}
 
-    if (strncmp($prefix, $class, $len) !== 0) {
+spl_autoload_register(static function ($class) use ($rootPath): void {
+    $prefix = 'App\\';
+    $length = strlen($prefix);
+
+    if (strncmp($prefix, $class, $length) !== 0) {
         return;
     }
 
-    $relativeClass = substr($class, $len);
-    $file = $baseDir . str_replace('\\', '/', $relativeClass) . '.php';
+    $relative = substr($class, $length);
+    $segments = str_replace('\\', '/', $relative);
 
-    if (file_exists($file)) {
-        require $file;
+    $paths = array(
+        $rootPath . '/src/' . $segments . '.php',
+        $rootPath . '/app/' . $segments . '.php',
+    );
+
+    foreach ($paths as $path) {
+        if (is_file($path)) {
+            require_once $path;
+            return;
+        }
     }
 });
 
-$configPath = __DIR__ . '/config/config.php';
-$installerPath = __DIR__ . '/install.php';
-
-if (!file_exists($configPath)) {
-    if (file_exists($installerPath)) {
-        header('Location: /install.php');
-        exit;
+if (!function_exists('envStr')) {
+    function envStr(string $key, ?string $default = null): ?string
+    {
+        return $_ENV[$key] ?? $_SERVER[$key] ?? $default;
     }
-
-    include __DIR__ . '/templates/auth-header.php';
-    ?>
-    <div class="auth-wrapper">
-        <div class="auth-card">
-            <div class="text-center mb-4">
-                <div class="brand">Bayi Yönetim Sistemi</div>
-                <p class="text-muted mt-2">Kurulum tamamlanmadı</p>
-            </div>
-            <div class="alert alert-warning">
-                <h5 class="alert-heading">Yapılandırma Gerekli</h5>
-                <p class="mb-2">Lütfen <code>config/config.sample.php</code> dosyasını <code>config/config.php</code> olarak
-                    kopyalayın ve MySQL bağlantı bilgilerinizi girin.</p>
-                <ol class="mb-0 text-start">
-                    <li><code>config/config.sample.php</code> dosyasını kopyalayın.</li>
-                    <li>Yeni dosyada <code>DB_HOST</code>, <code>DB_NAME</code>, <code>DB_USER</code> ve <code>DB_PASSWORD</code>
-                        değerlerini güncelleyin.</li>
-                    <li>Veritabanınızı oluşturup <code>schema.sql</code> dosyasındaki tabloları içeri aktarın.</li>
-                    <li>Ardından bu sayfayı yenileyerek giriş ekranına ulaşın.</li>
-                </ol>
-            </div>
-        </div>
-    </div>
-    <?php
-    include __DIR__ . '/templates/auth-footer.php';
-    exit;
 }
 
-require $configPath;
-
-try {
-    App\Database::initialize([
-        'host' => DB_HOST,
-        'name' => DB_NAME,
-        'user' => DB_USER,
-        'password' => DB_PASSWORD,
-    ]);
-} catch (\PDOException $exception) {
-    include __DIR__ . '/templates/auth-header.php';
-    ?>
-    <div class="auth-wrapper">
-        <div class="auth-card">
-            <div class="text-center mb-4">
-                <div class="brand">Bayi Yönetim Sistemi</div>
-                <p class="text-muted mt-2">Veritabanı bağlantısı kurulamadı</p>
-            </div>
-            <div class="alert alert-danger">
-                <h5 class="alert-heading">Bağlantı Hatası</h5>
-                <p class="mb-2">Lütfen <code>config/config.php</code> dosyanızdaki MySQL bilgilerini kontrol edin ve veritabanı sunucunuzu doğrulayın.</p>
-                <p class="mb-0 small text-muted">Hata detayı: <?= App\Helpers::sanitize($exception->getMessage()) ?></p>
-            </div>
-        </div>
-    </div>
-    <?php
-    include __DIR__ . '/templates/auth-footer.php';
-    exit;
+if (class_exists(\Dotenv\Dotenv::class)) {
+    \Dotenv\Dotenv::createImmutable($rootPath)->safeLoad();
+} elseif (is_file($rootPath . '/env.php')) {
+    /** @noinspection PhpIncludeInspection */
+    require_once $rootPath . '/env.php';
 }
 
-App\Lang::boot();
+@mkdir($rootPath . '/storage', 0777, true);
 
-App\ResellerPolicy::enforce();
+$configPath = $rootPath . '/config/config.php';
+if (is_file($configPath)) {
+    require_once $configPath;
+}
 
-if (!empty($_SESSION['user'])) {
-    $freshUser = App\Auth::findUser((int)$_SESSION['user']['id']);
-    if ($freshUser) {
-        $_SESSION['user'] = $freshUser;
+$dbHost = envStr('DB_HOST', defined('DB_HOST') ? (string) DB_HOST : 'localhost');
+$dbName = envStr('DB_NAME', defined('DB_NAME') ? (string) DB_NAME : '');
+$dbUser = envStr('DB_USER', defined('DB_USER') ? (string) DB_USER : '');
+$dbPassword = envStr('DB_PASSWORD', defined('DB_PASSWORD') ? (string) DB_PASSWORD : '');
 
-        if (isset($freshUser['status']) && $freshUser['status'] !== 'active') {
-            App\Helpers::setFlash('error', 'Hesabınız pasif durumda. Lütfen destek ekibi ile iletişime geçin.');
-            unset($_SESSION['user']);
-            App\Helpers::redirect('/index.php');
-        }
+if ($dbName !== '') {
+    try {
+        App\Database::initialize(array(
+            'host' => $dbHost,
+            'name' => $dbName,
+            'user' => $dbUser,
+            'password' => $dbPassword,
+        ));
+    } catch (\Throwable $connectionException) {
+        error_log('[Bootstrap] Veritabanı bağlantısı kurulamadı: ' . $connectionException->getMessage());
     }
+}
 
-    $preferredLanguage = App\Settings::get('user_' . $_SESSION['user']['id'] . '_preferred_language');
-    if ($preferredLanguage) {
-        App\Lang::setLocale($preferredLanguage);
+if (class_exists(App\Migrations\Schema::class)) {
+    try {
+        App\Migrations\Schema::ensure();
+    } catch (\Throwable $schemaException) {
+        error_log('[Bootstrap] Şema güncellenemedi: ' . $schemaException->getMessage());
     }
 }

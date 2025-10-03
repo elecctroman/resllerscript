@@ -1,0 +1,210 @@
+<?php declare(strict_types=1);
+
+namespace App;
+
+use RuntimeException;
+
+final class LotusClientCurl
+{
+    private string $baseUrl;
+    private string $apiKey;
+    private Logger $logger;
+    private int $timeoutMs;
+    private int $connectTimeoutMs;
+
+    public function __construct(string $baseUrl, string $apiKey, int $timeoutMs, int $connectTimeoutMs, Logger $logger)
+    {
+        $this->baseUrl = rtrim($baseUrl, '/') . '/';
+        $this->apiKey = $apiKey;
+        $this->timeoutMs = max(1000, $timeoutMs);
+        $this->connectTimeoutMs = max(1000, $connectTimeoutMs);
+        $this->logger = $logger;
+    }
+
+    /** @return array<string,mixed> */
+    public function getUser(): array
+    {
+        return $this->request('GET', 'api/user');
+    }
+
+    /** @return array<string,mixed> */
+    public function getProducts(): array
+    {
+        return $this->request('GET', 'api/products');
+    }
+
+    /** @return array<string,mixed> */
+    public function createOrder(int $productId, ?string $note = null): array
+    {
+        $payload = array('product_id' => $productId);
+        if ($note !== null && $note !== '') {
+            $payload['note'] = $note;
+        }
+
+        return $this->request('POST', 'api/orders', $payload);
+    }
+
+    /** @return array<string,mixed> */
+    public function listOrders(): array
+    {
+        return $this->request('GET', 'api/orders');
+    }
+
+    /** @return array<string,mixed> */
+    public function getOrder(int $orderId): array
+    {
+        return $this->request('GET', 'api/orders/' . $orderId);
+    }
+
+    /**
+     * @param array<string,mixed>|null $payload
+     * @return array<string,mixed>
+     */
+    private function request(string $method, string $path, ?array $payload = null, int $redirectDepth = 0): array
+    {
+        $url = (strpos($path, '://') !== false) ? $path : $this->baseUrl . ltrim($path, '/');
+
+        $attempts = 0;
+        $delays = array(500, 1000, 2000);
+
+        do {
+            $attempts++;
+            $response = $this->performRequest($method, $url, $payload, $redirectDepth);
+
+            if ($response['status'] >= 500 && $attempts < 3) {
+                $delay = $delays[$attempts - 1] ?? end($delays);
+                usleep($delay * 1000);
+                continue;
+            }
+
+            return $response['body'];
+        } while (true);
+    }
+
+    /**
+     * @param array<string,mixed>|null $payload
+     * @return array{status:int,body:array<string,mixed>}
+     */
+    private function performRequest(string $method, string $url, ?array $payload, int $redirectDepth): array
+    {
+        if (!function_exists('curl_init')) {
+            throw new RuntimeException('cURL desteği bulunamadı.');
+        }
+
+        $ch = curl_init();
+        if ($ch === false) {
+            throw new RuntimeException('cURL oturumu başlatılamadı.');
+        }
+
+        $headers = array(
+            'Accept: application/json',
+            'X-API-Key: ' . $this->apiKey,
+            'User-Agent: LotusIntegrationCurl/1.0'
+        );
+
+        if ($payload !== null) {
+            $headers[] = 'Content-Type: application/json';
+        }
+
+        $options = array(
+            CURLOPT_URL => $url,
+            CURLOPT_CUSTOMREQUEST => $method,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT_MS => $this->timeoutMs,
+            CURLOPT_CONNECTTIMEOUT_MS => $this->connectTimeoutMs,
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS => 5,
+        );
+
+        if (ini_get('open_basedir')) {
+            unset($options[CURLOPT_FOLLOWLOCATION], $options[CURLOPT_MAXREDIRS]);
+        }
+
+        curl_setopt_array($ch, $options);
+
+        if ($payload !== null) {
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        }
+
+        $result = curl_exec($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $contentType = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+        $effectiveUrl = (string) curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+        $redirects = (int) curl_getinfo($ch, CURLINFO_REDIRECT_COUNT);
+
+        if ($result === false) {
+            $error = curl_error($ch);
+            curl_close($ch);
+            $this->logger->error('cURL isteği başarısız: ' . $error);
+            throw new RuntimeException('Sağlayıcı API isteği başarısız: ' . $error);
+        }
+
+        curl_close($ch);
+
+        $decoded = json_decode($result, true);
+        if (!is_array($decoded)) {
+            $snippet = function_exists('mb_substr') ? mb_substr($result, 0, 200) : substr($result, 0, 200);
+            $preview = trim((string) $snippet);
+            $this->logger->error(sprintf(
+                'Geçersiz JSON alındı (HTTP %d, redirect=%d, content-type=%s, url=%s): %s',
+                $status,
+                $redirects,
+                $contentType !== '' ? $contentType : 'bilinmiyor',
+                $effectiveUrl !== '' ? $effectiveUrl : $url,
+                $preview
+            ));
+
+            if ($status >= 300 && $status < 400 && $redirectDepth < 5) {
+                $location = $this->extractRedirectLocation($result, $effectiveUrl);
+                if ($location !== null) {
+                    $this->logger->info('Lotus yönlendirmesi algılandı (cURL), yeni hedef: ' . $location);
+                    return $this->performRequest($method, $location, $payload, $redirectDepth + 1);
+                }
+            }
+
+            if ($redirectDepth < 5 && stripos($result, '301 Moved Permanently') !== false) {
+                $alt = rtrim($url, '/') . '/';
+                if ($alt !== $url) {
+                    $this->logger->info('Lotus 301 gövdesi algılandı (cURL), trailing slash ile yeniden denenecek: ' . $alt);
+                    return $this->performRequest($method, $alt, $payload, $redirectDepth + 1);
+                }
+            }
+
+            if ($status >= 300 && $status < 400) {
+                throw new RuntimeException('Sağlayıcı API yönlendirme yanıtı döndürdü. API URL ayarınızı "https://alanadiniz.com" formatında girin ve güvenlik kısıtlamalarını kontrol edin.');
+            }
+
+            throw new RuntimeException('Sağlayıcıdan beklenmeyen yanıt alındı.');
+        }
+
+        return array('status' => $status, 'body' => $decoded);
+    }
+
+    private function extractRedirectLocation(string $html, string $effectiveUrl): ?string
+    {
+        if (preg_match('#<meta\s+http-equiv="refresh"\s+content="\d+;\s*url=([^"]+)"#i', $html, $matches)) {
+            return html_entity_decode($matches[1], ENT_QUOTES, 'UTF-8');
+        }
+
+        if (preg_match('#<a\s+href="([^"]+)"#i', $html, $matches)) {
+            $candidate = html_entity_decode($matches[1], ENT_QUOTES, 'UTF-8');
+            if ($candidate !== '') {
+                if (strpos($candidate, '://') === false && $effectiveUrl !== '') {
+                    $parts = parse_url($effectiveUrl);
+                    if ($parts !== false && isset($parts['scheme'], $parts['host'])) {
+                        $base = $parts['scheme'] . '://' . $parts['host'];
+                        if (isset($parts['port'])) {
+                            $base .= ':' . $parts['port'];
+                        }
+                        $candidate = rtrim($base, '/') . '/' . ltrim($candidate, '/');
+                    }
+                }
+
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+}
