@@ -3,7 +3,6 @@ require __DIR__ . '/bootstrap.php';
 
 use App\Auth;
 use App\Helpers;
-use App\Mailer;
 
 if (!empty($_SESSION['user'])) {
     Helpers::redirect('/dashboard.php');
@@ -37,7 +36,7 @@ if (isset($_GET['token'])) {
         }
     }
 
-    include __DIR__ . '/templates/auth-header.php';
+    Helpers::includeTemplate('auth-header.php');
     ?>
     <div class="auth-wrapper">
         <div class="auth-card">
@@ -78,26 +77,34 @@ if (isset($_GET['token'])) {
         </div>
     </div>
     <?php
-    include __DIR__ . '/templates/auth-footer.php';
+    Helpers::includeTemplate('auth-footer.php');
     exit;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = isset($_POST['email']) ? trim($_POST['email']) : '';
 
-    if (!$email) {
+    if ($email === '') {
         $errors[] = 'Lütfen e-posta adresinizi girin.';
     }
 
     if (!$errors) {
-        $token = Auth::createPasswordReset($email);
-        $resetLink = sprintf('%s/password-reset.php?token=%s', rtrim((isset($_SERVER['HTTPS']) ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'], '/'), $token);
-        Auth::sendResetLink($email, $token, $resetLink);
-        $successMessage = 'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.';
+        $user = Auth::findUserByEmail($email);
+
+        if (!$user) {
+            $errors[] = 'Bu e-posta adresiyle kayıtlı bir hesap bulunamadı.';
+        } elseif (empty($user['telegram_bot_token']) || empty($user['telegram_chat_id'])) {
+            $errors[] = 'Hesabınız için Telegram bildirimi tanımlı olmadığı için sıfırlama bağlantısı gönderilemedi. Lütfen yönetici ile iletişime geçin.';
+        } else {
+            $token = Auth::createPasswordReset($email);
+            $resetLink = Helpers::url('password-reset.php?token=' . urlencode($token), true);
+            Auth::sendResetLink($email, $token, $resetLink);
+            $successMessage = 'Şifre sıfırlama bağlantısı Telegram üzerinden gönderildi.';
+        }
     }
 }
 
-include __DIR__ . '/templates/auth-header.php';
+Helpers::includeTemplate('auth-header.php');
 ?>
 <div class="auth-wrapper">
     <div class="auth-card">
@@ -132,4 +139,4 @@ include __DIR__ . '/templates/auth-header.php';
         </form>
     </div>
 </div>
-<?php include __DIR__ . '/templates/auth-footer.php';
+<?php Helpers::includeTemplate('auth-footer.php'); ?>

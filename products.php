@@ -4,6 +4,7 @@ require __DIR__ . '/bootstrap.php';
 use App\Auth;
 use App\Database;
 use App\Helpers;
+use App\Services\ProviderDispatchService;
 use App\Telegram;
 
 if (empty($_SESSION['user'])) {
@@ -86,6 +87,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $pdo->rollBack();
                     $errors[] = 'Ürün bulunamadı veya pasif durumda.';
                 } else {
+                    $providerCode = isset($product['provider_code']) ? strtolower((string)$product['provider_code']) : '';
+                    $useLocalStock = ($providerCode === '' || $providerCode === 'stock' || $providerCode === 'panel');
+
                     $userStmt = $pdo->prepare('SELECT id, balance FROM users WHERE id = :id LIMIT 1 FOR UPDATE');
                     $userStmt->execute(['id' => $user['id']]);
                     $freshUser = $userStmt->fetch();
@@ -101,53 +105,81 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $pdo->rollBack();
                             $errors[] = 'Bakiyeniz bu ürünü sipariş etmek için yetersiz görünüyor. Lütfen bakiye yükleyip tekrar deneyin.';
                         } else {
-                            $orderStmt = $pdo->prepare('INSERT INTO product_orders (product_id, user_id, quantity, note, price, status, source, created_at) VALUES (:product_id, :user_id, :quantity, :note, :price, :status, :source, NOW())');
-                            $orderStmt->execute([
-                                'product_id' => $productId,
-                                'user_id' => $user['id'],
-                                'quantity' => 1,
-                                'note' => $note ?: null,
-                                'price' => $price,
-                                'status' => 'pending',
-                                'source' => 'panel',
-                            ]);
+                            $quantity = 1;
+                            $insufficientStock = false;
+                            if ($useLocalStock) {
+                                $stockCheck = $pdo->prepare('SELECT COUNT(*) FROM product_stock_items WHERE product_id = :product_id AND status = \"available\" FOR UPDATE');
+                                $stockCheck->execute(array('product_id' => (int)$product['id']));
+                                $availableStock = (int)$stockCheck->fetchColumn();
 
-                            $orderId = (int)$pdo->lastInsertId();
-
-                            $pdo->prepare('UPDATE users SET balance = balance - :amount WHERE id = :id')->execute([
-                                'amount' => $price,
-                                'id' => $user['id'],
-                            ]);
-
-                            $pdo->prepare('INSERT INTO balance_transactions (user_id, amount, type, description, created_at) VALUES (:user_id, :amount, :type, :description, NOW())')->execute([
-                                'user_id' => $user['id'],
-                                'amount' => $price,
-                                'type' => 'debit',
-                                'description' => 'Ürün siparişi: ' . $product['name'],
-                            ]);
-
-                            $pdo->commit();
-
-                            Telegram::notify(sprintf(
-                                "🛒 Yeni ürün siparişi alındı!\nBayi: %s\nÜrün: %s\nTutar: %s\nSipariş No: #%d",
-                                $user['name'],
-                                $product['name'],
-                                Helpers::formatCurrency($price, 'USD'),
-                                $orderId
-                            ));
-
-                            $_SESSION['flash_success'] = 'Sipariş talebiniz alındı ve bakiyenizden düşüldü. Ürün teslimatı kısa süre içinde gerçekleştirilecektir.';
-
-                            $queryParams = [];
-                            if ($selectedCategoryId) {
-                                $queryParams['category'] = $selectedCategoryId;
-                            }
-                            if ($searchTerm !== '') {
-                                $queryParams['q'] = $searchTerm;
+                                if ($availableStock < $quantity) {
+                                    $pdo->rollBack();
+                                    $errors[] = 'Bu ürün şu anda stokta bulunmuyor. Lütfen daha sonra tekrar deneyin.';
+                                    $insufficientStock = true;
+                                }
                             }
 
-                            $redirectQuery = $queryParams ? ('?' . http_build_query($queryParams)) : '';
-                            Helpers::redirect('/products.php' . $redirectQuery);
+                            if (!$insufficientStock) {
+                                $orderStmt = $pdo->prepare('INSERT INTO product_orders (product_id, user_id, quantity, note, price, status, source, created_at) VALUES (:product_id, :user_id, :quantity, :note, :price, :status, :source, NOW())');
+                                $orderStmt->execute(array(
+                                    'product_id' => $productId,
+                                    'user_id' => $user['id'],
+                                    'quantity' => $quantity,
+                                    'note' => $note ?: null,
+                                    'price' => $price,
+                                    'status' => 'pending',
+                                    'source' => 'panel',
+                                ));
+
+                                $orderId = (int) $pdo->lastInsertId();
+
+                                $pdo->prepare('UPDATE users SET balance = balance - :amount WHERE id = :id')->execute(array(
+                                    'amount' => $price,
+                                    'id' => $user['id'],
+                                ));
+
+                                $pdo->prepare('INSERT INTO balance_transactions (user_id, amount, type, description, created_at) VALUES (:user_id, :amount, :type, :description, NOW())')->execute(array(
+                                    'user_id' => $user['id'],
+                                    'amount' => $price,
+                                    'type' => 'debit',
+                                    'description' => 'Ürün siparişi: ' . $product['name'],
+                                ));
+
+                                $pdo->commit();
+
+                                Telegram::notify(sprintf(
+                                    "🛒 Yeni ürün siparişi alındı!\nBayi: %s\nÜrün: %s\nTutar: %s\nSipariş No: #%d",
+                                    $user['name'],
+                                    $product['name'],
+                                    Helpers::formatCurrency($price, 'USD'),
+                                    $orderId
+                                ));
+
+                                $_SESSION['flash_success'] = 'Sipariş talebiniz alındı ve bakiyenizden düşüldü. Ürün teslimatı kısa sürede gerçekleştirilecektir.';
+
+                                $dispatchResult = ProviderDispatchService::dispatchProductOrder($orderId);
+                                if (is_array($dispatchResult)) {
+                                    if (!empty($dispatchResult['message'])) {
+                                        $_SESSION['flash_success'] .= ' ' . $dispatchResult['message'];
+                                    }
+                                    if (!empty($dispatchResult['success']) && !empty($dispatchResult['status']) && $dispatchResult['status'] === 'completed') {
+                                        $_SESSION['flash_success'] .= ' Teslimat tamamlandı, detayları siparişlerim bölümünde görüntüleyebilirsiniz.';
+                                    } elseif (isset($dispatchResult['success']) && !$dispatchResult['success']) {
+                                        Helpers::setFlash('warning', isset($dispatchResult['reason']) ? $dispatchResult['reason'] : 'Sağlayıcıya iletilirken bir sorun oluştu, siparişiniz yönetici tarafından incelenecektir.');
+                                    }
+                                }
+
+                                $queryParams = array();
+                                if ($selectedCategoryId) {
+                                    $queryParams['category'] = $selectedCategoryId;
+                                }
+                                if ($searchTerm !== '') {
+                                    $queryParams['q'] = $searchTerm;
+                                }
+
+                                $redirectQuery = $queryParams ? ('?' . http_build_query($queryParams)) : '';
+                                Helpers::redirect('/products.php' . $redirectQuery);
+                            }
                         }
                     }
                 }
@@ -281,7 +313,7 @@ try {
         }
 
         $placeholders = implode(',', array_fill(0, count($categoryIds), '?'));
-        $productsQuery = 'SELECT pr.*, cat.name AS category_name FROM products pr INNER JOIN categories cat ON pr.category_id = cat.id WHERE pr.status = ? AND pr.category_id IN (' . $placeholders . ')';
+        $productsQuery = 'SELECT pr.*, cat.name AS category_name, (SELECT COUNT(*) FROM product_stock_items psi WHERE psi.product_id = pr.id AND psi.status = "available") AS available_stock FROM products pr INNER JOIN categories cat ON pr.category_id = cat.id WHERE pr.status = ? AND pr.category_id IN (' . $placeholders . ')';
         $productParams = array_merge(['active'], $categoryIds);
 
         if ($searchTerm !== '') {
@@ -296,7 +328,7 @@ try {
         $products = $productsStmt->fetchAll();
     } else {
         if ($searchTerm !== '') {
-            $productsQuery = 'SELECT pr.*, cat.name AS category_name FROM products pr INNER JOIN categories cat ON pr.category_id = cat.id WHERE pr.status = ?';
+            $productsQuery = 'SELECT pr.*, cat.name AS category_name, (SELECT COUNT(*) FROM product_stock_items psi WHERE psi.product_id = pr.id AND psi.status = "available") AS available_stock FROM products pr INNER JOIN categories cat ON pr.category_id = cat.id WHERE pr.status = ?';
             $productParams = ['active'];
 
             if ($searchTerm !== '') {
@@ -472,6 +504,21 @@ include __DIR__ . '/templates/header.php';
                         }
                         $shortDescription = Helpers::truncate($rawDescription, 140);
                         $skuValue = (isset($product['sku']) && $product['sku'] !== '') ? $product['sku'] : null;
+                        $providerCode = isset($product['provider_code']) ? strtolower((string)$product['provider_code']) : '';
+                        $isStockBased = ($providerCode === '' || $providerCode === 'stock' || $providerCode === 'panel');
+                        $availableStock = isset($product['available_stock']) ? (int)$product['available_stock'] : 0;
+                        $stockBadgeClass = 'bg-info text-dark';
+                        $stockLabel = 'Sağlayıcı teslimatı';
+                        if ($isStockBased) {
+                            if ($availableStock > 0) {
+                                $stockBadgeClass = 'bg-success';
+                                $stockLabel = sprintf('Stokta %d adet', $availableStock);
+                            } else {
+                                $stockBadgeClass = 'bg-danger';
+                                $stockLabel = 'Stok tükendi';
+                            }
+                        }
+                        $buttonDisabled = $isStockBased && $availableStock <= 0;
                         ?>
                         <div class="product-card">
                             <div class="product-card__header">
@@ -484,17 +531,21 @@ include __DIR__ . '/templates/header.php';
                             <?php if ($skuValue): ?>
                                 <div class="product-card__sku">SKU: <?= Helpers::sanitize($skuValue) ?></div>
                             <?php endif; ?>
+                            <div class="product-card__stock">
+                                <span class="badge <?= htmlspecialchars($stockBadgeClass, ENT_QUOTES, 'UTF-8') ?>"><?= Helpers::sanitize($stockLabel) ?></span>
+                            </div>
                             <p class="product-card__description"><?= Helpers::sanitize($shortDescription) ?></p>
                             <div class="product-card__actions">
                                 <button type="button"
-                                        class="product-card__button"
+                                        class="product-card__button<?= $buttonDisabled ? ' is-disabled' : '' ?>"
                                         data-bs-toggle="modal"
                                         data-bs-target="#orderModal"
                                         data-product-id="<?= (int)$product['id'] ?>"
                                         data-product-name="<?= Helpers::sanitize($productName) ?>"
                                         data-product-price="<?= Helpers::sanitize($productPrice) ?>"
                                         data-product-sku="<?= Helpers::sanitize($skuValue ?: '-') ?>"
-                                        data-product-category="<?= Helpers::sanitize($categoryTrail) ?>">
+                                        data-product-category="<?= Helpers::sanitize($categoryTrail) ?>"
+                                        <?= $buttonDisabled ? 'disabled aria-disabled="true" title="Stok tükendi"' : '' ?>>
                                     Sipariş ver
                                 </button>
                             </div>

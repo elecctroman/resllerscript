@@ -12,8 +12,8 @@ if (!defined('ABSPATH')) {
 
 final class Reseller_Sync_Connector
 {
-    const API_BASE = 'https://your-reseller-panel.com/api/v1/';
-    const OPTION_EMAIL = 'reseller_sync_email';
+    const DEFAULT_API_BASE = 'https://your-reseller-panel.com/api/v1/';
+    const OPTION_API_URL = 'reseller_sync_api_url';
     const OPTION_API_KEY = 'reseller_sync_api_key';
     const OPTION_LAST_WEBHOOK_SYNC = 'reseller_sync_webhook_synced_at';
 
@@ -28,7 +28,8 @@ final class Reseller_Sync_Connector
 
     private function api_base()
     {
-        $base = self::API_BASE;
+        $stored = get_option(self::OPTION_API_URL, '');
+        $base = $stored ? $stored : self::DEFAULT_API_BASE;
 
         if (defined('RESELLER_SYNC_API_BASE') && RESELLER_SYNC_API_BASE) {
             $base = RESELLER_SYNC_API_BASE;
@@ -44,12 +45,11 @@ final class Reseller_Sync_Connector
         return $this->api_base() . ltrim($path, '/');
     }
 
-    private function build_headers($apiKey, $email)
+    private function build_headers($apiKey)
     {
         return array(
             'Authorization' => 'Bearer ' . $apiKey,
             'Content-Type' => 'application/json',
-            'X-Reseller-Email' => $email,
         );
     }
 
@@ -67,9 +67,9 @@ final class Reseller_Sync_Connector
 
     public function register_settings()
     {
-        register_setting('reseller_sync_settings', self::OPTION_EMAIL, array(
+        register_setting('reseller_sync_settings', self::OPTION_API_URL, array(
             'type' => 'string',
-            'sanitize_callback' => 'sanitize_email',
+            'sanitize_callback' => 'esc_url_raw',
         ));
 
         register_setting('reseller_sync_settings', self::OPTION_API_KEY, array(
@@ -84,21 +84,28 @@ final class Reseller_Sync_Connector
             return;
         }
 
-        $email = get_option(self::OPTION_EMAIL, '');
+        $apiUrl = get_option(self::OPTION_API_URL, '');
         $apiKey = get_option(self::OPTION_API_KEY, '');
 
         if (isset($_POST['reseller_sync_settings_nonce']) && wp_verify_nonce($_POST['reseller_sync_settings_nonce'], 'reseller_sync_save_settings')) {
-            $newEmail = isset($_POST[self::OPTION_EMAIL]) ? sanitize_email(wp_unslash($_POST[self::OPTION_EMAIL])) : '';
+            $newApiUrl = isset($_POST[self::OPTION_API_URL]) ? esc_url_raw(wp_unslash($_POST[self::OPTION_API_URL])) : '';
+            if ($newApiUrl && !filter_var($newApiUrl, FILTER_VALIDATE_URL)) {
+                $newApiUrl = '';
+                add_settings_error('reseller_sync_messages', 'reseller_sync_invalid_url', __('Geçerli bir API adresi giriniz.', 'reseller-sync'), 'error');
+            }
+            if ($newApiUrl) {
+                $newApiUrl = trailingslashit($newApiUrl);
+            }
             $newApiKey = isset($_POST[self::OPTION_API_KEY]) ? sanitize_text_field(wp_unslash($_POST[self::OPTION_API_KEY])) : '';
 
-            update_option(self::OPTION_EMAIL, $newEmail);
+            update_option(self::OPTION_API_URL, $newApiUrl);
             update_option(self::OPTION_API_KEY, $newApiKey);
 
-            $email = $newEmail;
+            $apiUrl = $newApiUrl;
             $apiKey = $newApiKey;
 
-            if ($email && $apiKey) {
-                $syncResult = $this->register_webhook_with_api($apiKey, $email);
+            if ($apiUrl && $apiKey) {
+                $syncResult = $this->register_webhook_with_api($apiKey);
                 if ($syncResult === true) {
                     update_option(self::OPTION_LAST_WEBHOOK_SYNC, current_time('mysql'));
                     add_settings_error('reseller_sync_messages', 'reseller_sync_success', __('Webhook adresi başarıyla kaydedildi.', 'reseller-sync'), 'updated');
@@ -106,7 +113,7 @@ final class Reseller_Sync_Connector
                     add_settings_error('reseller_sync_messages', 'reseller_sync_error', sprintf(__('Webhook kaydı başarısız: %s', 'reseller-sync'), $syncResult), 'error');
                 }
             } else {
-                add_settings_error('reseller_sync_messages', 'reseller_sync_warning', __('E-posta ve API anahtarı alanları zorunludur.', 'reseller-sync'), 'error');
+                add_settings_error('reseller_sync_messages', 'reseller_sync_warning', __('API adresi ve API anahtarı alanları zorunludur.', 'reseller-sync'), 'error');
             }
         }
 
@@ -120,17 +127,17 @@ final class Reseller_Sync_Connector
                 <table class="form-table" role="presentation">
                     <tbody>
                     <tr>
-                        <th scope="row"><label for="reseller-sync-email"><?php esc_html_e('Bayi E-postası', 'reseller-sync'); ?></label></th>
+                        <th scope="row"><label for="reseller-sync-api-url"><?php esc_html_e('API Adresi', 'reseller-sync'); ?></label></th>
                         <td>
-                            <input name="<?php echo esc_attr(self::OPTION_EMAIL); ?>" type="email" id="reseller-sync-email" value="<?php echo esc_attr($email); ?>" class="regular-text" placeholder="bayi@ornek.com">
-                            <p class="description"><?php esc_html_e('Bayi panelinde tanımlı e-posta adresinizi girin.', 'reseller-sync'); ?></p>
+                            <input name="<?php echo esc_attr(self::OPTION_API_URL); ?>" type="url" id="reseller-sync-api-url" value="<?php echo esc_attr($apiUrl); ?>" class="regular-text" placeholder="https://panel.ornek.com/api/v1/">
+                            <p class="description"><?php esc_html_e('Bayi paneli profil ekranında görüntülenen API URL bilgisini girin.', 'reseller-sync'); ?></p>
                         </td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="reseller-sync-api-key"><?php esc_html_e('API Anahtarı', 'reseller-sync'); ?></label></th>
                         <td>
                             <input name="<?php echo esc_attr(self::OPTION_API_KEY); ?>" type="password" id="reseller-sync-api-key" value="<?php echo esc_attr($apiKey); ?>" class="regular-text">
-                            <p class="description"><?php esc_html_e('Bayi panelindeki profil bölümünden aldığınız API anahtarı.', 'reseller-sync'); ?></p>
+                            <p class="description"><?php esc_html_e('Bayi paneli profil ekranından oluşturduğunuz API anahtarını girin.', 'reseller-sync'); ?></p>
                         </td>
                     </tr>
                     </tbody>
@@ -151,10 +158,10 @@ final class Reseller_Sync_Connector
         <?php
     }
 
-    private function register_webhook_with_api($apiKey, $email)
+    private function register_webhook_with_api($apiKey)
     {
         $response = wp_remote_post($this->build_endpoint('token-webhook.php'), array(
-            'headers' => $this->build_headers($apiKey, $email),
+            'headers' => $this->build_headers($apiKey),
             'body' => wp_json_encode(array(
                 'webhook_url' => rest_url('reseller-sync/v1/order-status'),
             )),
@@ -183,10 +190,10 @@ final class Reseller_Sync_Connector
 
     public function maybe_push_order($orderId)
     {
-        $email = get_option(self::OPTION_EMAIL);
+        $apiUrl = get_option(self::OPTION_API_URL);
         $apiKey = get_option(self::OPTION_API_KEY);
 
-        if (!$email || !$apiKey) {
+        if (!$apiUrl || !$apiKey) {
             return;
         }
 
@@ -239,7 +246,7 @@ final class Reseller_Sync_Connector
         }
 
         $response = wp_remote_post($this->build_endpoint('orders.php'), array(
-            'headers' => $this->build_headers($apiKey, $email),
+            'headers' => $this->build_headers($apiKey),
             'body' => wp_json_encode($payload),
             'timeout' => 20,
         ));
