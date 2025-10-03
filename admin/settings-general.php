@@ -32,6 +32,7 @@ $featureLabels = array(
     'support' => 'Destek talepleri',
     'packages' => 'Bayilik paketleri başvurusu',
     'api' => 'API erişimi',
+    'premium_modules' => 'Premium modül pazarı',
 );
 
 $featureStates = FeatureToggle::all();

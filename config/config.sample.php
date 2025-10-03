@@ -14,4 +14,6 @@ define('DB_PASSWORD', 'your_secure_password');
 define('TELEGRAM_BOT_TOKEN', '');
 define('TELEGRAM_CHAT_ID', '');
 
+define('PREMIUM_MODULE_API_KEY', 'change-this-key');
+
 define('DEFAULT_LANGUAGE', 'en');
