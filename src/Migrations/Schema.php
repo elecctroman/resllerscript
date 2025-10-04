@@ -26,6 +26,8 @@ final class Schema
         self::ensureApiRequestLogTable($pdo);
         self::ensureAutoTopupTable($pdo);
         self::ensureUserLocaleColumns($pdo);
+        self::ensureBlogCategoriesTable($pdo);
+        self::ensureBlogPostsTable($pdo);
 
     }
 
@@ -166,6 +168,53 @@ final class Schema
     {
         self::ensureColumn($pdo, 'users', 'locale', "VARCHAR(5) NULL");
         self::ensureColumn($pdo, 'users', 'currency', "VARCHAR(3) NULL");
+    }
+
+    private static function ensureBlogCategoriesTable(PDO $pdo): void
+    {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS blog_categories (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(150) NOT NULL,
+            slug VARCHAR(191) NOT NULL,
+            description TEXT NULL,
+            meta_title VARCHAR(150) NULL,
+            meta_description VARCHAR(255) NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_blog_category_slug (slug)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        self::ensureColumn($pdo, 'blog_categories', 'meta_title', 'VARCHAR(150) NULL');
+        self::ensureColumn($pdo, 'blog_categories', 'meta_description', 'VARCHAR(255) NULL');
+    }
+
+    private static function ensureBlogPostsTable(PDO $pdo): void
+    {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS blog_posts (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            category_id INT NULL,
+            title VARCHAR(191) NOT NULL,
+            slug VARCHAR(191) NOT NULL,
+            excerpt TEXT NULL,
+            content MEDIUMTEXT NOT NULL,
+            image_url VARCHAR(255) NULL,
+            author_name VARCHAR(150) NULL,
+            status ENUM('draft','published') NOT NULL DEFAULT 'draft',
+            published_at DATETIME NULL,
+            meta_title VARCHAR(191) NULL,
+            meta_description VARCHAR(255) NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (category_id) REFERENCES blog_categories(id) ON DELETE SET NULL,
+            UNIQUE KEY uniq_blog_post_slug (slug),
+            INDEX idx_blog_status (status),
+            INDEX idx_blog_category (category_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        self::ensureColumn($pdo, 'blog_posts', 'meta_title', 'VARCHAR(191) NULL');
+        self::ensureColumn($pdo, 'blog_posts', 'meta_description', 'VARCHAR(255) NULL');
+        self::ensureColumn($pdo, 'blog_posts', 'author_name', 'VARCHAR(150) NULL');
+        self::ensureColumn($pdo, 'blog_posts', 'image_url', 'VARCHAR(255) NULL');
     }
 
 
