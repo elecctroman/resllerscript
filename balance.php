@@ -4,7 +4,7 @@ require __DIR__ . '/bootstrap.php';
 use App\Auth;
 use App\Database;
 use App\Helpers;
-use App\Mailer;
+use App\Notifications\ResellerNotifier;
 use App\Settings;
 use App\Telegram;
 use App\Payments\PaymentGatewayManager;
@@ -30,6 +30,10 @@ $flashSuccess = isset($_SESSION['flash_success']) ? $_SESSION['flash_success'] :
 if ($flashSuccess !== '') {
     unset($_SESSION['flash_success']);
 }
+$bankTransferNotice = isset($_SESSION['bank_transfer_notice']) && is_array($_SESSION['bank_transfer_notice']) ? $_SESSION['bank_transfer_notice'] : array();
+if ($bankTransferNotice) {
+    unset($_SESSION['bank_transfer_notice']);
+}
 
 $paymentTestMode = Settings::get('payment_test_mode') === '1';
 $gateways = PaymentGatewayManager::getActiveGateways();
@@ -39,6 +43,29 @@ if ($hasLiveGateway) {
     foreach ($gateways as $identifier => $info) {
         $defaultGateway = $identifier;
         break;
+    }
+}
+
+$bankTransferDetails = PaymentGatewayManager::getBankTransferDetails();
+$bankTransferSummary = array();
+if (isset($gateways['bank-transfer'])) {
+    if (!empty($bankTransferDetails['bank_name'])) {
+        $bankTransferSummary[] = 'Banka: ' . $bankTransferDetails['bank_name'];
+    }
+    if (!empty($bankTransferDetails['account_name'])) {
+        $bankTransferSummary[] = 'Hesap Sahibi: ' . $bankTransferDetails['account_name'];
+    }
+    if (!empty($bankTransferDetails['iban'])) {
+        $bankTransferSummary[] = 'IBAN: ' . $bankTransferDetails['iban'];
+    }
+    if (!empty($bankTransferDetails['instructions'])) {
+        $lines = preg_split('/\r\n|\r|\n/', $bankTransferDetails['instructions']);
+        foreach ($lines as $line) {
+            $trimmed = trim($line);
+            if ($trimmed !== '') {
+                $bankTransferSummary[] = $trimmed;
+            }
+        }
     }
 }
 
@@ -63,9 +90,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->beginTransaction();
         try {
             $methodLabel = $paymentTestMode ? 'Test Modu' : PaymentGatewayManager::getLabel($selectedGateway);
-            $stmt = $pdo->prepare('INSERT INTO balance_requests (user_id, amount, payment_method, notes, status, created_at) VALUES (:user_id, :amount, :payment_method, :notes, :status, NOW())');
+            $stmt = $pdo->prepare('INSERT INTO balance_requests (user_id, package_order_id, amount, payment_method, notes, status, created_at) VALUES (:user_id, :package_order_id, :amount, :payment_method, :notes, :status, NOW())');
             $stmt->execute([
                 'user_id' => $user['id'],
+                'package_order_id' => null,
                 'amount' => $amount,
                 'payment_method' => $methodLabel,
                 'notes' => $notes ?: null,
@@ -99,18 +127,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ]);
 
                 $pdo->commit();
+                $freshUser = Auth::findUser($user['id']);
+                if ($freshUser) {
+                    $_SESSION['user'] = $freshUser;
+                    $user = $freshUser;
 
-                $adminEmails = $pdo->query("SELECT email FROM users WHERE role IN ('super_admin','admin','finance') AND status = 'active'")->fetchAll(\PDO::FETCH_COLUMN);
-                $message = "Test modunda bakiye talebi onaylandı.\n\n" .
-                    "Bayi: {$user['name']}\n" .
-                    "E-posta: {$user['email']}\n" .
-                    "Tutar: " . Helpers::formatCurrency($amount, 'USD') . "\n";
+                    $requestPayload = array(
+                        'amount' => $amount,
+                        'payment_method' => $methodLabel,
+                        'reference' => $displayReference,
+                    );
 
-                foreach ($adminEmails as $adminEmail) {
-                    Mailer::send($adminEmail, 'Test Modu Bakiye Talebi', $message);
+                    ResellerNotifier::sendBalanceApproved($freshUser, $requestPayload, 'Test modu otomatik onaylandı.');
                 }
-
-                Mailer::send($user['email'], 'Bakiye Yükleme Onayı', 'Test modunda oluşturduğunuz bakiye talebi onaylandı.');
 
                 Telegram::notify(sprintf(
                     "💳 Test modunda bakiye yüklendi!\nBayi: %s\nTutar: %s\nTalep No: %s",
@@ -118,7 +147,91 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     Helpers::formatCurrency($amount, 'USD'),
                     $displayReference
                 ));
-                $_SESSION['flash_success'] = 'Test modu aktif olduğu için bakiye yüklemesi otomatik onaylandı.';
+                $_SESSION['flash_success'] = 'Test modu aktif olduğu için bakiye yüklemesi otomatik onaylandı. Bildirimler Telegram botunuza gönderildi.';
+                Helpers::redirect('/balance.php');
+            }
+
+            if ($selectedGateway === 'bank-transfer') {
+                $pdo->prepare('UPDATE balance_requests SET payment_provider = :provider, reference = :display_reference WHERE id = :id')
+                    ->execute([
+                        'provider' => $selectedGateway,
+                        'display_reference' => $displayReference,
+                        'id' => $requestId,
+                    ]);
+
+                $pdo->commit();
+                $noticeLines = array();
+                if (!empty($bankTransferDetails['bank_name'])) {
+                    $noticeLines[] = 'Banka: ' . $bankTransferDetails['bank_name'];
+                }
+                if (!empty($bankTransferDetails['account_name'])) {
+                    $noticeLines[] = 'Hesap Sahibi: ' . $bankTransferDetails['account_name'];
+                }
+                if (!empty($bankTransferDetails['iban'])) {
+                    $noticeLines[] = 'IBAN: ' . $bankTransferDetails['iban'];
+                }
+                $noticeLines[] = 'Tutar: ' . Helpers::formatCurrency($amount);
+                $noticeLines[] = 'Talep No: ' . $displayReference;
+                if (!empty($bankTransferDetails['instructions'])) {
+                    $lines = preg_split('/\r\n|\r|\n/', $bankTransferDetails['instructions']);
+                    foreach ($lines as $line) {
+                        $trimmed = trim($line);
+                        if ($trimmed !== '') {
+                            $noticeLines[] = $trimmed;
+                        }
+                    }
+                }
+
+                $_SESSION['flash_success'] = 'Bakiye talebiniz oluşturuldu. Havale/EFT talimatları Telegram botunuza gönderildi.';
+                $_SESSION['bank_transfer_notice'] = $noticeLines;
+
+                $freshUser = Auth::findUser($user['id']);
+                if ($freshUser) {
+                    $_SESSION['user'] = $freshUser;
+                    $user = $freshUser;
+
+                    $messageLines = array(
+                        '💳 <b>Bakiye talimatı</b>',
+                        '',
+                        'Tutar: <b>' . htmlspecialchars(Helpers::formatCurrency($amount), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</b>',
+                        'Talep No: <code>' . htmlspecialchars($displayReference, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</code>',
+                    );
+
+                    if (!empty($bankTransferDetails['bank_name'])) {
+                        $messageLines[] = '🏛 Banka: ' . htmlspecialchars($bankTransferDetails['bank_name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                    }
+                    if (!empty($bankTransferDetails['account_name'])) {
+                        $messageLines[] = '👤 Hesap Sahibi: ' . htmlspecialchars($bankTransferDetails['account_name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                    }
+                    if (!empty($bankTransferDetails['iban'])) {
+                        $messageLines[] = '🏷 IBAN: <code>' . htmlspecialchars($bankTransferDetails['iban'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</code>';
+                    }
+                    if (!empty($bankTransferDetails['instructions'])) {
+                        $messageLines[] = '';
+                        $messageLines[] = '📝 Talimatlar:';
+                        $instructionLines = preg_split('/\r\n|\r|\n/', $bankTransferDetails['instructions']);
+                        foreach ($instructionLines as $line) {
+                            $trimmed = trim($line);
+                            if ($trimmed !== '') {
+                                $messageLines[] = '• ' . htmlspecialchars($trimmed, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                            }
+                        }
+                    }
+
+                    $messageLines[] = '';
+                    $messageLines[] = '✅ Ödeme sonrası dekontu iletmeyi unutmayın.';
+
+                    ResellerNotifier::sendDirect($freshUser, implode("\n", $messageLines));
+                }
+
+                Telegram::notify(sprintf(
+                    "💳 Yeni bakiye talebi alındı!\nBayi: %s\nTutar: %s\nYöntem: %s\nTalep No: %s",
+                    $user['name'],
+                    Helpers::formatCurrency($amount, 'USD'),
+                    $methodLabel,
+                    $displayReference
+                ));
+
                 Helpers::redirect('/balance.php');
             }
 
@@ -171,17 +284,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'id' => $requestId,
                 ]);
 
-            $adminEmails = $pdo->query("SELECT email FROM users WHERE role IN ('super_admin','admin','finance') AND status = 'active'")->fetchAll(\PDO::FETCH_COLUMN);
-            $message = "Yeni bir bakiye yükleme talebi oluşturuldu.\n\n" .
-                "Bayi: {$user['name']}\n" .
-                "E-posta: {$user['email']}\n" .
-                "Tutar: " . Helpers::formatCurrency($amount, 'USD') . "\n" .
-                "Ödeme Yöntemi: " . $methodLabel . "\n";
-
-            foreach ($adminEmails as $adminEmail) {
-                Mailer::send($adminEmail, 'Yeni Bakiye Talebi', $message);
-            }
-
             Telegram::notify(sprintf(
                 "💳 Yeni bakiye talebi alındı!\nBayi: %s\nTutar: %s\nYöntem: %s\nTalep No: %s",
                 $user['name'],
@@ -189,6 +291,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $methodLabel,
                 $displayReference
             ));
+
+            $freshUser = Auth::findUser($user['id']);
+            if ($freshUser) {
+                $_SESSION['user'] = $freshUser;
+                $user = $freshUser;
+
+                $messageLines = array(
+                    '💳 <b>Bakiye talebiniz oluşturuldu</b>',
+                    '',
+                    'Tutar: <b>' . htmlspecialchars(Helpers::formatCurrency($amount), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</b>',
+                    'Talep No: <code>' . htmlspecialchars($displayReference, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</code>',
+                    'Ödeme Sağlayıcısı: <b>' . htmlspecialchars($methodLabel, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</b>',
+                );
+
+                if ($paymentUrl) {
+                    $messageLines[] = '';
+                    $messageLines[] = '🔗 <a href="' . htmlspecialchars($paymentUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">Ödeme bağlantısını aç</a>';
+                }
+
+                ResellerNotifier::sendDirect($freshUser, implode("\n", $messageLines));
+            }
 
             if ($paymentUrl) {
                 Helpers::redirect($paymentUrl);
@@ -237,6 +360,16 @@ include __DIR__ . '/templates/header.php';
                 <?php if ($flashSuccess): ?>
                     <div class="alert alert-success"><?= Helpers::sanitize($flashSuccess) ?></div>
                 <?php endif; ?>
+                <?php if ($bankTransferNotice): ?>
+                    <div class="alert alert-info">
+                        <h6 class="mb-2">Banka Havalesi Talimatı</h6>
+                        <ul class="mb-0">
+                            <?php foreach ($bankTransferNotice as $line): ?>
+                                <li><?= Helpers::sanitize($line) ?></li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
+                <?php endif; ?>
 
                 <?php if ($errors): ?>
                     <div class="alert alert-danger">
@@ -280,6 +413,16 @@ include __DIR__ . '/templates/header.php';
                                 </div>
                             <?php endforeach; ?>
                         </div>
+                        <?php if ($bankTransferSummary): ?>
+                            <div class="alert alert-secondary small">
+                                <strong>Banka Havalesi Talimatı</strong>
+                                <ul class="mb-0">
+                                    <?php foreach ($bankTransferSummary as $line): ?>
+                                        <li><?= Helpers::sanitize($line) ?></li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            </div>
+                        <?php endif; ?>
                     <?php endif; ?>
                     <div>
                         <label class="form-label">Açıklama</label>
@@ -287,6 +430,57 @@ include __DIR__ . '/templates/header.php';
                     </div>
                     <button type="submit" class="btn btn-primary w-100" <?= (!$paymentTestMode && !$hasLiveGateway) ? 'disabled' : '' ?>>Ödemeyi Başlat</button>
                     <p class="text-muted small mb-0">Ödeme tamamlandığında işlem durumu otomatik olarak güncellenir.</p>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-xl-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Otomatik Bakiye Yükleme</h5>
+                <?php if ($autoTopupConfig): ?>
+                    <span class="badge bg-success">Aktif</span>
+                <?php else: ?>
+                    <span class="badge bg-secondary">Pasif</span>
+                <?php endif; ?>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small">Bakiye belirlediğiniz eşiğin altına düştüğünde otomatik olarak yükleme talimatı oluşturabilirsiniz.</p>
+                <form id="autoTopupForm" class="vstack gap-3">
+                    <input type="hidden" name="csrf_token" value="<?= Helpers::csrfToken() ?>">
+                    <div>
+                        <label class="form-label">Minimum Bakiye (Eşik)</label>
+                        <input type="number" step="0.01" min="1" class="form-control" name="threshold" value="<?= $autoTopupConfig ? Helpers::sanitize((string)$autoTopupConfig['threshold']) : '' ?>" required>
+                    </div>
+                    <div>
+                        <label class="form-label">Yüklenecek Tutar</label>
+                        <input type="number" step="0.01" min="1" class="form-control" name="amount" value="<?= $autoTopupConfig ? Helpers::sanitize((string)$autoTopupConfig['topup_amount']) : '' ?>" required>
+                    </div>
+                    <div>
+                        <label class="form-label">Ödeme Yöntemi</label>
+                        <select class="form-select" name="method" required>
+                            <?php
+                            $methods = array(
+                                'stripe' => 'Stripe',
+                                'paypal' => 'PayPal',
+                                'iyzico' => 'Iyzico',
+                                'paytr' => 'PayTR',
+                                'bank-transfer' => 'Banka Havalesi',
+                                'crypto-wallet' => 'Kripto Cüzdan',
+                            );
+                            $activeMethod = $autoTopupConfig ? (string)$autoTopupConfig['payment_method'] : '';
+                            foreach ($methods as $value => $label):
+                                $selected = $value === $activeMethod ? 'selected' : '';
+                                ?>
+                                <option value="<?= Helpers::sanitize($value) ?>" <?= $selected ?>><?= Helpers::sanitize($label) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-primary flex-grow-1" data-auto-topup-save>Kaydet</button>
+                        <button type="button" class="btn btn-outline-danger" data-auto-topup-remove <?= $autoTopupConfig ? '' : 'disabled' ?>>Kapat</button>
+                    </div>
+                    <div class="alert d-none" role="alert" data-auto-topup-feedback></div>
                 </form>
             </div>
         </div>
@@ -370,4 +564,71 @@ include __DIR__ . '/templates/header.php';
         </div>
     </div>
 </div>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var form = document.getElementById('autoTopupForm');
+        if (!form) { return; }
+        var csrfToken = form.querySelector('input[name="csrf_token"]').value;
+        var saveButton = form.querySelector('[data-auto-topup-save]');
+        var removeButton = form.querySelector('[data-auto-topup-remove]');
+        var feedback = form.querySelector('[data-auto-topup-feedback]');
+
+        function showFeedback(type, message) {
+            if (!feedback) { return; }
+            feedback.classList.remove('d-none', 'alert-success', 'alert-danger', 'alert-warning');
+            feedback.classList.add('alert-' + type);
+            feedback.textContent = message;
+        }
+
+        function submitAutoTopup(action) {
+            var formData = new URLSearchParams();
+            formData.append('action', action);
+            formData.append('csrf_token', csrfToken);
+            if (action === 'save_auto_topup') {
+                formData.append('threshold', form.elements.threshold.value);
+                formData.append('amount', form.elements.amount.value);
+                formData.append('method', form.elements.method.value);
+            }
+
+            fetch('/reseller-actions.php', {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: formData
+            }).then(function (response) {
+                if (!response.ok) {
+                    throw new Error('İstek başarısız (' + response.status + ')');
+                }
+                return response.json();
+            }).then(function (data) {
+                if (!data.success) {
+                    throw new Error(data.error || 'İşlem tamamlanamadı');
+                }
+                if (action === 'save_auto_topup') {
+                    showFeedback('success', 'Otomatik bakiye yükleme talimatınız kaydedildi.');
+                    removeButton.disabled = false;
+                } else {
+                    showFeedback('warning', 'Otomatik bakiye yükleme devre dışı bırakıldı.');
+                    removeButton.disabled = true;
+                }
+            }).catch(function (error) {
+                showFeedback('danger', error.message);
+            });
+        }
+
+        if (saveButton) {
+            saveButton.addEventListener('click', function (event) {
+                event.preventDefault();
+                submitAutoTopup('save_auto_topup');
+            });
+        }
+
+        if (removeButton) {
+            removeButton.addEventListener('click', function (event) {
+                event.preventDefault();
+                if (removeButton.disabled) { return; }
+                submitAutoTopup('remove_auto_topup');
+            });
+        }
+    });
+</script>
 <?php include __DIR__ . '/templates/footer.php';

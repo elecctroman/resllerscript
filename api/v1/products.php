@@ -2,6 +2,7 @@
 require __DIR__ . '/../bootstrap.php';
 
 $token = authenticate_token();
+require_scope($token, 'read');
 
 try {
     $pdo = App\Database::connection();

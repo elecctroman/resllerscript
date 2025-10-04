@@ -18,10 +18,11 @@ class ApiToken
         }
 
         $pdo = Database::connection();
-        $query = 'SELECT t.id AS token_id, t.user_id, t.token, t.label, t.webhook_url, t.created_at AS token_created_at, t.last_used_at, u.id AS user_id, u.name, u.email, u.balance, u.role, u.status, u.created_at, u.updated_at FROM api_tokens t INNER JOIN users u ON t.user_id = u.id WHERE t.token = :token AND u.status = :status';
+        $query = 'SELECT t.id AS token_id, t.user_id, t.token, t.label, t.webhook_url, t.status AS token_status, t.scopes, t.ip_whitelist, t.otp_secret, t.created_at AS token_created_at, t.last_used_at, u.id AS user_id, u.name, u.email, u.balance, u.role, u.status, u.created_at, u.updated_at FROM api_tokens t INNER JOIN users u ON t.user_id = u.id WHERE t.token = :token AND u.status = :status AND t.status = :token_status';
         $params = array(
             'token' => $token,
             'status' => 'active',
+            'token_status' => 'active',
         );
 
         if ($email !== null && $email !== '') {
@@ -43,6 +44,10 @@ class ApiToken
                 'token' => $row['token'],
                 'label' => isset($row['label']) ? $row['label'] : null,
                 'webhook_url' => isset($row['webhook_url']) ? $row['webhook_url'] : null,
+                'token_status' => isset($row['token_status']) ? $row['token_status'] : 'active',
+                'scopes' => isset($row['scopes']) ? (string)$row['scopes'] : '',
+                'ip_whitelist' => isset($row['ip_whitelist']) ? (string)$row['ip_whitelist'] : '',
+                'otp_secret' => isset($row['otp_secret']) ? (string)$row['otp_secret'] : '',
                 'created_at' => isset($row['token_created_at']) ? $row['token_created_at'] : null,
                 'last_used_at' => isset($row['last_used_at']) ? $row['last_used_at'] : null,
                 'name' => isset($row['name']) ? $row['name'] : null,
@@ -65,15 +70,17 @@ class ApiToken
      * @param string $label
      * @return array{token:string,id:int}
      */
-    public static function issueToken($userId, $label = 'WooCommerce Entegrasyonu')
+    public static function issueToken($userId, $label = 'WooCommerce Entegrasyonu', $scopes = 'full')
     {
         $plain = bin2hex(random_bytes(16));
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('INSERT INTO api_tokens (user_id, token, label, created_at) VALUES (:user_id, :token, :label, NOW())');
+        $stmt = $pdo->prepare('INSERT INTO api_tokens (user_id, token, label, scopes, status, created_at) VALUES (:user_id, :token, :label, :scopes, :status, NOW())');
         $stmt->execute(array(
             'user_id' => $userId,
             'token' => $plain,
             'label' => $label,
+            'scopes' => is_array($scopes) ? implode(',', $scopes) : (string)$scopes,
+            'status' => 'active',
         ));
 
         return array(
@@ -82,6 +89,7 @@ class ApiToken
             'user_id' => $userId,
             'label' => $label,
             'webhook_url' => null,
+            'scopes' => is_array($scopes) ? implode(',', $scopes) : (string)$scopes,
             'created_at' => date('Y-m-d H:i:s'),
             'last_used_at' => null,
         );
@@ -99,6 +107,82 @@ class ApiToken
         $pdo->prepare('DELETE FROM api_tokens WHERE user_id = :user_id')->execute(array('user_id' => $userId));
 
         return self::issueToken($userId);
+    }
+
+    /**
+     * @param int $tokenId
+     * @param array<int,string>|string $scopes
+     * @return void
+     */
+    public static function updateScopes($tokenId, $scopes)
+    {
+        $pdo = Database::connection();
+        $value = is_array($scopes) ? implode(',', $scopes) : (string)$scopes;
+        $stmt = $pdo->prepare('UPDATE api_tokens SET scopes = :scopes WHERE id = :id');
+        $stmt->execute(array('scopes' => $value, 'id' => $tokenId));
+    }
+
+    /**
+     * @param int $tokenId
+     * @param string|null $ipWhitelist
+     * @return void
+     */
+    public static function updateIpWhitelist($tokenId, $ipWhitelist)
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('UPDATE api_tokens SET ip_whitelist = :list WHERE id = :id');
+        $stmt->execute(array('list' => $ipWhitelist, 'id' => $tokenId));
+    }
+
+    /**
+     * @param int $tokenId
+     * @param string $status
+     * @return void
+     */
+    public static function updateStatus($tokenId, $status)
+    {
+        $status = in_array($status, array('active', 'disabled'), true) ? $status : 'disabled';
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('UPDATE api_tokens SET status = :status WHERE id = :id');
+        $stmt->execute(array('status' => $status, 'id' => $tokenId));
+    }
+
+    /**
+     * @param int $tokenId
+     * @return string
+     */
+    public static function rotateOtpSecret($tokenId)
+    {
+        $secret = self::generateSecret();
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('UPDATE api_tokens SET otp_secret = :secret, last_rotated_at = NOW() WHERE id = :id');
+        $stmt->execute(array('secret' => $secret, 'id' => $tokenId));
+        return $secret;
+    }
+
+    /**
+     * @param int $tokenId
+     * @return void
+     */
+    public static function clearOtpSecret($tokenId)
+    {
+        $pdo = Database::connection();
+        $pdo->prepare('UPDATE api_tokens SET otp_secret = NULL WHERE id = :id')->execute(array('id' => $tokenId));
+    }
+
+    /**
+     * @return string
+     */
+    private static function generateSecret()
+    {
+        $random = random_bytes(20);
+        $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+        $secret = '';
+        foreach (str_split(bin2hex($random), 2) as $chunk) {
+            $index = hexdec($chunk) % strlen($alphabet);
+            $secret .= $alphabet[$index];
+        }
+        return substr($secret, 0, 32);
     }
 
     /**

@@ -6,6 +6,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $token = authenticate_token();
+require_scope($token, 'manage');
 $payload = read_json_body();
 $webhookUrl = isset($payload['webhook_url']) ? trim($payload['webhook_url']) : '';
 

@@ -2,6 +2,12 @@
 require __DIR__ . '/../bootstrap.php';
 
 $token = authenticate_token();
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    require_scope($token, 'read');
+} else {
+    require_scope($token, 'orders');
+}
 $pdo = App\Database::connection();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -52,7 +58,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             json_response(array('success' => false, 'error' => 'Bayi kaydı bulunamadı.'), 404);
         }
 
-        $productLookup = $pdo->prepare('SELECT id, name, price, sku FROM products WHERE sku = :sku AND status = :status LIMIT 1');
+        $productLookup = $pdo->prepare('SELECT id, name, price, sku, provider_code FROM products WHERE sku = :sku AND status = :status LIMIT 1');
+        $stockCheckStmt = $pdo->prepare('SELECT COUNT(*) FROM product_stock_items WHERE product_id = :product_id AND status = "available" FOR UPDATE');
         $orderIds = array();
         $totalCost = 0.0;
         $lineDetails = array();
@@ -64,6 +71,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$product) {
                 $pdo->rollBack();
                 json_response(array('success' => false, 'error' => 'SKU ' . $line['sku'] . ' ürün kataloğunda bulunamadı.'), 404);
+            }
+
+            $providerCode = isset($product['provider_code']) ? strtolower((string) $product['provider_code']) : '';
+            $requiresStock = ($providerCode === '' || $providerCode === 'stock' || $providerCode === 'panel');
+            if ($requiresStock) {
+                $stockCheckStmt->execute(array('product_id' => (int) $product['id']));
+                $availableStock = (int) $stockCheckStmt->fetchColumn();
+                if ($availableStock < (int) $line['quantity']) {
+                    $pdo->rollBack();
+                    json_response(array('success' => false, 'error' => 'SKU ' . $line['sku'] . ' için yeterli stok bulunmuyor.'), 422);
+                }
             }
 
             $lineTotal = (float)$product['price'] * (int)$line['quantity'];
@@ -132,6 +150,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $pdo->commit();
+
+        if ($orderIds) {
+            \App\Services\ProviderDispatchService::dispatchProductOrders($orderIds);
+        }
 
         $remaining = $currentBalance - $totalCost;
 

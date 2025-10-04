@@ -23,6 +23,10 @@ $current = Settings::getMany(array(
     'reseller_auto_suspend_enabled',
     'reseller_auto_suspend_threshold',
     'reseller_auto_suspend_days',
+    'platform_default_locale',
+    'platform_default_currency',
+    'api_rate_limit_per_minute',
+    'api_captcha_secret',
 ));
 
 $featureLabels = array(
@@ -32,6 +36,7 @@ $featureLabels = array(
     'support' => 'Destek talepleri',
     'packages' => 'Bayilik paketleri başvurusu',
     'api' => 'API erişimi',
+    'premium_modules' => 'Premium modül pazarı',
 );
 
 $featureStates = FeatureToggle::all();
@@ -61,6 +66,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $commissionRate = 0.0;
             }
 
+            $defaultLocale = isset($_POST['platform_default_locale']) ? strtolower((string)$_POST['platform_default_locale']) : 'tr';
+            $availableLocales = App\Lang::availableLocales();
+            if (!in_array($defaultLocale, $availableLocales, true)) {
+                $defaultLocale = 'tr';
+            }
+
+            $defaultCurrency = isset($_POST['platform_default_currency']) ? strtoupper((string)$_POST['platform_default_currency']) : 'TRY';
+            $currencyOptions = array('TRY', 'USD', 'EUR');
+            if (!in_array($defaultCurrency, $currencyOptions, true)) {
+                $defaultCurrency = 'TRY';
+            }
+
+            $rateLimitPerMinute = isset($_POST['api_rate_limit_per_minute']) ? max(10, (int)$_POST['api_rate_limit_per_minute']) : 120;
+            $captchaSecret = isset($_POST['api_captcha_secret']) ? trim($_POST['api_captcha_secret']) : '';
+
             $autoSuspendEnabled = isset($_POST['reseller_auto_suspend_enabled']) ? '1' : '0';
             $autoThresholdInput = isset($_POST['reseller_auto_suspend_threshold']) ? str_replace(',', '.', trim($_POST['reseller_auto_suspend_threshold'])) : '0';
             $autoThreshold = (float)$autoThresholdInput;
@@ -85,6 +105,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 Settings::set('seo_meta_description', $metaDescription !== '' ? $metaDescription : null);
                 Settings::set('seo_meta_keywords', $metaKeywords !== '' ? $metaKeywords : null);
                 Settings::set('pricing_commission_rate', (string)$commissionRate);
+
+                Settings::set('platform_default_locale', $defaultLocale);
+                Settings::set('platform_default_currency', $defaultCurrency);
+                Settings::set('api_rate_limit_per_minute', (string)$rateLimitPerMinute);
+                Settings::set('api_captcha_secret', $captchaSecret !== '' ? $captchaSecret : null);
 
                 foreach ($featureLabels as $key => $label) {
                     $enabled = isset($_POST['features'][$key]);
@@ -119,6 +144,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'reseller_auto_suspend_enabled',
                     'reseller_auto_suspend_threshold',
                     'reseller_auto_suspend_days',
+                    'platform_default_locale',
+                    'platform_default_currency',
+                    'api_rate_limit_per_minute',
+                    'api_captcha_secret',
                 ));
             }
         }
@@ -200,6 +229,40 @@ include __DIR__ . '/../templates/header.php';
                         </div>
                     </div>
 
+                    <div class="row g-3 mt-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Varsayılan Platform Dili</label>
+                            <select name="platform_default_locale" class="form-select">
+                                <?php foreach (App\Lang::availableLocales() as $locale): ?>
+                                    <option value="<?= Helpers::sanitize($locale) ?>" <?= isset($current['platform_default_locale']) && $current['platform_default_locale'] === $locale ? 'selected' : '' ?>><?= strtoupper(Helpers::sanitize($locale)) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <small class="text-muted">Bayi profili aksi seçmedikçe bu dil kullanılır.</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Varsayılan Para Birimi</label>
+                            <select name="platform_default_currency" class="form-select">
+                                <?php foreach (array('TRY' => 'Türk Lirası', 'USD' => 'ABD Doları', 'EUR' => 'Euro') as $code => $label): ?>
+                                    <option value="<?= Helpers::sanitize($code) ?>" <?= isset($current['platform_default_currency']) && strtoupper((string)$current['platform_default_currency']) === $code ? 'selected' : '' ?>><?= Helpers::sanitize($label) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <small class="text-muted">Grafikler ve fiyatlar bu para birimine göre gösterilir.</small>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mt-3">
+                        <div class="col-md-6">
+                            <label class="form-label">API Rate Limit (dakika)</label>
+                            <input type="number" name="api_rate_limit_per_minute" min="10" step="10" class="form-control" value="<?= Helpers::sanitize(isset($current['api_rate_limit_per_minute']) ? $current['api_rate_limit_per_minute'] : '120') ?>">
+                            <small class="text-muted">Dakikada izin verilen maksimum API isteği.</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">API Captcha Gizli Anahtar</label>
+                            <input type="text" name="api_captcha_secret" class="form-control" value="<?= Helpers::sanitize(isset($current['api_captcha_secret']) ? $current['api_captcha_secret'] : '') ?>" placeholder="Opsiyonel güvenlik katmanı">
+                            <small class="text-muted">Belirlenirse API çağrıları X-Captcha-Token başlığıyla bu değeri iletmelidir.</small>
+                        </div>
+                    </div>
+
                     <hr>
 
                     <div>
@@ -238,12 +301,13 @@ include __DIR__ . '/../templates/header.php';
                         </div>
                     </div>
 
-                    <div class="d-flex justify-content-end">
-                        <button type="submit" class="btn btn-primary">Ayarları Kaydet</button>
-                    </div>
-                </form>
-            </div>
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-primary">Ayarları Kaydet</button>
+                </div>
+            </form>
         </div>
+    </div>
+
     </div>
 </div>
 <?php include __DIR__ . '/../templates/footer.php';
