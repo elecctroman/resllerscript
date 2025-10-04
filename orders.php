@@ -52,7 +52,7 @@ include __DIR__ . '/templates/header.php';
     </div>
 <?php endif; ?>
 
-<div class="row g-4">
+<div class="row g-4" data-csrf-token="<?= Helpers::csrfToken() ?>">
     <div class="col-12">
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
@@ -73,10 +73,40 @@ include __DIR__ . '/templates/header.php';
                                 <th>Kaynak</th>
                                 <th>Durum</th>
                                 <th>Tarih</th>
+                                <th class="text-end">İşlem</th>
                             </tr>
                             </thead>
                             <tbody>
                             <?php foreach ($productOrders as $order): ?>
+                                <?php
+                                $providerName = '';
+                                $providerStatus = '';
+                                $deliveryContent = '';
+                                if (!empty($order['external_metadata'])) {
+                                    $metadata = json_decode($order['external_metadata'], true);
+                                    if (is_array($metadata)) {
+                                        if (!empty($metadata['provider'])) {
+                                            $providerName = (string)$metadata['provider'];
+                                        }
+                                        if (isset($metadata['provider_response']['data']['status'])) {
+                                            $providerStatus = (string)$metadata['provider_response']['data']['status'];
+                                        } elseif (isset($metadata['provider_error']['message'])) {
+                                            $providerStatus = 'failed';
+                                        }
+                                        if (!empty($metadata['delivery_content'])) {
+                                            $deliveryContent = (string)$metadata['delivery_content'];
+                                        } elseif (!empty($metadata['provider_response']['data']['content'])) {
+                                            $deliveryContent = (string)$metadata['provider_response']['data']['content'];
+                                        } elseif (!empty($metadata['provider_error']['message'])) {
+                                            $deliveryContent = (string)$metadata['provider_error']['message'];
+                                        }
+                                    }
+                                }
+                                $metaLabel = 'SKU: ' . (isset($order['product_sku']) ? $order['product_sku'] : '-');
+                                if ($providerName !== '') {
+                                    $metaLabel .= ' | Sağlayıcı: ' . strtoupper($providerName);
+                                }
+                                ?>
                                 <tr>
                                     <td><?= (int)$order['id'] ?></td>
                                     <td>
@@ -87,6 +117,9 @@ include __DIR__ . '/templates/header.php';
                                         <?php endif; ?>
                                         <?php if (!empty($order['admin_note'])): ?>
                                             <div class="text-muted small">Yönetici Notu: <?= Helpers::sanitize($order['admin_note']) ?></div>
+                                        <?php endif; ?>
+                                        <?php if ($providerName !== ''): ?>
+                                            <div class="text-muted small">Sağlayıcı: <?= Helpers::sanitize(strtoupper($providerName)) ?><?php if ($providerStatus !== ''): ?> (<?= Helpers::sanitize(strtoupper($providerStatus)) ?>)<?php endif; ?></div>
                                         <?php endif; ?>
                                     </td>
                                     <td><?= Helpers::sanitize($order['category_name']) ?></td>
@@ -103,6 +136,37 @@ include __DIR__ . '/templates/header.php';
                                     </td>
                                     <td><span class="badge-status <?= Helpers::sanitize($order['status']) ?>"><?= strtoupper(Helpers::sanitize($order['status'])) ?></span></td>
                                     <td><?= date('d.m.Y H:i', strtotime($order['created_at'])) ?></td>
+                                    <td class="text-end">
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-primary"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#orderDetailModal"
+                                                data-order-type="product"
+                                                data-order-id="#<?= (int)$order['id'] ?>"
+                                                data-order-title="<?= Helpers::sanitize($order['product_name']) ?>"
+                                                data-order-category="<?= Helpers::sanitize($order['category_name']) ?>"
+                                                data-order-quantity="<?= isset($order['quantity']) ? (int)$order['quantity'] : 1 ?>"
+                                                data-order-price="<?= Helpers::sanitize(Helpers::formatCurrency((float)$order['price'])) ?>"
+                                                data-order-source="<?= Helpers::sanitize(strtoupper(isset($order['source']) ? $order['source'] : 'panel')) ?>"
+                                                data-order-reference="<?= Helpers::sanitize(isset($order['external_reference']) ? $order['external_reference'] : '') ?>"
+                                                data-order-status="<?= Helpers::sanitize(strtoupper($order['status'])) ?>"
+                                                data-order-status-class="<?= Helpers::sanitize($order['status']) ?>"
+                                                data-order-created="<?= date('d.m.Y H:i', strtotime($order['created_at'])) ?>"
+                                                data-order-note="<?= Helpers::sanitize(isset($order['note']) ? $order['note'] : '') ?>"
+                                                data-order-admin-note="<?= Helpers::sanitize(isset($order['admin_note']) ? $order['admin_note'] : '') ?>"
+                                                data-order-provider="<?= Helpers::sanitize($providerName) ?>"
+                                                data-order-provider-status="<?= Helpers::sanitize($providerStatus) ?>"
+                                                data-order-delivery="<?= Helpers::sanitize($deliveryContent) ?>"
+                                                data-order-meta="<?= Helpers::sanitize($metaLabel) ?>">
+                                            Görüntüle
+                                        </button>
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-success ms-2 js-repeat-order"
+                                                data-order-id="<?= (int)$order['id'] ?>"
+                                                title="Tekrar sipariş ver">
+                                            <i class="bi bi-arrow-repeat"></i>
+                                        </button>
+                                    </td>
                                 </tr>
                             <?php endforeach; ?>
                             </tbody>
@@ -132,6 +196,7 @@ include __DIR__ . '/templates/header.php';
                                 <th>Tutar</th>
                                 <th>Durum</th>
                                 <th>Tarih</th>
+                                <th class="text-end">İşlem</th>
                             </tr>
                             </thead>
                             <tbody>
@@ -150,6 +215,25 @@ include __DIR__ . '/templates/header.php';
                                     <td><?= Helpers::sanitize(Helpers::formatCurrency((float)$order['total_amount'])) ?></td>
                                     <td><span class="badge-status <?= Helpers::sanitize($order['status']) ?>"><?= strtoupper(Helpers::sanitize($order['status'])) ?></span></td>
                                     <td><?= date('d.m.Y H:i', strtotime($order['created_at'])) ?></td>
+                                    <td class="text-end">
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-primary"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#orderDetailModal"
+                                                data-order-type="package"
+                                                data-order-id="#<?= (int)$order['id'] ?>"
+                                                data-order-title="<?= Helpers::sanitize($order['package_name']) ?>"
+                                                data-order-price="<?= Helpers::sanitize(Helpers::formatCurrency((float)$order['total_amount'])) ?>"
+                                                data-order-status="<?= Helpers::sanitize(strtoupper($order['status'])) ?>"
+                                                data-order-status-class="<?= Helpers::sanitize($order['status']) ?>"
+                                                data-order-created="<?= date('d.m.Y H:i', strtotime($order['created_at'])) ?>"
+                                                data-order-note="<?= Helpers::sanitize(isset($order['notes']) ? $order['notes'] : '') ?>"
+                                                data-order-admin-note="<?= Helpers::sanitize(isset($order['admin_note']) ? $order['admin_note'] : '') ?>"
+                                                data-order-meta="Başvuru E-postası: <?= Helpers::sanitize($order['email']) ?>"
+                                                data-order-email="<?= Helpers::sanitize($order['email']) ?>">
+                                            Görüntüle
+                                        </button>
+                                    </td>
                                 </tr>
                             <?php endforeach; ?>
                             </tbody>
@@ -162,4 +246,288 @@ include __DIR__ . '/templates/header.php';
         </div>
     </div>
 </div>
-<?php include __DIR__ . '/templates/footer.php';
+
+<div class="modal fade" id="orderDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title order-detail-title">Sipariş Detayı</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex flex-column flex-md-row justify-content-between gap-3">
+                    <div>
+                        <div class="small text-muted">Sipariş No</div>
+                        <div class="fw-semibold" data-detail-field="id"></div>
+                    </div>
+                    <div class="text-md-end">
+                        <div class="small text-muted">Oluşturulma</div>
+                        <div class="fw-semibold" data-detail-field="created"></div>
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <h6 class="mb-1" data-detail-field="title"></h6>
+                    <div class="text-muted small" data-detail-field="meta"></div>
+                </div>
+
+                <div class="mt-3">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Durum</dt>
+                        <dd class="col-sm-8"><span class="badge badge-status" data-detail-field="status"></span></dd>
+                        <dt class="col-sm-4">Tutar</dt>
+                        <dd class="col-sm-8" data-detail-field="price"></dd>
+                    </dl>
+                </div>
+
+                <div class="mt-3 d-none" data-detail-section="summary">
+                    <h6 class="small text-uppercase text-muted mb-2">Özet</h6>
+                    <ul class="list-unstyled mb-0" data-detail-field="summary"></ul>
+                </div>
+
+                <div class="mt-3 d-none" data-detail-section="provider">
+                    <h6 class="small text-uppercase text-muted mb-2">Sağlayıcı</h6>
+                    <ul class="list-unstyled mb-0" data-detail-field="provider"></ul>
+                </div>
+
+                <div class="mt-3 d-none" data-detail-section="delivery">
+                    <h6 class="mb-1">Teslimat İçeriği</h6>
+                    <pre class="bg-light p-2 small mb-0" data-detail-field="delivery"></pre>
+                </div>
+
+                <div class="mt-3 d-none" data-detail-section="note">
+                    <h6 class="mb-1">Bayi Notu</h6>
+                    <p class="mb-0" data-detail-field="note"></p>
+                </div>
+
+                <div class="mt-3 d-none" data-detail-section="admin-note">
+                    <div class="alert alert-warning mb-0">
+                        <h6 class="alert-heading mb-1">Yönetici Notu</h6>
+                        <p class="mb-0" data-detail-field="admin-note"></p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Kapat</button>
+            </div>
+        </div>
+    </div>
+</div>
+<?php
+$GLOBALS['pageInlineScripts'][] = <<<'JS'
+(function () {
+    var modalEl = document.getElementById('orderDetailModal');
+    if (!modalEl) {
+        return;
+    }
+
+    var fields = {
+        id: modalEl.querySelector('[data-detail-field="id"]'),
+        created: modalEl.querySelector('[data-detail-field="created"]'),
+        title: modalEl.querySelector('[data-detail-field="title"]'),
+        meta: modalEl.querySelector('[data-detail-field="meta"]'),
+        status: modalEl.querySelector('[data-detail-field="status"]'),
+        price: modalEl.querySelector('[data-detail-field="price"]'),
+        summary: modalEl.querySelector('[data-detail-field="summary"]'),
+        provider: modalEl.querySelector('[data-detail-field="provider"]'),
+        delivery: modalEl.querySelector('[data-detail-field="delivery"]'),
+        note: modalEl.querySelector('[data-detail-field="note"]'),
+        adminNote: modalEl.querySelector('[data-detail-field="admin-note"]')
+    };
+
+    var sections = {
+        summary: modalEl.querySelector('[data-detail-section="summary"]'),
+        provider: modalEl.querySelector('[data-detail-section="provider"]'),
+        delivery: modalEl.querySelector('[data-detail-section="delivery"]'),
+        note: modalEl.querySelector('[data-detail-section="note"]'),
+        adminNote: modalEl.querySelector('[data-detail-section="admin-note"]')
+    };
+
+    modalEl.addEventListener('show.bs.modal', function (event) {
+        var trigger = event.relatedTarget;
+        if (!trigger) {
+            return;
+        }
+
+        var type = trigger.getAttribute('data-order-type') || 'order';
+        var orderId = trigger.getAttribute('data-order-id') || '';
+        var created = trigger.getAttribute('data-order-created') || '';
+        var title = trigger.getAttribute('data-order-title') || 'Sipariş Detayı';
+        var meta = trigger.getAttribute('data-order-meta') || '';
+        var status = trigger.getAttribute('data-order-status') || '';
+        var statusClass = trigger.getAttribute('data-order-status-class') || '';
+        var price = trigger.getAttribute('data-order-price') || '';
+        var quantity = trigger.getAttribute('data-order-quantity') || '';
+        var category = trigger.getAttribute('data-order-category') || '';
+        var source = trigger.getAttribute('data-order-source') || '';
+        var reference = trigger.getAttribute('data-order-reference') || '';
+        var provider = trigger.getAttribute('data-order-provider') || '';
+        var providerStatus = trigger.getAttribute('data-order-provider-status') || '';
+        var delivery = trigger.getAttribute('data-order-delivery') || '';
+        var note = trigger.getAttribute('data-order-note') || '';
+        var adminNote = trigger.getAttribute('data-order-admin-note') || '';
+
+        fields.id.textContent = orderId;
+        fields.created.textContent = created;
+        fields.title.textContent = title;
+        fields.meta.textContent = meta;
+        fields.price.textContent = price !== '' ? price : '-';
+
+        fields.status.textContent = status !== '' ? status : '-';
+        fields.status.className = 'badge badge-status' + (statusClass ? ' ' + statusClass : '');
+
+        sections.summary.classList.add('d-none');
+        fields.summary.innerHTML = '';
+
+        var summaryItems = [];
+        if (quantity) {
+            summaryItems.push({ label: 'Adet', value: quantity });
+        }
+        if (category) {
+            summaryItems.push({ label: 'Kategori', value: category });
+        }
+        if (source) {
+            summaryItems.push({ label: 'Kaynak', value: source.toUpperCase() });
+        }
+        if (reference) {
+            summaryItems.push({ label: 'Referans', value: reference, isCode: true });
+        }
+        if (type === 'package') {
+            var applicantEmail = trigger.getAttribute('data-order-email') || '';
+            if (applicantEmail) {
+                summaryItems.push({ label: 'Başvuru E-postası', value: applicantEmail });
+            }
+        }
+
+        if (providerStatus) {
+            summaryItems.push({ label: 'Sağlayıcı Durumu', value: providerStatus.toUpperCase() });
+        }
+
+        if (summaryItems.length > 0) {
+            summaryItems.forEach(function (item) {
+                var li = document.createElement('li');
+                li.className = 'd-flex justify-content-between align-items-center gap-2';
+
+                var labelSpan = document.createElement('span');
+                labelSpan.className = 'text-muted';
+                labelSpan.textContent = item.label;
+
+                var valueSpan = document.createElement('span');
+                valueSpan.className = 'fw-semibold text-end';
+                if (item.isCode) {
+                    var code = document.createElement('code');
+                    code.textContent = item.value;
+                    valueSpan.appendChild(code);
+                } else {
+                    valueSpan.textContent = item.value;
+                }
+
+                li.appendChild(labelSpan);
+                li.appendChild(valueSpan);
+                fields.summary.appendChild(li);
+            });
+
+            sections.summary.classList.remove('d-none');
+        }
+
+        fields.provider.innerHTML = '';
+        if (provider || providerStatus) {
+            var providerItems = [];
+            if (provider) {
+                providerItems.push({ label: 'Sağlayıcı', value: provider.toUpperCase() });
+            }
+            if (providerStatus) {
+                providerItems.push({ label: 'Durum', value: providerStatus.toUpperCase() });
+            }
+
+            providerItems.forEach(function (item) {
+                var li = document.createElement('li');
+                li.className = 'd-flex justify-content-between align-items-center gap-2';
+
+                var labelSpan = document.createElement('span');
+                labelSpan.className = 'text-muted';
+                labelSpan.textContent = item.label;
+
+                var valueSpan = document.createElement('span');
+                valueSpan.className = 'fw-semibold text-end';
+                valueSpan.textContent = item.value;
+
+                li.appendChild(labelSpan);
+                li.appendChild(valueSpan);
+                fields.provider.appendChild(li);
+            });
+
+            sections.provider.classList.remove('d-none');
+        } else {
+            sections.provider.classList.add('d-none');
+        }
+
+        if (delivery) {
+            fields.delivery.textContent = delivery;
+            sections.delivery.classList.remove('d-none');
+        } else {
+            fields.delivery.textContent = '';
+            sections.delivery.classList.add('d-none');
+        }
+
+        if (note) {
+            fields.note.textContent = note;
+            sections.note.classList.remove('d-none');
+        } else {
+            fields.note.textContent = '';
+            sections.note.classList.add('d-none');
+        }
+
+        if (adminNote) {
+            fields.adminNote.textContent = adminNote;
+            sections.adminNote.classList.remove('d-none');
+        } else {
+            fields.adminNote.textContent = '';
+            sections.adminNote.classList.add('d-none');
+        }
+    });
+})();
+JS;
+
+$GLOBALS['pageInlineScripts'][] = <<<'JS'
+(function () {
+    var container = document.querySelector('.row.g-4[data-csrf-token]');
+    if (!container) { return; }
+    var csrfToken = container.getAttribute('data-csrf-token') || '';
+
+    container.querySelectorAll('.js-repeat-order').forEach(function (button) {
+        button.addEventListener('click', function () {
+            var orderId = button.getAttribute('data-order-id');
+            if (!orderId) { return; }
+
+            button.disabled = true;
+            var formData = new URLSearchParams();
+            formData.append('action', 'repeat_order');
+            formData.append('csrf_token', csrfToken);
+            formData.append('order_id', orderId);
+
+            fetch('/reseller-actions.php', {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: formData
+            }).then(function (response) {
+                if (!response.ok) {
+                    throw new Error('İstek başarısız (' + response.status + ')');
+                }
+                return response.json();
+            }).then(function (data) {
+                if (!data.success) {
+                    throw new Error(data.error || 'Sipariş tekrar oluşturulamadı.');
+                }
+                alert('Siparişiniz oluşturuldu. Yeni sipariş numarası: #' + data.order_id);
+            }).catch(function (error) {
+                alert(error.message);
+            }).finally(function () {
+                button.disabled = false;
+            });
+        });
+    });
+})();
+JS;
+
+include __DIR__ . '/templates/footer.php';

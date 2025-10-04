@@ -24,7 +24,13 @@ class Lang
         }
 
         $default = self::defaultLocale();
-        $locale = isset($_SESSION['locale']) ? strtolower((string)$_SESSION['locale']) : $default;
+        $sessionLocale = isset($_SESSION['locale']) ? strtolower((string)$_SESSION['locale']) : '';
+
+        if ($sessionLocale === '' && isset($_SESSION['user']) && isset($_SESSION['user']['locale']) && $_SESSION['user']['locale'] !== null) {
+            $sessionLocale = strtolower((string)$_SESSION['user']['locale']);
+        }
+
+        $locale = $sessionLocale !== '' ? $sessionLocale : $default;
 
         if (!in_array($locale, self::availableLocales(), true)) {
             $locale = $default;
@@ -137,7 +143,7 @@ class Lang
      */
     public static function availableLocales()
     {
-        return array('en');
+        return array('tr', 'en');
     }
 
     /**
@@ -145,14 +151,24 @@ class Lang
      */
     public static function defaultLocale()
     {
-        if (defined('DEFAULT_LANGUAGE')) {
-            $value = strtolower((string)DEFAULT_LANGUAGE);
-            if (in_array($value, self::availableLocales(), true)) {
-                return $value;
+        $preferred = null;
+
+        if (class_exists(Settings::class)) {
+            $stored = Settings::get('platform_default_locale');
+            if ($stored) {
+                $preferred = strtolower((string)$stored);
             }
         }
 
-        return 'en';
+        if ($preferred === null && defined('DEFAULT_LANGUAGE')) {
+            $preferred = strtolower((string) DEFAULT_LANGUAGE);
+        }
+
+        if ($preferred !== null && in_array($preferred, self::availableLocales(), true)) {
+            return $preferred;
+        }
+
+        return 'tr';
     }
 
     /**
