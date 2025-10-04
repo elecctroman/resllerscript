@@ -6,7 +6,7 @@ use App\AuditLog;
 use App\Helpers;
 use App\Database;
 use App\Telegram;
-use App\Mailer;
+use App\Notifications\ResellerNotifier;
 use App\ApiToken;
 
 Auth::requireRoles(array('super_admin', 'admin', 'support'));
@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $pdo->beginTransaction();
 
-            $orderStmt = $pdo->prepare('SELECT po.*, u.name AS user_name, u.email AS user_email, u.id AS owner_id, p.name AS product_name, p.sku, c.name AS category_name FROM product_orders po INNER JOIN users u ON po.user_id = u.id INNER JOIN products p ON po.product_id = p.id LEFT JOIN categories c ON p.category_id = c.id WHERE po.id = :id FOR UPDATE');
+            $orderStmt = $pdo->prepare('SELECT po.*, u.name AS user_name, u.email AS user_email, u.id AS owner_id, u.notify_order_completed, u.telegram_bot_token, u.telegram_chat_id, p.name AS product_name, p.sku, c.name AS category_name FROM product_orders po INNER JOIN users u ON po.user_id = u.id INNER JOIN products p ON po.product_id = p.id LEFT JOIN categories c ON p.category_id = c.id WHERE po.id = :id FOR UPDATE');
             $orderStmt->execute(array('id' => $orderId));
             $order = $orderStmt->fetch();
 
@@ -102,8 +102,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $pdo->commit();
 
                             if ($newStatus === 'completed') {
-                                $message = "Merhaba {$order['user_name']}, siparişini verdiğiniz {$order['product_name']} ürününün teslimatı tamamlandı.";
-                                Mailer::send($order['user_email'], 'Ürün Siparişiniz Tamamlandı', $message);
+                                $orderPayload = array(
+                                    'id' => $orderId,
+                                    'product_name' => isset($order['product_name']) ? $order['product_name'] : null,
+                                    'quantity' => isset($order['quantity']) ? (int)$order['quantity'] : 1,
+                                    'price' => isset($order['price']) ? $order['price'] : null,
+                                );
+
+                                $userPayload = array(
+                                    'email' => $order['user_email'],
+                                    'name' => isset($order['user_name']) ? $order['user_name'] : null,
+                                    'notify_order_completed' => isset($order['notify_order_completed']) ? $order['notify_order_completed'] : null,
+                                    'telegram_bot_token' => isset($order['telegram_bot_token']) ? $order['telegram_bot_token'] : null,
+                                    'telegram_chat_id' => isset($order['telegram_chat_id']) ? $order['telegram_chat_id'] : null,
+                                );
+
+                                ResellerNotifier::sendOrderCompleted($orderPayload, $userPayload);
 
                                 Telegram::notify(sprintf(
                                     "Ürün siparişi tamamlandı!\nBayi: %s\nÜrün: %s\nSipariş No: #%d",
@@ -118,8 +132,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $externalReference = isset($order['external_reference']) ? $order['external_reference'] : null;
                                 if ((!$externalReference || $externalReference === '') && isset($order['external_metadata']) && $order['external_metadata'] !== '') {
                                     $metadata = json_decode($order['external_metadata'], true);
-                                    if (is_array($metadata) && isset($metadata['woocommerce_order']['id'])) {
-                                        $externalReference = (string)$metadata['woocommerce_order']['id'];
+                                    if (is_array($metadata) && isset($metadata['external_order']['id'])) {
+                                        $externalReference = (string)$metadata['external_order']['id'];
                                     }
                                 }
 
@@ -132,7 +146,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     'status' => $newStatus,
                                     'previous_status' => $currentStatus,
                                     'external_reference' => $externalReference,
-                                    'woocommerce_order_id' => $externalReference,
                                     'sku' => isset($order['sku']) ? $order['sku'] : null,
                                     'quantity' => isset($order['quantity']) ? (int)$order['quantity'] : 1,
                                     'total' => (float)$order['price'],
@@ -144,13 +157,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     $payload['admin_note'] = null;
                                 }
 
-                                if (is_array($metadata) && isset($metadata['woocommerce_order']['key']) && $metadata['woocommerce_order']['key'] !== '') {
-                                    $payload['woocommerce_order_key'] = $metadata['woocommerce_order']['key'];
+                                if (is_array($metadata) && isset($metadata['external_order'])) {
+                                    $payload['external_order'] = $metadata['external_order'];
                                 }
 
                                 $webhookResult = ApiToken::notifyWebhook((int)$order['api_token_id'], $payload);
                                 if (!$webhookResult['success']) {
-                                    $formErrors[] = 'WooCommerce sipariş bildirimi gönderilemedi: ' . (isset($webhookResult['error']) ? $webhookResult['error'] : 'Bilinmeyen hata');
+                                    $formErrors[] = 'API webhook bildirimi gönderilemedi: ' . (isset($webhookResult['error']) ? $webhookResult['error'] : 'Bilinmeyen hata');
                                 }
                             }
 
@@ -256,6 +269,34 @@ include __DIR__ . '/../templates/header.php';
                     </thead>
                     <tbody>
                     <?php foreach ($orders as $order): ?>
+                        <?php
+                        $providerName = '';
+                        $providerStatus = '';
+                        $deliveryContent = '';
+
+                        if (!empty($order['external_metadata'])) {
+                            $metadata = json_decode($order['external_metadata'], true);
+                            if (is_array($metadata)) {
+                                if (!empty($metadata['provider'])) {
+                                    $providerName = (string)$metadata['provider'];
+                                }
+
+                                if (isset($metadata['provider_response']['data']['status'])) {
+                                    $providerStatus = (string)$metadata['provider_response']['data']['status'];
+                                } elseif (isset($metadata['provider_error']['message']) && $metadata['provider_error']['message'] !== '') {
+                                    $providerStatus = 'failed';
+                                }
+
+                                if (!empty($metadata['delivery_content'])) {
+                                    $deliveryContent = (string)$metadata['delivery_content'];
+                                } elseif (!empty($metadata['provider_response']['data']['content'])) {
+                                    $deliveryContent = (string)$metadata['provider_response']['data']['content'];
+                                } elseif (!empty($metadata['provider_error']['message'])) {
+                                    $deliveryContent = (string)$metadata['provider_error']['message'];
+                                }
+                            }
+                        }
+                        ?>
                         <tr>
                             <td><?= (int)$order['id'] ?></td>
                             <td>
@@ -265,6 +306,13 @@ include __DIR__ . '/../templates/header.php';
                             <td>
                                 <strong><?= Helpers::sanitize($order['product_name']) ?></strong><br>
                                 <small class="text-muted">Kategori: <?= Helpers::sanitize(isset($order['category_name']) ? $order['category_name'] : '-') ?> | SKU: <?= Helpers::sanitize(isset($order['sku']) ? $order['sku'] : '-') ?></small>
+                                <?php if ($providerName !== ''): ?>
+                                    <div class="text-muted small mt-1">
+                                        Sağlayıcı: <?= Helpers::sanitize(strtoupper($providerName)) ?><?php if ($providerStatus !== ''): ?> (<?= Helpers::sanitize(strtoupper($providerStatus)) ?>)<?php endif; ?>
+                                    </div>
+                                <?php elseif ($providerStatus !== ''): ?>
+                                    <div class="text-muted small mt-1">Sağlayıcı Durumu: <?= Helpers::sanitize(strtoupper($providerStatus)) ?></div>
+                                <?php endif; ?>
                             </td>
                             <td><?= isset($order['quantity']) ? (int)$order['quantity'] : 1 ?></td>
                             <td><?= Helpers::sanitize(Helpers::formatCurrency((float)$order['price'])) ?></td>
@@ -318,6 +366,21 @@ include __DIR__ . '/../templates/header.php';
                                                 }
                                                 ?>
                                             </dd>
+                                            <?php if ($providerName !== '' || $providerStatus !== ''): ?>
+                                                <dt class="col-sm-4">Sağlayıcı</dt>
+                                                <dd class="col-sm-8">
+                                                    <?php if ($providerName !== ''): ?>
+                                                        <div>Ad: <strong><?= Helpers::sanitize(strtoupper($providerName)) ?></strong></div>
+                                                    <?php endif; ?>
+                                                    <?php if ($providerStatus !== ''): ?>
+                                                        <div>Durum: <span class="badge bg-light text-dark"><?= Helpers::sanitize(strtoupper($providerStatus)) ?></span></div>
+                                                    <?php endif; ?>
+                                                </dd>
+                                            <?php endif; ?>
+                                            <?php if ($deliveryContent !== ''): ?>
+                                                <dt class="col-sm-4">Teslimat İçeriği</dt>
+                                                <dd class="col-sm-8"><pre class="bg-light p-2 small mb-0"><?= Helpers::sanitize($deliveryContent) ?></pre></dd>
+                                            <?php endif; ?>
                                             <?php if (!empty($order['external_metadata'])): ?>
                                                 <dt class="col-sm-4">Harici Bilgi</dt>
                                                 <dd class="col-sm-8"><pre class="bg-light p-2 small mb-0"><?= Helpers::sanitize($order['external_metadata']) ?></pre></dd>

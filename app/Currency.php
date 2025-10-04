@@ -56,6 +56,10 @@ class Currency
         switch ($currency) {
             case 'TRY':
                 return '₺';
+            case 'EUR':
+                return '€';
+            case 'GBP':
+                return '£';
             case 'USD':
             default:
                 return '$';

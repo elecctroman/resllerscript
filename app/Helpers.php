@@ -2,8 +2,41 @@
 
 namespace App;
 
+if (!function_exists(__NAMESPACE__ . '\\mail')) {
+    /**
+     * Safe wrapper for PHP's global mail() so namespaced calls do not fatal out
+     * when the function is disabled.
+     */
+    function mail(
+        string $to,
+        string $subject,
+        string $message,
+        $additionalHeaders = '',
+        $additionalParameters = ''
+    ): bool {
+        if (!\function_exists('mail')) {
+            error_log('PHP mail() fonksiyonu bu sunucuda kullanılamıyor veya başarısız oldu.');
+            return false;
+        }
+
+        try {
+            $result = \mail($to, $subject, $message, $additionalHeaders, $additionalParameters);
+        } catch (\Throwable $exception) {
+            error_log('PHP mail() fonksiyonu gönderim sırasında hata verdi: ' . $exception->getMessage());
+            return false;
+        }
+
+        if ($result !== true) {
+            error_log('PHP mail() fonksiyonu bu sunucuda kullanılamıyor veya başarısız oldu.');
+        }
+
+        return (bool) $result;
+    }
+}
+
 class Helpers
 {
+
     /**
      * @return string
      */
@@ -83,7 +116,7 @@ class Helpers
             return $value;
         }
 
-        return 'Manage reseller orders, balance, and WooCommerce synchronisation from a single dashboard.';
+        return 'Manage reseller orders, balance, and integrations from a single dashboard.';
     }
 
     /**
@@ -95,6 +128,100 @@ class Helpers
         $value = $value !== null ? trim($value) : '';
 
         return $value !== '' ? $value : 'reseller panel, smm panel, automation';
+    }
+
+    /**
+     * Legacy stub kept for backwards compatibility.
+     *
+     * @param string $path
+     * @param bool $absolute
+     * @return string
+     */
+    public static function url($path = '', $absolute = false)
+    {
+        $relative = $path !== '' ? '/' . ltrim((string)$path, '/') : '';
+
+        if ($absolute) {
+            $scheme = 'http';
+            if (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off') {
+                $scheme = 'https';
+            } elseif (!empty($_SERVER['HTTP_X_FORWARDED_PROTO'])) {
+                $proto = strtolower((string)$_SERVER['HTTP_X_FORWARDED_PROTO']);
+                if ($proto === 'https') {
+                    $scheme = 'https';
+                }
+            } elseif (!empty($_SERVER['REQUEST_SCHEME'])) {
+                $scheme = strtolower((string)$_SERVER['REQUEST_SCHEME']) === 'https' ? 'https' : 'http';
+            }
+            $host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'localhost';
+
+            return $scheme . '://' . $host . ($relative !== '' ? $relative : '/');
+        }
+
+        return $relative !== '' ? $relative : '/';
+    }
+
+    /**
+     * Determine the base URL for API consumers.
+     *
+     * @return string
+     */
+    public static function apiBaseUrl()
+    {
+        $base = Settings::get('api_base_url');
+        $base = $base !== null ? trim($base) : '';
+
+        if ($base !== '') {
+            return rtrim($base, '/');
+        }
+
+        $scheme = 'http';
+        if (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off') {
+            $scheme = 'https';
+        } elseif (!empty($_SERVER['HTTP_X_FORWARDED_PROTO'])) {
+            $proto = strtolower((string)$_SERVER['HTTP_X_FORWARDED_PROTO']);
+            if ($proto === 'https') {
+                $scheme = 'https';
+            }
+        } elseif (!empty($_SERVER['REQUEST_SCHEME'])) {
+            $scheme = strtolower((string)$_SERVER['REQUEST_SCHEME']) === 'https' ? 'https' : 'http';
+        }
+
+        $host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : (isset($_SERVER['SERVER_NAME']) ? $_SERVER['SERVER_NAME'] : 'localhost');
+
+        return $scheme . '://' . $host . '/api/v1';
+    }
+
+    /**
+     * Safely include a template from the templates directory.
+     *
+     * @param string $template
+     * @param array<string,mixed> $data
+     * @return void
+     */
+    public static function includeTemplate($template, array $data = [])
+    {
+        $cleanTemplate = ltrim((string)$template, '/');
+        $cleanTemplate = str_replace(['..', '\\'], '', $cleanTemplate);
+
+        $path = dirname(__DIR__) . '/templates/' . $cleanTemplate;
+
+        if (!is_file($path)) {
+            $message = sprintf('Template not found: %s', $cleanTemplate);
+            error_log('[Template] ' . $message);
+
+            if (PHP_SAPI !== 'cli') {
+                echo '<!-- ' . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . ' -->';
+            }
+
+            return;
+        }
+
+        if ($data) {
+            extract($data, EXTR_SKIP);
+        }
+
+        include $path;
     }
 
     /**
@@ -231,8 +358,24 @@ class Helpers
      */
     public static function activeCurrency()
     {
-        Lang::boot();
-        return Lang::locale() === 'tr' ? 'TRY' : 'USD';
+        $currency = null;
+
+        if (isset($_SESSION['user']) && isset($_SESSION['user']['currency']) && $_SESSION['user']['currency']) {
+            $currency = strtoupper((string)$_SESSION['user']['currency']);
+        }
+
+        if (!$currency) {
+            $stored = Settings::get('platform_default_currency');
+            if ($stored) {
+                $currency = strtoupper((string)$stored);
+            }
+        }
+
+        if (!$currency) {
+            $currency = 'TRY';
+        }
+
+        return in_array($currency, array('TRY', 'USD', 'EUR'), true) ? $currency : 'TRY';
     }
 
     /**
@@ -245,7 +388,7 @@ class Helpers
         Lang::boot();
         $activeCurrency = self::activeCurrency();
 
-        if ($activeCurrency !== $baseCurrency) {
+        if (strtoupper($baseCurrency) !== $activeCurrency) {
             $amount = Currency::convert((float)$amount, $baseCurrency, $activeCurrency);
         }
 

@@ -24,15 +24,10 @@ spl_autoload_register(function ($class) {
 });
 
 $configPath = __DIR__ . '/config/config.php';
-$installerPath = __DIR__ . '/install.php';
 
 if (!file_exists($configPath)) {
-    if (file_exists($installerPath)) {
-        header('Location: /install.php');
-        exit;
-    }
 
-    include __DIR__ . '/templates/auth-header.php';
+    App\Helpers::includeTemplate('auth-header.php');
     ?>
     <div class="auth-wrapper">
         <div class="auth-card">
@@ -55,7 +50,7 @@ if (!file_exists($configPath)) {
         </div>
     </div>
     <?php
-    include __DIR__ . '/templates/auth-footer.php';
+    App\Helpers::includeTemplate('auth-footer.php');
     exit;
 }
 
@@ -74,7 +69,7 @@ try {
         'password' => DB_PASSWORD,
     ]);
 } catch (\PDOException $exception) {
-    include __DIR__ . '/templates/auth-header.php';
+    App\Helpers::includeTemplate('auth-header.php');
     ?>
     <div class="auth-wrapper">
         <div class="auth-card">
@@ -90,7 +85,7 @@ try {
         </div>
     </div>
     <?php
-    include __DIR__ . '/templates/auth-footer.php';
+    App\Helpers::includeTemplate('auth-footer.php');
     exit;
 }
 
@@ -100,7 +95,8 @@ $siteName = Helpers::siteName();
 $siteTagline = Helpers::siteTagline();
 
 if (!empty($_SESSION['user'])) {
-    Helpers::redirect('/dashboard.php');
+    $redirectTarget = Auth::isAdminRole($_SESSION['user']['role']) ? '/admin/dashboard.php' : '/dashboard.php';
+    Helpers::redirect($redirectTarget);
 }
 
 $flashSuccess = isset($_SESSION['flash_success']) ? $_SESSION['flash_success'] : null;
@@ -125,14 +121,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 Lang::boot();
             }
-            Helpers::redirect('/dashboard.php');
+            $redirectTarget = Auth::isAdminRole($user['role']) ? '/admin/dashboard.php' : '/dashboard.php';
+            Helpers::redirect($redirectTarget);
         } else {
             $errors[] = 'Bilgileriniz doğrulanamadı. Lütfen tekrar deneyin.';
         }
     }
 }
 
-include __DIR__ . '/templates/auth-header.php';
+Helpers::includeTemplate('auth-header.php');
 ?>
 <div class="auth-wrapper">
     <div class="auth-card">
@@ -143,6 +140,10 @@ include __DIR__ . '/templates/auth-header.php';
             <?php else: ?>
                 <p class="text-muted mt-2">Yetkili bayiler için profesyonel yönetim paneli</p>
             <?php endif; ?>
+        </div>
+        <div class="d-flex gap-2 mb-4">
+            <a href="/index.php" class="btn btn-outline-primary flex-fill">Bayi Girişi</a>
+            <a href="/customer/login.php" class="btn btn-outline-secondary flex-fill">Müşteri Girişi</a>
         </div>
 
         <?php if ($flashSuccess): ?>
@@ -187,4 +188,4 @@ include __DIR__ . '/templates/auth-header.php';
         </form>
     </div>
 </div>
-<?php include __DIR__ . '/templates/auth-footer.php';
+<?php Helpers::includeTemplate('auth-footer.php'); ?>

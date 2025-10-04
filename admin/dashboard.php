@@ -213,7 +213,7 @@ include __DIR__ . '/../templates/header.php';
                         <a href="/admin/balances.php" class="btn btn-outline-primary w-100">Bakiyeler</a>
                     </div>
                     <div class="col-sm-6 col-xl-3">
-                        <a href="/admin/woocommerce-import.php" class="btn btn-outline-primary w-100">WooCommerce CSV</a>
+                        <a href="/admin/api-keys.php" class="btn btn-outline-primary w-100">API Yönetimine Git</a>
                     </div>
                     <div class="col-sm-6 col-xl-3">
                         <a href="/admin/reports.php" class="btn btn-outline-primary w-100">Raporlar</a>
