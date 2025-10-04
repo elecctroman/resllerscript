@@ -35,8 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'locale' => $locale,
                     'currency' => $currency,
                 ));
-                $_SESSION['customer'] = CustomerRepository::findById((int)$customer['id']);
-                $customer = $_SESSION['customer'];
+                $customer = CustomerAuth::refresh();
                 $success = 'Profil bilgileriniz güncellendi.';
                 $successAction = 'profile';
             }
@@ -58,9 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         } elseif ($action === 'token') {
             $token = CustomerRepository::regenerateToken((int)$customer['id']);
-            $_SESSION['customer']['api_token'] = $token;
-            $customer['api_token'] = $token;
-            $customer['api_token_created_at'] = date('Y-m-d H:i:s');
+            $customer = CustomerAuth::refresh();
             $success = 'API anahtarınız yenilendi.';
             $successAction = 'token';
         } elseif ($action === 'api_settings') {
@@ -93,16 +90,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'scopes' => $scopeValue,
                 'ip_whitelist' => $whitelist !== '' ? $whitelist : null,
             ));
-            $_SESSION['customer'] = CustomerRepository::findById((int)$customer['id']);
-            $customer = $_SESSION['customer'];
+            $customer = CustomerAuth::refresh();
             $success = 'API ayarlarınız güncellendi.';
             $successAction = 'api_settings';
         } elseif ($action === 'otp') {
             $otpAction = $_POST['otp_action'] ?? 'enable';
             if ($otpAction === 'disable') {
                 CustomerRepository::updateOtpSecret((int)$customer['id'], null);
-                $_SESSION['customer']['api_otp_secret'] = null;
-                $customer['api_otp_secret'] = null;
+                $customer = CustomerAuth::refresh();
                 $success = 'OTP koruması devre dışı bırakıldı.';
                 $successAction = 'otp';
             } else {
@@ -121,8 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $secret = substr($secret, 0, 16);
                 CustomerRepository::updateOtpSecret((int)$customer['id'], $secret);
-                $_SESSION['customer']['api_otp_secret'] = $secret;
-                $customer['api_otp_secret'] = $secret;
+                $customer = CustomerAuth::refresh();
                 $success = 'OTP anahtarınız oluşturuldu. Lütfen doğrulama uygulamanıza ekleyin.';
                 $successAction = 'otp';
             }

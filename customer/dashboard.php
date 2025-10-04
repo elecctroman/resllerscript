@@ -1,6 +1,7 @@
 <?php
 require __DIR__ . '/../bootstrap.php';
 
+use App\Blog\BlogRepository;
 use App\Customers\CustomerAuth;
 use App\Customers\OrderService;
 use App\Customers\WalletService;
@@ -21,6 +22,7 @@ $openTickets = (int)$ticketStmt->fetchColumn();
 
 $recentOrders = OrderService::listForCustomer((int)$customer['id'], 5);
 $walletHistory = WalletService::history((int)$customer['id'], 5);
+$blogPosts = BlogRepository::latestPosts(3);
 
 $pageTitle = 'Dashboard';
 require __DIR__ . '/../templates/customer-header.php';
@@ -128,6 +130,31 @@ require __DIR__ . '/../templates/customer-header.php';
                 <a href="/customer/support.php" class="btn btn-outline-secondary"><i class="bi bi-life-preserver me-2"></i>Destek Talebi Aç</a>
             </div>
         </div>
+        <?php if ($blogPosts): ?>
+            <div class="card customer-card mt-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Blog Duyuruları</h5>
+                    <a href="/blog/" class="btn btn-link btn-sm">Tümü</a>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        <?php foreach ($blogPosts as $post): ?>
+                            <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center position-relative">
+                                <div>
+                                    <a href="/blog/<?= rawurlencode($post['slug']) ?>" class="stretched-link text-decoration-none fw-semibold">
+                                        <?= Helpers::sanitize($post['title']) ?>
+                                    </a>
+                                    <div class="text-muted small mt-1">
+                                        <?= Helpers::sanitize(date('d.m.Y', strtotime($post['published_at'] ?: $post['created_at']))) ?>
+                                    </div>
+                                </div>
+                                <i class="bi bi-chevron-right text-muted"></i>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+            </div>
+        <?php endif; ?>
     </div>
 </div>
 <?php require __DIR__ . '/../templates/customer-footer.php';

@@ -1,4 +1,5 @@
 <?php
+use App\Customers\CustomerAuth;
 use App\Helpers;
 use App\Lang;
 
@@ -10,7 +11,7 @@ Lang::boot();
 
 $siteName = Helpers::siteName();
 $pageTitle = isset($pageTitle) ? $pageTitle : 'Müşteri Paneli';
-$customer = isset($_SESSION['customer']) ? $_SESSION['customer'] : null;
+$customer = isset($customer) ? $customer : CustomerAuth::customer();
 $theme = isset($_COOKIE['customer_theme']) && $_COOKIE['customer_theme'] === 'dark' ? 'dark' : 'light';
 ?>
 <!DOCTYPE html>
@@ -58,6 +59,7 @@ $theme = isset($_COOKIE['customer_theme']) && $_COOKIE['customer_theme'] === 'da
             <a href="/customer/dashboard.php" class="customer-sidebar-link<?= Helpers::currentPath() === '/customer/dashboard.php' ? ' active' : '' ?>"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a>
             <a href="/customer/orders.php" class="customer-sidebar-link<?= Helpers::currentPath() === '/customer/orders.php' ? ' active' : '' ?>"><i class="bi bi-receipt me-2"></i>Siparişler</a>
             <a href="/customer/new-order.php" class="customer-sidebar-link<?= Helpers::currentPath() === '/customer/new-order.php' ? ' active' : '' ?>"><i class="bi bi-cart-plus me-2"></i>Yeni Sipariş</a>
+            <a href="/blog/" class="customer-sidebar-link" target="_blank"><i class="bi bi-journal-text me-2"></i>Blog</a>
             <a href="/customer/profile.php" class="customer-sidebar-link<?= Helpers::currentPath() === '/customer/profile.php' ? ' active' : '' ?>"><i class="bi bi-person me-2"></i>Profil</a>
             <a href="/customer/wallet.php" class="customer-sidebar-link<?= Helpers::currentPath() === '/customer/wallet.php' ? ' active' : '' ?>"><i class="bi bi-wallet2 me-2"></i>Cüzdan</a>
             <a href="/customer/support.php" class="customer-sidebar-link<?= Helpers::currentPath() === '/customer/support.php' ? ' active' : '' ?>"><i class="bi bi-life-preserver me-2"></i>Destek</a>

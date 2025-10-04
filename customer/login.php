@@ -21,7 +21,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $customer = CustomerAuth::attempt($email, $password);
             if ($customer) {
-                $_SESSION['customer'] = $customer;
                 Helpers::redirect('/customer/dashboard.php');
             } else {
                 $errors[] = 'Bilgiler doğrulanamadı. Lütfen tekrar deneyin.';

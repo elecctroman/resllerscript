@@ -44,7 +44,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'locale' => $_POST['locale'] ?? 'tr',
                     'currency' => $_POST['currency'] ?? 'TRY',
                 ));
-                $_SESSION['customer'] = $customer;
                 Helpers::redirect('/customer/dashboard.php');
             } catch (\Throwable $exception) {
                 $errors[] = $exception->getMessage();

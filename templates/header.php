@@ -87,6 +87,13 @@ if ($user) {
                 ),
             ),
             array(
+                'heading' => 'İçerik Yönetimi',
+                'items' => array(
+                    array('label' => 'Blog Yazıları', 'href' => '/admin/blog-posts.php', 'pattern' => '/admin/blog-posts.php', 'icon' => 'bi-journal-text', 'roles' => array('super_admin', 'admin', 'content')),
+                    array('label' => 'Blog Kategorileri', 'href' => '/admin/blog-categories.php', 'pattern' => '/admin/blog-categories.php', 'icon' => 'bi-tags', 'roles' => array('super_admin', 'admin', 'content')),
+                ),
+            ),
+            array(
                 'heading' => 'Entegrasyon & API',
                 'items' => array(
                     array('label' => 'API Anahtarları', 'href' => '/admin/api-keys.php', 'pattern' => '/admin/api-keys.php', 'icon' => 'bi-key', 'roles' => array('super_admin', 'admin')),

@@ -3,7 +3,6 @@ require __DIR__ . '/../bootstrap.php';
 
 use App\Customers\CustomerAuth;
 use App\Customers\WalletService;
-use App\Customers\CustomerRepository;
 use App\Helpers;
 
 $customer = CustomerAuth::ensureCustomer();
@@ -29,8 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$errors) {
             if ($method === 'Cuzdan') {
                 WalletService::add((int)$customer['id'], $amount, 'Panel üzerinden bakiye ekleme', 'manual-topup');
-                $_SESSION['customer'] = CustomerRepository::findById((int)$customer['id']);
-                $customer = $_SESSION['customer'];
+                $customer = CustomerAuth::refresh();
                 $success = 'Bakiyeniz güncellendi.';
             } else {
                 WalletService::createTopupRequest((int)$customer['id'], $amount, $method, null, 'Panelden oluşturulan yükleme talebi');
