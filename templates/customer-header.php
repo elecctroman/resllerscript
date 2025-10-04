@@ -1,4 +1,5 @@
 <?php
+use App\Customers\CustomerAuth;
 use App\Helpers;
 use App\Lang;
 
@@ -10,7 +11,7 @@ Lang::boot();
 
 $siteName = Helpers::siteName();
 $pageTitle = isset($pageTitle) ? $pageTitle : 'Müşteri Paneli';
-$customer = isset($_SESSION['customer']) ? $_SESSION['customer'] : null;
+$customer = isset($customer) ? $customer : CustomerAuth::customer();
 $theme = isset($_COOKIE['customer_theme']) && $_COOKIE['customer_theme'] === 'dark' ? 'dark' : 'light';
 ?>
 <!DOCTYPE html>
