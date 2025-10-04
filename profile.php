@@ -33,17 +33,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         if ($action === 'profile') {
             $name = isset($_POST['name']) ? trim($_POST['name']) : '';
-            $email = isset($_POST['email']) ? trim($_POST['email']) : '';
             $currentPassword = isset($_POST['current_password']) ? $_POST['current_password'] : '';
             $newPassword = isset($_POST['new_password']) ? $_POST['new_password'] : '';
             $newPasswordConfirm = isset($_POST['new_password_confirmation']) ? $_POST['new_password_confirmation'] : '';
+            $telegramBotToken = isset($_POST['telegram_bot_token']) ? trim($_POST['telegram_bot_token']) : '';
+            $telegramChatId = isset($_POST['telegram_chat_id']) ? trim($_POST['telegram_chat_id']) : '';
+            $locale = isset($_POST['locale']) ? strtolower((string)$_POST['locale']) : '';
+            $currency = isset($_POST['currency']) ? strtoupper((string)$_POST['currency']) : '';
 
-            if ($name === '' || $email === '') {
-                $errors[] = 'Ad ve e-posta alanları zorunludur.';
+            $availableLocales = App\Lang::availableLocales();
+            if (!in_array($locale, $availableLocales, true)) {
+                $locale = App\Lang::defaultLocale();
             }
 
-            if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                $errors[] = 'Geçerli bir e-posta adresi giriniz.';
+            $currencyOptions = array('TRY', 'USD', 'EUR');
+            if (!in_array($currency, $currencyOptions, true)) {
+                $currency = Helpers::activeCurrency();
+            }
+
+            if ($name === '') {
+                $errors[] = 'Ad alanı zorunludur.';
+            }
+
+            if ($telegramBotToken === '' || $telegramChatId === '') {
+                $errors[] = 'Telegram bot tokenı ve sohbet kimliği zorunludur.';
             }
 
             $changingPassword = $newPassword !== '' || $newPasswordConfirm !== '';
@@ -70,48 +83,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 try {
                     $pdo->beginTransaction();
 
-                    $duplicateStmt = $pdo->prepare('SELECT id FROM users WHERE email = :email AND id <> :id LIMIT 1');
-                    $duplicateStmt->execute(array('email' => $email, 'id' => $user['id']));
-                    if ($duplicateStmt->fetch()) {
-                        $errors[] = 'Bu e-posta adresi başka bir hesap tarafından kullanılıyor.';
-                    } else {
-                        if ($changingPassword) {
-                            $passwordStmt = $pdo->prepare('SELECT password_hash FROM users WHERE id = :id LIMIT 1');
-                            $passwordStmt->execute(array('id' => $user['id']));
-                            $passwordRow = $passwordStmt->fetch();
+                    if ($changingPassword) {
+                        $passwordStmt = $pdo->prepare('SELECT password_hash FROM users WHERE id = :id LIMIT 1');
+                        $passwordStmt->execute(array('id' => $user['id']));
+                        $passwordRow = $passwordStmt->fetch();
 
-                            if (!$passwordRow || !password_verify($currentPassword, $passwordRow['password_hash'])) {
-                                $errors[] = 'Mevcut şifreniz doğrulanamadı.';
-                            }
+                        if (!$passwordRow || !password_verify($currentPassword, $passwordRow['password_hash'])) {
+                            $errors[] = 'Mevcut şifreniz doğrulanamadı.';
                         }
+                    }
 
-                        if (!$errors) {
-                            $pdo->prepare('UPDATE users SET name = :name, email = :email, updated_at = NOW() WHERE id = :id')->execute(array(
-                                'name' => $name,
-                                'email' => $email,
+                    if (!$errors) {
+                        $pdo->prepare('UPDATE users SET name = :name, telegram_bot_token = :bot, telegram_chat_id = :chat, locale = :locale, currency = :currency, updated_at = NOW() WHERE id = :id')->execute(array(
+                            'name' => $name,
+                            'bot' => $telegramBotToken,
+                            'chat' => $telegramChatId,
+                            'locale' => $locale,
+                            'currency' => $currency,
+                            'id' => $user['id'],
+                        ));
+
+                        if ($changingPassword) {
+                            $pdo->prepare('UPDATE users SET password_hash = :password WHERE id = :id')->execute(array(
+                                'password' => password_hash($newPassword, PASSWORD_BCRYPT),
                                 'id' => $user['id'],
                             ));
+                        }
 
-                            if ($changingPassword) {
-                                $pdo->prepare('UPDATE users SET password_hash = :password WHERE id = :id')->execute(array(
-                                    'password' => password_hash($newPassword, PASSWORD_BCRYPT),
-                                    'id' => $user['id'],
-                                ));
-                            }
+                        $pdo->commit();
 
-                            $pdo->commit();
+                        $freshUser = Auth::findUser($user['id']);
+                        if ($freshUser) {
+                            $_SESSION['user'] = $freshUser;
+                            $user = $freshUser;
+                        }
 
-                            $freshUser = Auth::findUser($user['id']);
-                            if ($freshUser) {
-                                $_SESSION['user'] = $freshUser;
-                                $user = $freshUser;
-                            }
+                        $successMessages[] = 'Profil bilgileriniz güncellendi.';
 
-                            $successMessages[] = 'Profil bilgileriniz güncellendi.';
-
-                            if ($changingPassword) {
-                                $successMessages[] = 'Şifreniz başarıyla değiştirildi.';
-                            }
+                        if ($changingPassword) {
+                            $successMessages[] = 'Şifreniz başarıyla değiştirildi.';
                         }
                     }
 
@@ -155,6 +165,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 );
             } catch (\Throwable $exception) {
                 $errors[] = 'API anahtarınız yenilenirken bir sorun oluştu: ' . $exception->getMessage();
+            }
+        } elseif ($action === 'notifications') {
+            $prefOrder = isset($_POST['notify_order_completed']) ? '1' : '0';
+            $prefBalance = isset($_POST['notify_balance_approved']) ? '1' : '0';
+            $prefSupport = isset($_POST['notify_support_replied']) ? '1' : '0';
+
+            try {
+                $pdo->prepare('UPDATE users SET notify_order_completed = :order_pref, notify_balance_approved = :balance_pref, notify_support_replied = :support_pref, updated_at = NOW() WHERE id = :id')
+                    ->execute(array(
+                        'order_pref' => $prefOrder,
+                        'balance_pref' => $prefBalance,
+                        'support_pref' => $prefSupport,
+                        'id' => $user['id'],
+                    ));
+
+                $freshUser = Auth::findUser($user['id']);
+                if ($freshUser) {
+                    $_SESSION['user'] = $freshUser;
+                    $user = $freshUser;
+                }
+
+                $successMessages[] = 'Telegram bildirim tercihlerin güncellendi.';
+            } catch (\PDOException $exception) {
+                $errors[] = 'Bildirim tercihlerin kaydedilirken bir hata oluştu: ' . $exception->getMessage();
             }
         }
     }
@@ -201,7 +235,38 @@ include __DIR__ . '/templates/header.php';
                     </div>
                     <div class="mb-3">
                         <label class="form-label">E-posta</label>
-                        <input type="email" name="email" class="form-control" value="<?= Helpers::sanitize($user['email']) ?>" required>
+                        <input type="email" class="form-control" value="<?= Helpers::sanitize($user['email']) ?>" readonly>
+                        <small class="text-muted">Kayıtlı e-posta adresiniz güvenlik nedeniyle değiştirilemez.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Telegram Bot Tokenı</label>
+                        <input type="text" name="telegram_bot_token" class="form-control" value="<?= Helpers::sanitize(isset($user['telegram_bot_token']) ? $user['telegram_bot_token'] : '') ?>" required>
+                        <small class="text-muted">BotFather üzerinden oluşturduğunuz botun tokenını girin.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Telegram Chat ID</label>
+                        <input type="text" name="telegram_chat_id" class="form-control" value="<?= Helpers::sanitize(isset($user['telegram_chat_id']) ? $user['telegram_chat_id'] : '') ?>" required>
+                        <small class="text-muted">Bildirimlerin gönderileceği kullanıcı veya kanal kimliği.</small>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Panel Dili</label>
+                            <select name="locale" class="form-select">
+                                <?php foreach (App\Lang::availableLocales() as $localeOption): ?>
+                                    <option value="<?= Helpers::sanitize($localeOption) ?>" <?= (isset($user['locale']) && $user['locale'] === $localeOption) ? 'selected' : '' ?>><?= strtoupper(Helpers::sanitize($localeOption)) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <small class="text-muted">Bayi panelinde kullanılacak varsayılan dil.</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Tercih Edilen Para Birimi</label>
+                            <select name="currency" class="form-select">
+                                <?php foreach (array('TRY' => 'Türk Lirası', 'USD' => 'ABD Doları', 'EUR' => 'Euro') as $code => $label): ?>
+                                    <option value="<?= Helpers::sanitize($code) ?>" <?= (isset($user['currency']) && strtoupper((string)$user['currency']) === $code) ? 'selected' : '' ?>><?= Helpers::sanitize($label) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <small class="text-muted">Grafik ve fiyatlar bu para birimine göre gösterilecektir.</small>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Mevcut Şifre</label>
@@ -228,6 +293,40 @@ include __DIR__ . '/templates/header.php';
                     <dt class="col-sm-4">Durum</dt>
                     <dd class="col-sm-8"><span class="badge bg-success">Aktif</span></dd>
                 </dl>
+            </div>
+        </div>
+        <div class="card border-0 shadow-sm mt-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Telegram Bildirimleri</h5>
+                <small class="text-muted">Telegram üzerinden hangi bildirimleri almak istediğinizi seçin.</small>
+            </div>
+            <div class="card-body">
+                <form method="post" class="vstack gap-3">
+                    <input type="hidden" name="csrf_token" value="<?= Helpers::sanitize(Helpers::csrfToken()) ?>">
+                    <input type="hidden" name="action" value="notifications">
+
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="notifyOrderCompleted" name="notify_order_completed" <?= (!isset($user['notify_order_completed']) || $user['notify_order_completed'] !== '0') ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="notifyOrderCompleted">Ürün siparişlerim tamamlandığında bilgilendir</label>
+                        <small class="text-muted d-block">Tamamlanan siparişler için teslimat detayları Telegram üzerinden iletilsin.</small>
+                    </div>
+
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="notifyBalanceApproved" name="notify_balance_approved" <?= (!isset($user['notify_balance_approved']) || $user['notify_balance_approved'] !== '0') ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="notifyBalanceApproved">Bakiye yüklemeleri onaylandığında bilgilendir</label>
+                        <small class="text-muted d-block">Onaylanan bakiye taleplerinde tutar ve yöntem özeti Telegram üzerinden gelsin.</small>
+                    </div>
+
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="notifySupportReplied" name="notify_support_replied" <?= (!isset($user['notify_support_replied']) || $user['notify_support_replied'] !== '0') ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="notifySupportReplied">Destek yanıtlarında bilgilendir</label>
+                        <small class="text-muted d-block">Destek ekibi talebinize yanıt verdiğinde Telegram bildirimi gönderilsin.</small>
+                    </div>
+
+                    <div class="text-end">
+                        <button type="submit" class="btn btn-outline-primary">Tercihlerimi Kaydet</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -279,7 +378,7 @@ include __DIR__ . '/templates/header.php';
                     <div class="border rounded p-3 bg-light">
                         <h6>WordPress Eklenti Ayarları</h6>
                         <ul class="small mb-0">
-                            <li>E-posta: <code><?= Helpers::sanitize(isset($user['email']) ? $user['email'] : '') ?></code></li>
+                            <li>API URL: <code><?= Helpers::sanitize(Helpers::url('api/v1/', true)) ?></code></li>
                             <li>API Anahtarı: Yukarıdaki anahtarı kullanın.</li>
                             <li>Webhook URL: WordPress sitenizin <code>/wp-json/reseller-sync/v1/order-status</code> adresi.</li>
                         </ul>
