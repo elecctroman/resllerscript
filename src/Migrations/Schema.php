@@ -26,6 +26,7 @@ final class Schema
         self::ensureApiRequestLogTable($pdo);
         self::ensureAutoTopupTable($pdo);
         self::ensureUserLocaleColumns($pdo);
+
     }
 
     private static function ensureProductsTable(PDO $pdo): void
@@ -166,6 +167,7 @@ final class Schema
         self::ensureColumn($pdo, 'users', 'locale', "VARCHAR(5) NULL");
         self::ensureColumn($pdo, 'users', 'currency', "VARCHAR(3) NULL");
     }
+
 
     private static function ensureColumn(PDO $pdo, string $table, string $column, string $definition): void
     {

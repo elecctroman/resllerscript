@@ -141,6 +141,10 @@ Helpers::includeTemplate('auth-header.php');
                 <p class="text-muted mt-2">Yetkili bayiler için profesyonel yönetim paneli</p>
             <?php endif; ?>
         </div>
+        <div class="d-flex gap-2 mb-4">
+            <a href="/index.php" class="btn btn-outline-primary flex-fill">Bayi Girişi</a>
+            <a href="/customer/login.php" class="btn btn-outline-secondary flex-fill">Müşteri Girişi</a>
+        </div>
 
         <?php if ($flashSuccess): ?>
             <div class="alert alert-success">

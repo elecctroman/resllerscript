@@ -79,6 +79,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
             $success = 'Destek durumu güncellendi.';
         }
+    } elseif ($action === 'customer_reply') {
+        $ticketId = isset($_POST['ticket_id']) ? (int)$_POST['ticket_id'] : 0;
+        $message = isset($_POST['message']) ? trim($_POST['message']) : '';
+        if ($ticketId <= 0 || $message === '') {
+            $errors[] = 'Müşteri destek mesajı boş olamaz.';
+        } else {
+            $ticketStmt = $pdo->prepare('SELECT ct.*, c.email FROM customer_tickets ct INNER JOIN customers c ON c.id = ct.customer_id WHERE ct.id = :id');
+            $ticketStmt->execute(array(':id' => $ticketId));
+            $ticket = $ticketStmt->fetch();
+            if (!$ticket) {
+                $errors[] = 'Müşteri destek kaydı bulunamadı.';
+            } else {
+                $pdo->prepare('INSERT INTO customer_ticket_replies (ticket_id, author_type, author_id, message, created_at) VALUES (:ticket, "admin", :author, :message, NOW())')
+                    ->execute(array(':ticket' => $ticketId, ':author' => $currentUser['id'], ':message' => $message));
+                $pdo->prepare('UPDATE customer_tickets SET status = "acik", updated_at = NOW() WHERE id = :id')
+                    ->execute(array(':id' => $ticketId));
+                $success = 'Müşteri destek yanıtı gönderildi.';
+            }
+        }
+    } elseif ($action === 'customer_status') {
+        $ticketId = isset($_POST['ticket_id']) ? (int)$_POST['ticket_id'] : 0;
+        $status = isset($_POST['status']) ? $_POST['status'] : 'acik';
+        if (!in_array($status, array('acik', 'kapali'), true)) {
+            $errors[] = 'Geçersiz müşteri destek durumu seçildi.';
+        } else {
+            $pdo->prepare('UPDATE customer_tickets SET status = :status, updated_at = NOW() WHERE id = :id')->execute(array(':status' => $status, ':id' => $ticketId));
+            $success = 'Müşteri destek durumu güncellendi.';
+        }
     }
 }
 
@@ -95,6 +123,8 @@ $query .= ' ORDER BY st.created_at DESC';
 $stmt = $pdo->prepare($query);
 $stmt->execute($params);
 $tickets = $stmt->fetchAll();
+
+$customerTickets = $pdo->query('SELECT ct.*, c.email, CONCAT(c.name, " ", c.surname) AS customer_name FROM customer_tickets ct INNER JOIN customers c ON c.id = ct.customer_id ORDER BY ct.created_at DESC LIMIT 200')->fetchAll();
 
 $pageTitle = 'Destek Yönetimi';
 include __DIR__ . '/../templates/header.php';
@@ -241,4 +271,95 @@ include __DIR__ . '/../templates/header.php';
         </div>
     </div>
 </div>
+
+<div class="card border-0 shadow-sm mt-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">Müşteri Destek Talepleri</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Müşteri</th>
+                        <th>Konu</th>
+                        <th>Durum</th>
+                        <th>Oluşturulma</th>
+                        <th>İşlemler</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($customerTickets as $ticket): ?>
+                    <tr>
+                        <td>#<?= (int)$ticket['id'] ?></td>
+                        <td><?= Helpers::sanitize($ticket['customer_name']) ?><br><small class="text-muted"><?= Helpers::sanitize($ticket['email']) ?></small></td>
+                        <td><?= Helpers::sanitize($ticket['subject']) ?></td>
+                        <td><span class="badge text-bg-secondary text-capitalize"><?= Helpers::sanitize($ticket['status']) ?></span></td>
+                        <td><?= Helpers::sanitize(date('d.m.Y H:i', strtotime($ticket['created_at']))) ?></td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#customerTicket<?= (int)$ticket['id'] ?>">Görüntüle</button>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<?php foreach ($customerTickets as $ticket): ?>
+    <div class="modal fade" id="customerTicket<?= (int)$ticket['id'] ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Ticket #<?= (int)$ticket['id'] ?> - <?= Helpers::sanitize($ticket['subject']) ?></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p><?= nl2br(Helpers::sanitize($ticket['message'])) ?></p>
+                    <?php
+                    $replies = $pdo->prepare('SELECT * FROM customer_ticket_replies WHERE ticket_id = :ticket ORDER BY created_at ASC');
+                    $replies->execute(array(':ticket' => $ticket['id']));
+                    $replyRows = $replies->fetchAll();
+                    ?>
+                    <?php if ($replyRows): ?>
+                        <div class="list-group mb-3">
+                            <?php foreach ($replyRows as $reply): ?>
+                                <div class="list-group-item">
+                                    <div class="d-flex justify-content-between">
+                                        <strong><?= Helpers::sanitize(ucfirst($reply['author_type'])) ?></strong>
+                                        <small class="text-muted"><?= Helpers::sanitize(date('d.m.Y H:i', strtotime($reply['created_at']))) ?></small>
+                                    </div>
+                                    <div><?= nl2br(Helpers::sanitize($reply['message'])) ?></div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                    <form method="post" class="mb-3">
+                        <input type="hidden" name="csrf_token" value="<?= Helpers::csrfToken() ?>">
+                        <input type="hidden" name="action" value="customer_reply">
+                        <input type="hidden" name="ticket_id" value="<?= (int)$ticket['id'] ?>">
+                        <div class="mb-3">
+                            <label class="form-label">Yanıtınız</label>
+                            <textarea name="message" class="form-control" rows="3" required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Yanıt Gönder</button>
+                    </form>
+                    <form method="post" class="text-end">
+                        <input type="hidden" name="csrf_token" value="<?= Helpers::csrfToken() ?>">
+                        <input type="hidden" name="action" value="customer_status">
+                        <input type="hidden" name="ticket_id" value="<?= (int)$ticket['id'] ?>">
+                        <select name="status" class="form-select d-inline-block w-auto">
+                            <option value="acik" <?= $ticket['status'] === 'acik' ? 'selected' : '' ?>>Açık</option>
+                            <option value="kapali" <?= $ticket['status'] === 'kapali' ? 'selected' : '' ?>>Kapalı</option>
+                        </select>
+                        <button type="submit" class="btn btn-outline-secondary ms-2">Durumu Güncelle</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endforeach; ?>
+
 <?php include __DIR__ . '/../templates/footer.php';

@@ -1,0 +1,123 @@
+:root {
+    --customer-primary: #0066ff;
+    --customer-light-bg: #f5f7fb;
+    --customer-dark-bg: #12121a;
+    --customer-card-light: #ffffff;
+    --customer-card-dark: #1d1d2b;
+}
+
+body.customer-app {
+    padding-top: 64px;
+    background-color: var(--customer-light-bg);
+    min-height: 100vh;
+    color: #1d1d2b;
+}
+
+body.customer-app-dark {
+    background-color: var(--customer-dark-bg);
+    color: #f1f1f5;
+}
+
+.customer-sidebar {
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    gap: 0.5rem;
+}
+
+.customer-sidebar-link {
+    display: flex;
+    align-items: center;
+    padding: 0.65rem 0.75rem;
+    border-radius: 0.75rem;
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.customer-sidebar-link:hover,
+.customer-sidebar-link.active {
+    background: rgba(0, 102, 255, 0.12);
+    color: var(--customer-primary);
+}
+
+body.customer-app-dark .customer-sidebar-link:hover,
+body.customer-app-dark .customer-sidebar-link.active {
+    background: rgba(0, 102, 255, 0.2);
+    color: #fff;
+}
+
+.customer-main {
+    padding: 1.5rem 1rem;
+}
+
+.customer-main-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.customer-card {
+    border-radius: 1rem;
+    border: none;
+    background: var(--customer-card-light);
+    box-shadow: 0 15px 35px rgba(16, 40, 77, 0.08);
+}
+
+body.customer-app-dark .customer-card {
+    background: var(--customer-card-dark);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+}
+
+.customer-metric-title {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #6b7a90;
+}
+
+body.customer-app-dark .customer-metric-title {
+    color: #a0abc4;
+}
+
+.customer-metric-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+}
+
+.customer-section-title {
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.customer-table thead {
+    background: rgba(0, 102, 255, 0.05);
+}
+
+body.customer-app-dark .customer-table thead {
+    background: rgba(0, 102, 255, 0.15);
+}
+
+.customer-table th,
+.customer-table td {
+    vertical-align: middle;
+}
+
+@media (min-width: 992px) {
+    .offcanvas.offcanvas-start {
+        visibility: visible !important;
+        position: static;
+        transform: none;
+        width: 240px;
+        max-width: none;
+    }
+
+    .customer-main {
+        margin-left: 240px;
+    }
+}
+
+@media (max-width: 991.98px) {
+    .customer-main {
+        padding-top: 4.5rem;
+    }
+}

@@ -214,6 +214,7 @@ CREATE TABLE IF NOT EXISTS user_purchases (
     FOREIGN KEY (module_id) REFERENCES premium_modules(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+
 INSERT INTO users (id, name, email, password_hash, role, balance, status, created_at)
 VALUES (
     1,
