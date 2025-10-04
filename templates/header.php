@@ -75,13 +75,7 @@ if ($user) {
                 'items' => array(
                     array('label' => 'Paket Siparişleri', 'href' => '/admin/orders.php', 'pattern' => '/admin/orders.php', 'icon' => 'bi-receipt', 'roles' => array('super_admin', 'admin', 'support'), 'badge' => isset($menuBadges['/admin/orders.php']) ? (int)$menuBadges['/admin/orders.php'] : 0),
                     array('label' => 'Ürün Siparişleri', 'href' => '/admin/product-orders.php', 'pattern' => '/admin/product-orders.php', 'icon' => 'bi-basket', 'roles' => array('super_admin', 'admin', 'support'), 'badge' => isset($menuBadges['/admin/product-orders.php']) ? (int)$menuBadges['/admin/product-orders.php'] : 0),
-                    array('label' => 'Müşteri Siparişleri', 'href' => '/admin/customer-orders.php', 'pattern' => '/admin/customer-orders.php', 'icon' => 'bi-people', 'roles' => array('super_admin', 'admin', 'support', 'finance')),
-                ),
-            ),
-            array(
-                'heading' => 'Müşteri Yönetimi',
-                'items' => array(
-                    array('label' => 'Müşteriler', 'href' => '/admin/customers.php', 'pattern' => '/admin/customers.php', 'icon' => 'bi-person-lines-fill', 'roles' => array('super_admin', 'admin', 'support', 'finance')),
+
                 ),
             ),
             array(

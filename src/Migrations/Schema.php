@@ -26,7 +26,7 @@ final class Schema
         self::ensureApiRequestLogTable($pdo);
         self::ensureAutoTopupTable($pdo);
         self::ensureUserLocaleColumns($pdo);
-        self::ensureCustomerTables($pdo);
+
     }
 
     private static function ensureProductsTable(PDO $pdo): void
@@ -168,117 +168,6 @@ final class Schema
         self::ensureColumn($pdo, 'users', 'currency', "VARCHAR(3) NULL");
     }
 
-    private static function ensureCustomerTables(PDO $pdo): void
-    {
-        $pdo->exec("CREATE TABLE IF NOT EXISTS customers (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            name VARCHAR(100) NOT NULL,
-            surname VARCHAR(100) NOT NULL,
-            email VARCHAR(150) NOT NULL UNIQUE,
-            phone VARCHAR(20) NULL,
-            password VARCHAR(255) NOT NULL,
-            balance DECIMAL(12,2) NOT NULL DEFAULT 0,
-            locale VARCHAR(5) NULL,
-            currency VARCHAR(3) NULL,
-            api_token VARCHAR(64) NULL,
-            api_token_created_at DATETIME NULL,
-            api_status ENUM('active','disabled') NOT NULL DEFAULT 'active',
-            api_scopes VARCHAR(191) NULL,
-            api_ip_whitelist TEXT NULL,
-            api_otp_secret VARCHAR(64) NULL,
-            last_login_at DATETIME NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-            INDEX idx_customers_api_token (api_token)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-        self::ensureColumn($pdo, 'customers', 'api_status', "ENUM('active','disabled') NOT NULL DEFAULT 'active'");
-        self::ensureColumn($pdo, 'customers', 'api_scopes', "VARCHAR(191) NULL");
-        self::ensureColumn($pdo, 'customers', 'api_ip_whitelist', 'TEXT NULL');
-        self::ensureColumn($pdo, 'customers', 'api_otp_secret', 'VARCHAR(64) NULL');
-        self::addIndex($pdo, 'customers', 'idx_customers_api_token', 'ADD INDEX idx_customers_api_token (api_token)');
-
-        $pdo->exec("CREATE TABLE IF NOT EXISTS customer_orders (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            customer_id INT NOT NULL,
-            product_id INT NOT NULL,
-            quantity INT NOT NULL DEFAULT 1,
-            total_price DECIMAL(12,2) NOT NULL,
-            payment_method VARCHAR(50) NOT NULL,
-            status ENUM('bekliyor','onaylandi','iptal') NOT NULL DEFAULT 'bekliyor',
-            license_key MEDIUMTEXT NULL,
-            metadata JSON NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-            FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
-            FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-            INDEX idx_customer_orders_customer (customer_id),
-            INDEX idx_customer_orders_status (status)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-        $pdo->exec("CREATE TABLE IF NOT EXISTS customer_tickets (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            customer_id INT NOT NULL,
-            subject VARCHAR(255) NOT NULL,
-            message MEDIUMTEXT NOT NULL,
-            status ENUM('acik','kapali') NOT NULL DEFAULT 'acik',
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-            FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
-            INDEX idx_customer_tickets_customer (customer_id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-        $pdo->exec("CREATE TABLE IF NOT EXISTS customer_ticket_replies (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            ticket_id INT NOT NULL,
-            author_type ENUM('customer','admin') NOT NULL DEFAULT 'customer',
-            author_id INT NULL,
-            message MEDIUMTEXT NOT NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (ticket_id) REFERENCES customer_tickets(id) ON DELETE CASCADE,
-            INDEX idx_ticket_replies_ticket (ticket_id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-        $pdo->exec("CREATE TABLE IF NOT EXISTS wallet_logs (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            customer_id INT NOT NULL,
-            amount DECIMAL(12,2) NOT NULL,
-            type ENUM('ekleme','cikarma') NOT NULL,
-            description VARCHAR(255) NULL,
-            reference_id VARCHAR(64) NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
-            INDEX idx_wallet_customer (customer_id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-        $pdo->exec("CREATE TABLE IF NOT EXISTS customer_api_logs (
-            id BIGINT AUTO_INCREMENT PRIMARY KEY,
-            customer_id INT NULL,
-            ip_address VARCHAR(45) NOT NULL,
-            method VARCHAR(10) NOT NULL,
-            endpoint VARCHAR(191) NOT NULL,
-            status_code INT NOT NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL,
-            INDEX idx_customer_api_logs_customer (customer_id),
-            INDEX idx_customer_api_logs_created (created_at)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-        $pdo->exec("CREATE TABLE IF NOT EXISTS wallet_topup_requests (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            customer_id INT NOT NULL,
-            amount DECIMAL(12,2) NOT NULL,
-            method VARCHAR(50) NOT NULL,
-            status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
-            reference VARCHAR(100) NULL,
-            notes VARCHAR(255) NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-            FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
-            INDEX idx_wallet_topup_customer (customer_id),
-            INDEX idx_wallet_topup_status (status)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-    }
 
     private static function ensureColumn(PDO $pdo, string $table, string $column, string $definition): void
     {
