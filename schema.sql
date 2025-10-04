@@ -214,6 +214,39 @@ CREATE TABLE IF NOT EXISTS user_purchases (
     FOREIGN KEY (module_id) REFERENCES premium_modules(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS blog_categories (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    slug VARCHAR(191) NOT NULL,
+    description TEXT NULL,
+    meta_title VARCHAR(150) NULL,
+    meta_description VARCHAR(255) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_blog_category_slug (slug)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS blog_posts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    category_id INT NULL,
+    title VARCHAR(191) NOT NULL,
+    slug VARCHAR(191) NOT NULL,
+    excerpt TEXT NULL,
+    content MEDIUMTEXT NOT NULL,
+    image_url VARCHAR(255) NULL,
+    author_name VARCHAR(150) NULL,
+    status ENUM('draft','published') NOT NULL DEFAULT 'draft',
+    published_at DATETIME NULL,
+    meta_title VARCHAR(191) NULL,
+    meta_description VARCHAR(255) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (category_id) REFERENCES blog_categories(id) ON DELETE SET NULL,
+    UNIQUE KEY uniq_blog_post_slug (slug),
+    INDEX idx_blog_status (status),
+    INDEX idx_blog_category (category_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 
 INSERT INTO users (id, name, email, password_hash, role, balance, status, created_at)
 VALUES (
