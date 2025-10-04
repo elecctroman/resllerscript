@@ -131,6 +131,52 @@ class Helpers
     }
 
     /**
+     * @param string $value
+     * @return string
+     */
+    public static function slugify($value)
+    {
+        $value = trim((string)$value);
+
+        if ($value === '') {
+            return '';
+        }
+
+        if (function_exists('mb_strtolower')) {
+            $value = mb_strtolower($value, 'UTF-8');
+        } else {
+            $value = strtolower($value);
+        }
+
+        $replacements = array(
+            'ı' => 'i',
+            'ğ' => 'g',
+            'ü' => 'u',
+            'ş' => 's',
+            'ö' => 'o',
+            'ç' => 'c',
+        );
+        $value = strtr($value, $replacements);
+
+        if (function_exists('iconv')) {
+            $transliterated = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value);
+            if ($transliterated !== false) {
+                $value = $transliterated;
+            }
+        }
+
+        $value = preg_replace('/[^a-z0-9]+/i', '-', $value);
+        if ($value === null) {
+            $value = '';
+        }
+
+        $value = trim($value, '-');
+        $value = preg_replace('/-+/', '-', $value);
+
+        return $value !== null ? $value : '';
+    }
+
+    /**
      * Legacy stub kept for backwards compatibility.
      *
      * @param string $path
