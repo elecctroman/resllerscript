@@ -236,11 +236,10 @@ Helpers::includeTemplate('public-header.php');
             </span>
             <h1 class="mt-4 mb-3"><?= Helpers::sanitize($siteName) ?></h1>
             <p class="lead mb-4">
-                <?= Helpers::sanitize($siteTagline ?: 'E-Pin, oyun içi para ve lisans satışlarınızı tek panelden yönetin. Otomatik teslimat, gelişmiş raporlama ve müşteri paneli tek pakette.') ?>
+                <?= Helpers::sanitize($siteTagline ?: 'E-Pin, oyun içi para ve lisans satışlarınızı tek panelden yönetin. Otomatik teslimat, gelişmiş raporlama ve bayi paneli tek pakette.') ?>
             </p>
             <div class="d-flex flex-wrap gap-3">
                 <a href="/register.php" class="btn btn-primary btn-lg px-4">Bayi Ol</a>
-                <a href="/customer/register.php" class="btn btn-outline-light btn-lg px-4">Müşteri Paneline Katıl</a>
             </div>
             <div class="public-hero-feature-list">
                 <div class="public-hero-feature">
@@ -264,10 +263,6 @@ Helpers::includeTemplate('public-header.php');
                         <h5 class="mb-1">Bayi Yönetim Paneli</h5>
                         <p class="text-muted mb-0">Hızlı giriş yapın, siparişleri yönetin.</p>
                     </div>
-                    <a href="/customer/login.php" class="public-pill-link">
-                        <i class="bi bi-people"></i>
-                        Müşteri Girişi
-                    </a>
                 </div>
                 <?php if ($flashSuccess): ?>
                     <div class="alert alert-success">
@@ -513,7 +508,6 @@ Helpers::includeTemplate('public-header.php');
         <p class="public-section-subtitle mx-auto mb-4">Reseller ağınızı büyütmek ve müşteri memnuniyetini artırmak için hemen ücretsiz deneme hesabı oluşturun.</p>
         <div class="d-flex flex-wrap justify-content-center gap-3">
             <a href="/register.php" class="btn btn-primary btn-lg px-4">Bayilik Başvurusu</a>
-            <a href="/customer/register.php" class="btn btn-outline-light btn-lg px-4">Müşteri Hesabı Aç</a>
         </div>
     </div>
 </section>
