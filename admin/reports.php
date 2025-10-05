@@ -148,7 +148,7 @@ include __DIR__ . '/../templates/header.php';
                 <h5 class="mb-0">Gelir Özeti</h5>
             </div>
             <div class="card-body">
-                <p class="fs-4 mb-1"><?= Helpers::sanitize(Helpers::formatCurrency($summary['packages']['revenue'] + $summary['products']['revenue'])) ?></p>
+                <p class="fs-4 mb-1"><?= Helpers::formatCurrencyHtml($summary['packages']['revenue'] + $summary['products']['revenue']) ?></p>
                 <p class="text-muted mb-0">Tamamlanan paket ve ürün siparişlerinden elde edilen toplam gelir.</p>
             </div>
         </div>
@@ -159,8 +159,8 @@ include __DIR__ . '/../templates/header.php';
                 <h5 class="mb-0">Bakiye Hareketleri</h5>
             </div>
             <div class="card-body">
-                <p class="fs-5 mb-1">Kredi: <?= Helpers::sanitize(Helpers::formatCurrency($summary['balance']['credits'])) ?></p>
-                <p class="fs-5">Borç: <?= Helpers::sanitize(Helpers::formatCurrency($summary['balance']['debits'])) ?></p>
+                <p class="fs-5 mb-1">Kredi: <?= Helpers::formatCurrencyHtml($summary['balance']['credits']) ?></p>
+                <p class="fs-5">Borç: <?= Helpers::formatCurrencyHtml($summary['balance']['debits']) ?></p>
                 <p class="text-muted mb-0">İlgili tarih aralığındaki toplam bakiye giriş/çıkışları.</p>
             </div>
         </div>
@@ -196,7 +196,7 @@ include __DIR__ . '/../templates/header.php';
                                     <small class="text-muted"><?= Helpers::sanitize($row['email']) ?></small>
                                 </td>
                                 <td><?= Helpers::sanitize($row['package_name']) ?></td>
-                                <td><?= Helpers::sanitize(Helpers::formatCurrency((float)$row['total_amount'])) ?></td>
+                                <td><?= Helpers::formatCurrencyHtml((float)$row['total_amount']) ?></td>
                                 <td><span class="badge bg-light text-dark text-uppercase"><?= Helpers::sanitize($row['status']) ?></span></td>
                                 <td><?= date('d.m.Y H:i', strtotime($row['created_at'])) ?></td>
                             </tr>
@@ -241,7 +241,7 @@ include __DIR__ . '/../templates/header.php';
                                 </td>
                                 <td><?= Helpers::sanitize($row['product_name']) ?></td>
                                 <td><?= (int)$row['quantity'] ?></td>
-                                <td><?= Helpers::sanitize(Helpers::formatCurrency($total)) ?></td>
+                                <td><?= Helpers::formatCurrencyHtml($total) ?></td>
                                 <td><span class="badge bg-light text-dark text-uppercase"><?= Helpers::sanitize($row['status']) ?></span></td>
                                 <td><?= date('d.m.Y H:i', strtotime($row['created_at'])) ?></td>
                             </tr>
@@ -289,7 +289,7 @@ include __DIR__ . '/../templates/header.php';
                                         <span class="badge bg-danger">Borç</span>
                                     <?php endif; ?>
                                 </td>
-                                <td><?= Helpers::sanitize(Helpers::formatCurrency((float)$transaction['amount'])) ?></td>
+                                <td><?= Helpers::formatCurrencyHtml((float)$transaction['amount']) ?></td>
                                 <td><?= Helpers::sanitize($transaction['description']) ?></td>
                                 <td><?= date('d.m.Y H:i', strtotime($transaction['created_at'])) ?></td>
                             </tr>
