@@ -100,95 +100,7 @@ class ProviderDispatchService
             $metadata['provider_response'] = $apiResult;
 
             $responseBody = isset($apiResult['body']) && is_array($apiResult['body']) ? $apiResult['body'] : array();
-            $responseData = array();
 
-            if (isset($apiResult['data']) && is_array($apiResult['data'])) {
-                $responseData = $apiResult['data'];
-            } elseif (isset($responseBody['data']) && is_array($responseBody['data'])) {
-                $responseData = $responseBody['data'];
-            } elseif (isset($responseBody['order']) && is_array($responseBody['order'])) {
-                $responseData = $responseBody['order'];
-            } elseif (isset($responseBody['result']) && is_array($responseBody['result'])) {
-                $responseData = $responseBody['result'];
-            }
-
-            if (isset($responseData[0]) && is_array($responseData[0])) {
-                $responseData = $responseData[0];
-            }
-
-            $statusSources = array(
-                $responseData['status'] ?? null,
-                $responseData['state'] ?? null,
-                $responseData['order_status'] ?? null,
-                $responseBody['status'] ?? null,
-                $responseBody['result']['status'] ?? null,
-            );
-
-            $remoteStatus = '';
-            foreach ($statusSources as $statusSource) {
-                if (is_string($statusSource) && $statusSource !== '') {
-                    $remoteStatus = strtolower($statusSource);
-                    break;
-                }
-            }
-
-            if ($remoteStatus === '' && isset($responseBody['success']) && $responseBody['success']) {
-                $remoteStatus = 'completed';
-            }
-
-            switch ($remoteStatus) {
-                case 'success':
-                case 'ok':
-                case 'done':
-                case 'completed':
-                    $remoteStatus = 'completed';
-                    break;
-                case 'waiting':
-                case 'queued':
-                case 'queue':
-                case 'processing':
-                case 'pending':
-                case 'in_progress':
-                case 'in-progress':
-                    $remoteStatus = 'processing';
-                    break;
-                case 'cancel':
-                case 'cancelled':
-                case 'canceled':
-                    $remoteStatus = 'cancelled';
-                    break;
-                case 'error':
-                case 'fail':
-                case 'failed':
-                case 'denied':
-                    $remoteStatus = 'failed';
-                    break;
-            }
-
-            $referenceKeys = array('order_id', 'orderId', 'orderID', 'id', 'reference', 'ref', 'transaction_id', 'transactionId', 'order_no', 'orderNo');
-            $remoteReference = null;
-            foreach ($referenceKeys as $referenceKey) {
-                if (isset($responseData[$referenceKey]) && $responseData[$referenceKey] !== '') {
-                    $remoteReference = (string) $responseData[$referenceKey];
-                    break;
-                }
-                if (isset($responseBody[$referenceKey]) && $responseBody[$referenceKey] !== '') {
-                    $remoteReference = (string) $responseBody[$referenceKey];
-                    break;
-                }
-            }
-
-            $contentKeys = array('content', 'delivery', 'details', 'detail', 'message', 'note', 'notes', 'response');
-            $remoteContent = null;
-            foreach ($contentKeys as $contentKey) {
-                if (isset($responseData[$contentKey]) && is_string($responseData[$contentKey]) && $responseData[$contentKey] !== '') {
-                    $remoteContent = (string) $responseData[$contentKey];
-                    break;
-                }
-            }
-            if ($remoteContent === null && isset($responseBody['message']) && is_string($responseBody['message']) && $responseBody['message'] !== '') {
-                $remoteContent = (string) $responseBody['message'];
-            }
 
             $localStatus = 'processing';
             $message = 'Sipariş sağlayıcıya iletildi.';
@@ -210,7 +122,7 @@ class ProviderDispatchService
                 $adminNote = $remoteContent ?: 'Sağlayıcı siparişi iptal etti.';
             } elseif ($remoteStatus === 'failed') {
                 $localStatus = 'pending';
-                $message = isset($responseBody['message']) ? (string) $responseBody['message'] : (isset($responseData['message']) ? (string) $responseData['message'] : 'Sağlayıcı siparişi reddetti.');
+
                 $adminNote = $remoteContent ?: $message;
             }
 
