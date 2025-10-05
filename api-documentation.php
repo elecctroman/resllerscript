@@ -98,5 +98,3 @@ Content-Type: application/json
   }
 }</code></pre>
 
-
-<?php Helpers::includeTemplate('public-footer.php');
