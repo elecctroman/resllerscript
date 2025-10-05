@@ -17,8 +17,6 @@ final class Schema
             return;
         }
 
-        self::ensureProvidersTable($pdo);
-        self::ensureProviderProductsTable($pdo);
 
         self::ensureProductsTable($pdo);
         self::ensureProductStockTable($pdo);

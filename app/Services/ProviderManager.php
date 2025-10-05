@@ -8,6 +8,7 @@ use PDO;
 
 final class ProviderManager
 {
+ main
     /**
      * @return array<int,array<string,mixed>>
      */
@@ -105,12 +106,7 @@ final class ProviderManager
             );
         }
 
-        $items = array();
-        if (isset($apiResult['data']) && is_array($apiResult['data'])) {
-            $items = $apiResult['data'];
-        } elseif (isset($apiResult['body']['data']) && is_array($apiResult['body']['data'])) {
-            $items = $apiResult['body']['data'];
-        }
+
 
         $syncTimestamp = date('Y-m-d H:i:s');
         $syncedCount = 0;
@@ -128,30 +124,27 @@ final class ProviderManager
                     $externalId = (string) $item['id'];
                 } elseif (isset($item['product_id'])) {
                     $externalId = (string) $item['product_id'];
+
                 }
 
                 if ($externalId === '') {
                     continue;
                 }
 
-                $name = isset($item['name']) ? (string) $item['name'] : (string) ($item['title'] ?? $externalId);
-                $description = isset($item['description']) ? (string) $item['description'] : (isset($item['content']) ? (string) $item['content'] : null);
+
                 $price = null;
                 if (isset($item['price'])) {
                     $price = (float) $item['price'];
                 } elseif (isset($item['amount'])) {
                     $price = (float) $item['amount'];
-                }
-                $currency = isset($item['currency']) ? (string) $item['currency'] : null;
-                $stock = null;
-                if (isset($item['stock'])) {
-                    $stock = (int) $item['stock'];
+
                 }
                 $available = null;
                 if (isset($item['is_available'])) {
                     $available = (int) $item['is_available'] === 1;
                 } elseif (isset($item['available'])) {
                     $available = (bool) $item['available'];
+
                 }
 
                 $payload = json_encode($item, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -392,6 +385,5 @@ final class ProviderManager
             $provider['code'] = '';
         }
 
-        return $provider;
-    }
+
 }

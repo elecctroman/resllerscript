@@ -419,7 +419,9 @@ include __DIR__ . '/templates/header.php';
                         <?php
                         $productId = isset($product['id']) ? (int)$product['id'] : 0;
                         $productName = isset($product['name']) ? $product['name'] : 'Servis';
-                        $productPrice = Helpers::formatCurrency(isset($product['price']) ? (float)$product['price'] : 0);
+                        $productBaseAmount = isset($product['price']) ? (float)$product['price'] : 0.0;
+                        $productBaseCurrency = 'USD';
+                        $productPriceHtml = Helpers::formatCurrencyHtml($productBaseAmount, $productBaseCurrency);
                         $categoryTrail = isset($product['category_id']) ? $categoryPath((int)$product['category_id']) : (isset($product['category_name']) ? $product['category_name'] : 'Kategori');
                         $rawDescription = isset($product['description']) ? trim($product['description']) : '';
                         if ($rawDescription === '') {
@@ -461,7 +463,7 @@ include __DIR__ . '/templates/header.php';
                                     <h3 class="product-card__title"><?= Helpers::sanitize($productName) ?></h3>
                                     <div class="product-card__category"><?= Helpers::sanitize($categoryTrail) ?></div>
                                 </div>
-                                <div class="product-card__price"><?= Helpers::sanitize($productPrice) ?></div>
+                                <div class="product-card__price"><?= $productPriceHtml ?></div>
                             </div>
                             <?php if ($skuValue): ?>
                                 <div class="product-card__sku">SKU: <?= Helpers::sanitize($skuValue) ?></div>
@@ -482,7 +484,9 @@ include __DIR__ . '/templates/header.php';
                                         data-bs-target="#orderModal"
                                         data-product-id="<?= $productId ?>"
                                         data-product-name="<?= Helpers::sanitize($productName) ?>"
-                                        data-product-price="<?= Helpers::sanitize($productPrice) ?>"
+                                        data-product-price-html="<?= htmlspecialchars($productPriceHtml, ENT_QUOTES, 'UTF-8') ?>"
+                                        data-product-base-amount="<?= Helpers::sanitize(number_format($productBaseAmount, 6, '.', '')) ?>"
+                                        data-product-base-currency="<?= Helpers::sanitize($productBaseCurrency) ?>"
                                         data-product-sku="<?= Helpers::sanitize($skuValue ?: '-') ?>"
                                         data-product-category="<?= Helpers::sanitize($categoryTrail) ?>"
                                         <?= $buttonDisabled ? 'disabled aria-disabled="true" title="Stok tükendi"' : '' ?>>
@@ -543,7 +547,7 @@ include __DIR__ . '/templates/header.php';
                         </div>
                         <div class="col-6 text-end">
                             <div class="fw-semibold"><?= Helpers::sanitize('Fiyat') ?></div>
-                            <div id="orderProductPrice"><?= Helpers::sanitize(Helpers::formatCurrency(0)) ?></div>
+                            <div id="orderProductPrice"><?= Helpers::formatCurrencyHtml(0) ?></div>
                         </div>
                         <div class="col-12">
                             <div class="fw-semibold">SKU</div>
@@ -648,7 +652,14 @@ include __DIR__ . '/templates/header.php';
 
             orderModal.querySelector('#orderProductId').value = dataset.productId || '';
             orderModal.querySelector('#orderProductName').value = dataset.productName || '';
-            orderModal.querySelector('#orderProductPrice').textContent = dataset.productPrice || '<?= Helpers::sanitize(Helpers::formatCurrency(0)) ?>';
+            var priceNode = orderModal.querySelector('#orderProductPrice');
+            if (priceNode) {
+                var priceHtml = dataset.productPriceHtml || '<?= htmlspecialchars(Helpers::formatCurrencyHtml(0), ENT_QUOTES, 'UTF-8') ?>';
+                priceNode.innerHTML = priceHtml;
+                if (window.App && typeof window.App.refreshMoney === 'function') {
+                    window.App.refreshMoney();
+                }
+            }
             orderModal.querySelector('#orderProductSku').textContent = dataset.productSku || '-';
             orderModal.querySelector('#orderProductCategory').textContent = dataset.productCategory || '-';
 

@@ -315,7 +315,7 @@ include __DIR__ . '/../templates/header.php';
                                 <?php endif; ?>
                             </td>
                             <td><?= isset($order['quantity']) ? (int)$order['quantity'] : 1 ?></td>
-                            <td><?= Helpers::sanitize(Helpers::formatCurrency((float)$order['price'])) ?></td>
+                            <td><?= Helpers::formatCurrencyHtml((float)$order['price']) ?></td>
                             <td>
                                 <?php
                                 $source = isset($order['source']) ? $order['source'] : 'panel';
@@ -353,7 +353,7 @@ include __DIR__ . '/../templates/header.php';
                                                 <small class="text-muted">Kategori: <?= Helpers::sanitize(isset($order['category_name']) ? $order['category_name'] : '-') ?> | SKU: <?= Helpers::sanitize(isset($order['sku']) ? $order['sku'] : '-') ?></small>
                                             </dd>
                                             <dt class="col-sm-4">Fiyat</dt>
-                                            <dd class="col-sm-8"><?= Helpers::sanitize(Helpers::formatCurrency((float)$order['price'])) ?></dd>
+                                            <dd class="col-sm-8"><?= Helpers::formatCurrencyHtml((float)$order['price']) ?></dd>
                                             <dt class="col-sm-4">Adet</dt>
                                             <dd class="col-sm-8"><?= isset($order['quantity']) ? (int)$order['quantity'] : 1 ?></dd>
                                             <dt class="col-sm-4">Kaynak</dt>

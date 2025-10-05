@@ -100,10 +100,7 @@ class ProviderDispatchService
             $metadata['provider_response'] = $apiResult;
 
             $responseBody = isset($apiResult['body']) && is_array($apiResult['body']) ? $apiResult['body'] : array();
-            $responseData = isset($responseBody['data']) && is_array($responseBody['data']) ? $responseBody['data'] : array();
-            $remoteStatus = isset($responseData['status']) ? strtolower((string) $responseData['status']) : '';
-            $remoteReference = isset($responseData['order_id']) ? (string) $responseData['order_id'] : ($responseBody['order_id'] ?? null);
-            $remoteContent = isset($responseData['content']) ? (string) $responseData['content'] : null;
+
 
             $localStatus = 'processing';
             $message = 'Sipariş sağlayıcıya iletildi.';
@@ -125,7 +122,7 @@ class ProviderDispatchService
                 $adminNote = $remoteContent ?: 'Sağlayıcı siparişi iptal etti.';
             } elseif ($remoteStatus === 'failed') {
                 $localStatus = 'pending';
-                $message = isset($responseBody['message']) ? (string) $responseBody['message'] : 'Sağlayıcı siparişi reddetti.';
+
                 $adminNote = $remoteContent ?: $message;
             }
 

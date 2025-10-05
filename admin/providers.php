@@ -21,6 +21,7 @@ if ($errorFlash) {
 $success = is_string($success) ? $success : '';
 
 
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = isset($_POST['action']) ? $_POST['action'] : '';
     $token = isset($_POST['csrf_token']) ? $_POST['csrf_token'] : '';
@@ -57,6 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
 
+
             if (!$errors) {
                 $check = $pdo->prepare('SELECT id FROM providers WHERE code = :code LIMIT 1');
                 $check->execute(array('code' => $code));
@@ -67,15 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if (!$errors) {
                 $settings = array(
-                    'products_endpoint' => $productsEndpoint !== '' ? $productsEndpoint : '/api/products',
-                    'orders_endpoint' => $ordersEndpoint !== '' ? $ordersEndpoint : '/api/orders',
 
-                );
-
-                $stmt = $pdo->prepare('INSERT INTO providers (name, code, base_url, api_key, status, settings, created_at) VALUES (:name, :code, :base_url, :api_key, :status, :settings, NOW())');
-                $stmt->execute(array(
-                    'name' => $name,
-                    'code' => $code,
                     'base_url' => rtrim($baseUrl),
                     'api_key' => $apiKey,
                     'status' => $status,
@@ -134,6 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
 
+
             if (!$errors) {
                 $check = $pdo->prepare('SELECT id FROM providers WHERE code = :code AND id <> :id LIMIT 1');
                 $check->execute(array('code' => $code, 'id' => $providerId));
@@ -144,14 +139,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if (!$errors) {
                 $settings = array(
-                    'products_endpoint' => $productsEndpoint !== '' ? $productsEndpoint : '/api/products',
-                    'orders_endpoint' => $ordersEndpoint !== '' ? $ordersEndpoint : '/api/orders',
 
-                $stmt = $pdo->prepare('UPDATE providers SET name = :name, code = :code, base_url = :base_url, api_key = :api_key, status = :status, settings = :settings, updated_at = NOW() WHERE id = :id');
                 $stmt->execute(array(
                     'id' => $providerId,
                     'name' => $name,
                     'code' => $code,
+
                     'base_url' => rtrim($baseUrl),
                     'api_key' => $apiKey,
                     'status' => $status,
@@ -381,8 +374,6 @@ include __DIR__ . '/../templates/header.php';
                                 <tr>
                                     <th>Adı</th>
                                     <th>Kod</th>
-                                    <th>Durum</th>
-                                    <th>API Adresi</th>
 
                                     <th>Son Senkron</th>
                                     <th class="text-end">İşlemler</th>
@@ -397,6 +388,7 @@ include __DIR__ . '/../templates/header.php';
                                         </td>
                                         <td><code><?= Helpers::sanitize(isset($providerItem['code']) ? $providerItem['code'] : '') ?></code></td>
                                         <td>
+
                                             <?php if (isset($providerItem['status']) && $providerItem['status'] === 'active'): ?>
                                                 <span class="badge bg-success">Aktif</span>
                                             <?php else: ?>
@@ -584,6 +576,7 @@ $GLOBALS['pageInlineScripts'][] = <<<JS
                 });
             });
         }
+
 
     });
 JS;
