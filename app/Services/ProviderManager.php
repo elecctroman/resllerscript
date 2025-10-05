@@ -8,7 +8,7 @@ use PDO;
 
 final class ProviderManager
 {
-    private const ALLOWED_DRIVERS = array('generic', 'netgsm', 'turkpin', 'pinabi');
+
 
     /**
      * @return array<int,array<string,mixed>>
@@ -107,7 +107,7 @@ final class ProviderManager
             );
         }
 
-        $items = self::extractProductItems($apiResult);
+
 
         $syncTimestamp = date('Y-m-d H:i:s');
         $syncedCount = 0;
@@ -125,76 +125,27 @@ final class ProviderManager
                     $externalId = (string) $item['id'];
                 } elseif (isset($item['product_id'])) {
                     $externalId = (string) $item['product_id'];
-                } elseif (isset($item['productId'])) {
-                    $externalId = (string) $item['productId'];
-                } elseif (isset($item['product_code'])) {
-                    $externalId = (string) $item['product_code'];
-                } elseif (isset($item['productCode'])) {
-                    $externalId = (string) $item['productCode'];
-                } elseif (isset($item['code'])) {
-                    $externalId = (string) $item['code'];
-                } elseif (isset($item['sku'])) {
-                    $externalId = (string) $item['sku'];
+
                 }
 
                 if ($externalId === '') {
                     continue;
                 }
 
-                $name = isset($item['name']) ? (string) $item['name'] : (string) ($item['title'] ?? ($item['product_name'] ?? ($item['label'] ?? $externalId)));
-                $description = null;
-                if (isset($item['description']) && $item['description'] !== '') {
-                    $description = (string) $item['description'];
-                } elseif (isset($item['details']) && $item['details'] !== '') {
-                    $description = (string) $item['details'];
-                } elseif (isset($item['content']) && $item['content'] !== '') {
-                    $description = (string) $item['content'];
-                } elseif (isset($item['explanation']) && $item['explanation'] !== '') {
-                    $description = (string) $item['explanation'];
-                }
+
                 $price = null;
                 if (isset($item['price'])) {
                     $price = (float) $item['price'];
                 } elseif (isset($item['amount'])) {
                     $price = (float) $item['amount'];
-                } elseif (isset($item['sale_price'])) {
-                    $price = (float) $item['sale_price'];
-                } elseif (isset($item['unit_price'])) {
-                    $price = (float) $item['unit_price'];
-                }
-                $currency = isset($item['currency']) ? (string) $item['currency'] : null;
-                if ($currency === null && isset($item['currency_code'])) {
-                    $currency = (string) $item['currency_code'];
-                }
-                if ($currency === null && isset($item['currencySymbol'])) {
-                    $currency = (string) $item['currencySymbol'];
-                }
-                $stock = null;
-                if (isset($item['stock'])) {
-                    $stock = (int) $item['stock'];
-                } elseif (isset($item['stock_quantity'])) {
-                    $stock = (int) $item['stock_quantity'];
-                } elseif (isset($item['available_quantity'])) {
-                    $stock = (int) $item['available_quantity'];
-                } elseif (isset($item['quantity'])) {
-                    $stock = (int) $item['quantity'];
-                } elseif (isset($item['balance'])) {
-                    $stock = (int) $item['balance'];
+
                 }
                 $available = null;
                 if (isset($item['is_available'])) {
                     $available = (int) $item['is_available'] === 1;
                 } elseif (isset($item['available'])) {
                     $available = (bool) $item['available'];
-                } elseif (isset($item['is_active'])) {
-                    $available = (bool) $item['is_active'];
-                } elseif (isset($item['status'])) {
-                    $statusValue = strtolower((string) $item['status']);
-                    if (in_array($statusValue, array('active', '1', 'available', 'true', 'open'), true)) {
-                        $available = true;
-                    } elseif (in_array($statusValue, array('0', 'inactive', 'pasif', 'closed', 'false'), true)) {
-                        $available = false;
-                    }
+
                 }
 
                 $payload = json_encode($item, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -410,109 +361,7 @@ final class ProviderManager
     }
 
     /**
-     * Sağlayıcı kimlik doğrulamasını test eder ve sonucu kaydeder.
-     *
-     * @param array<string,mixed> $provider
-     * @return array<string,mixed>
-     */
-    public static function testConnection(array $provider): array
-    {
-        $provider = self::hydrate($provider);
-        if (empty($provider['id'])) {
-            return array('success' => false, 'error' => 'Sağlayıcı bulunamadı.');
-        }
 
-        $result = ProviderApiClient::testConnection($provider);
-
-        $settings = isset($provider['settings']) && is_array($provider['settings']) ? $provider['settings'] : array();
-        $settings['connection_test'] = array(
-            'checked_at' => date('c'),
-            'status' => !empty($result['success']) ? 'success' : 'error',
-            'message' => isset($result['message']) && is_string($result['message']) ? $result['message'] : (isset($result['error']) ? (string) $result['error'] : ''),
-        );
-
-        $pdo = Database::connection();
-        $pdo->prepare('UPDATE providers SET settings = :settings, updated_at = NOW() WHERE id = :id')->execute(array(
-            'id' => (int) $provider['id'],
-            'settings' => json_encode($settings, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-        ));
-
-        return $result;
-    }
-
-    /**
-     * @param array<string,mixed> $apiResult
-     * @return array<int,array<string,mixed>>
-     */
-    private static function extractProductItems(array $apiResult): array
-    {
-        $candidates = array();
-
-        if (isset($apiResult['data'])) {
-            $candidates[] = $apiResult['data'];
-        }
-
-        if (isset($apiResult['body']) && is_array($apiResult['body'])) {
-            $candidates[] = $apiResult['body'];
-        }
-
-        foreach ($candidates as $candidate) {
-            $items = self::normaliseProductList($candidate);
-            if ($items) {
-                return $items;
-            }
-        }
-
-        return array();
-    }
-
-    /**
-     * @param mixed $payload
-     * @return array<int,array<string,mixed>>
-     */
-    private static function normaliseProductList($payload): array
-    {
-        if (!is_array($payload)) {
-            return array();
-        }
-
-        if (self::isListArray($payload)) {
-            return $payload;
-        }
-
-        $keys = array('data', 'items', 'products', 'result', 'results', 'list', 'catalog');
-
-        foreach ($keys as $key) {
-            if (isset($payload[$key]) && is_array($payload[$key])) {
-                $subset = $payload[$key];
-                if (self::isListArray($subset)) {
-                    return $subset;
-                }
-
-                return array($subset);
-            }
-        }
-
-        if (!empty($payload)) {
-            return array($payload);
-        }
-
-        return array();
-    }
-
-    /**
-     * @param array<int|string,mixed> $value
-     */
-    private static function isListArray(array $value): bool
-    {
-        if ($value === array()) {
-            return true;
-        }
-
-        return array_keys($value) === range(0, count($value) - 1);
-    }
-
-    /**
      * @param array<string,mixed> $provider
      * @return array<string,mixed>
      */
@@ -537,25 +386,5 @@ final class ProviderManager
             $provider['code'] = '';
         }
 
-        $provider['driver'] = self::normaliseDriver($provider['driver'] ?? ($provider['settings']['driver'] ?? null), (string) $provider['code']);
 
-        return $provider;
-    }
-
-    private static function normaliseDriver($driver, string $code): string
-    {
-        $driver = is_string($driver) ? strtolower(trim($driver)) : '';
-        if ($driver === '' && $code !== '') {
-            $code = strtolower(trim($code));
-            if (in_array($code, array('netgsm', 'turkpin', 'pinabi'), true)) {
-                $driver = $code;
-            }
-        }
-
-        if (!in_array($driver, self::ALLOWED_DRIVERS, true)) {
-            $driver = 'generic';
-        }
-
-        return $driver;
-    }
 }

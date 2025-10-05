@@ -77,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errors[] = 'Sağlayıcı ürün kimliği zorunludur.';
             }
 
-            if ($selectedProvider) {
+
                 $automaticDelivery = 1;
             } elseif ($automaticDelivery === 0) {
                 $automaticDelivery = 1; // stok girişi yapılmadığında otomatik teslimat aktif kalır
@@ -155,7 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             if (!$errors) {
-                if ($selectedProvider) {
+
                     $automaticDelivery = 1;
                 } elseif ($automaticDelivery === 0) {
                     $availableStock = 0;
@@ -345,13 +345,7 @@ include __DIR__ . '/../templates/header.php';
                             <label class="form-label">Sağlayıcı</label>
                             <select name="provider_code" class="form-select" data-provider-select="#createProviderProduct">
                                 <option value="">Panel (Stok Teslimatı)</option>
-                                <?php foreach ($providerChoices as $code => $providerData): ?>
-                                    <?php
-                                    $isActiveProvider = isset($providerData['status']) ? $providerData['status'] === 'active' : false;
-                                    $disableAttr = $isActiveProvider ? '' : 'disabled';
-                                    ?>
-                                    <option value="<?= Helpers::sanitize($code) ?>" <?= $disableAttr ?>><?= Helpers::sanitize(isset($providerData['name']) ? $providerData['name'] : strtoupper($code)) ?><?= $isActiveProvider ? '' : ' (Pasif)' ?></option>
-                                <?php endforeach; ?>
+
                             </select>
                             <small class="text-muted">Harici sağlayıcı seçtiğinizde siparişler otomatik olarak sağlayıcıya yönlendirilir.</small>
                         </div>
@@ -514,21 +508,7 @@ include __DIR__ . '/../templates/header.php';
                                                             <label class="form-label">Sağlayıcı</label>
                                                             <select name="provider_code" class="form-select" data-provider-select="#providerProduct<?= (int)$product['id'] ?>">
                                                                 <option value="">Panel (Stok Teslimatı)</option>
-                                                                <?php foreach ($providerChoices as $code => $providerData): ?>
-                                                                    <?php
-                                                                    $isActiveProvider = isset($providerData['status']) ? $providerData['status'] === 'active' : false;
-                                                                    $isSelectedProvider = $selectedProviderCode === $code;
-                                                                    $disableAttr = (!$isActiveProvider && !$isSelectedProvider) ? 'disabled' : '';
-                                                                    ?>
-                                                                    <option value="<?= Helpers::sanitize($code) ?>" <?= $isSelectedProvider ? 'selected' : '' ?> <?= $disableAttr ?>><?= Helpers::sanitize(isset($providerData['name']) ? $providerData['name'] : strtoupper($code)) ?><?= $isActiveProvider ? '' : ' (Pasif)' ?></option>
-                                                                <?php endforeach; ?>
-                                                                <?php if ($selectedProviderCode && !isset($providerChoices[$selectedProviderCode])): ?>
-                                                                    <option value="<?= Helpers::sanitize($selectedProviderCode) ?>" selected><?= Helpers::sanitize(strtoupper($selectedProviderCode)) ?> (Tanımsız)</option>
-                                                                <?php endif; ?>
-                                                            </select>
-                                                        </div>
-                                                        <?php
-                                                        $providerActive = $selectedProviderCode !== '';
+
                                                         ?>
                                                         <div class="col-md-4<?= $providerActive ? '' : ' d-none' ?>" id="providerProduct<?= (int)$product['id'] ?>">
                                                             <label class="form-label">Sağlayıcı Ürün ID</label>
