@@ -91,11 +91,13 @@ if ($user) {
                 'items' => array(
                     array('label' => 'Blog Yazıları', 'href' => '/admin/blog-posts.php', 'pattern' => '/admin/blog-posts.php', 'icon' => 'bi-journal-text', 'roles' => array('super_admin', 'admin', 'content')),
                     array('label' => 'Blog Kategorileri', 'href' => '/admin/blog-categories.php', 'pattern' => '/admin/blog-categories.php', 'icon' => 'bi-tags', 'roles' => array('super_admin', 'admin', 'content')),
+                    array('label' => 'Talimatlar', 'href' => '/admin/instructions.php', 'pattern' => '/admin/instructions.php', 'icon' => 'bi-card-checklist', 'roles' => array('super_admin', 'admin', 'content')),
                 ),
             ),
             array(
                 'heading' => 'Entegrasyon & API',
                 'items' => array(
+                    array('label' => 'Sağlayıcılar', 'href' => '/admin/providers.php', 'pattern' => '/admin/providers.php', 'icon' => 'bi-hdd-network', 'roles' => array('super_admin', 'admin')),
                     array('label' => 'API Anahtarları', 'href' => '/admin/api-keys.php', 'pattern' => '/admin/api-keys.php', 'icon' => 'bi-key', 'roles' => array('super_admin', 'admin')),
                     array('label' => 'API Güvenliği', 'href' => '/admin/settings-general.php#api-security', 'pattern' => '/admin/settings-general.php', 'icon' => 'bi-shield-lock', 'roles' => array('super_admin', 'admin')),
                     array('label' => 'Telegram Entegrasyonu', 'href' => '/admin/settings-telegram.php', 'pattern' => '/admin/settings-telegram.php', 'icon' => 'bi-telegram', 'roles' => array('super_admin', 'admin')),
@@ -166,6 +168,8 @@ if ($user) {
         if (Helpers::featureEnabled('support')) {
             $resellerItems[] = array('label' => 'Destek', 'href' => '/support.php', 'pattern' => '/support.php', 'icon' => 'bi-life-preserver');
         }
+
+        $resellerItems[] = array('label' => 'Talimatlar', 'href' => '/instructions.php', 'pattern' => '/instructions.php', 'icon' => 'bi-journal-check');
 
         if (Helpers::featureEnabled('premium_modules')) {
             $resellerItems[] = array('label' => 'Premium Modüller', 'href' => '/premium-modules.php', 'pattern' => '/premium-modules.php', 'icon' => 'bi-gem');
