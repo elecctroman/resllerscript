@@ -32,61 +32,7 @@ final class ProviderApiClient
     }
 
     /**
-     * Sağlayıcı bağlantısını kontrol eder.
-     *
-     * @param array<string,mixed> $provider
-     * @return array<string,mixed>
-     */
-    public static function testConnection(array $provider): array
-    {
-        $endpoint = self::setting($provider, 'status_endpoint', '/api/user');
 
-        try {
-            $client = self::client($provider);
-            $response = $client->get($endpoint, array(
-                'headers' => self::headers($provider),
-                'query' => array('apikey' => self::apiKey($provider)),
-            ));
-        } catch (GuzzleException $exception) {
-            return array(
-                'success' => false,
-                'error' => $exception->getMessage(),
-            );
-        }
-
-        $decoded = self::decodeResponse($response->getStatusCode(), (string) $response->getBody());
-
-        if (empty($decoded['success'])) {
-            $error = 'Sağlayıcı kimlik doğrulaması başarısız.';
-            if (isset($decoded['body']['message']) && is_string($decoded['body']['message']) && $decoded['body']['message'] !== '') {
-                $error = $decoded['body']['message'];
-            } elseif (isset($decoded['body']['error']) && is_string($decoded['body']['error']) && $decoded['body']['error'] !== '') {
-                $error = $decoded['body']['error'];
-            }
-
-            return array(
-                'success' => false,
-                'error' => $error,
-                'status_code' => $decoded['status_code'] ?? null,
-                'body' => $decoded['body'] ?? null,
-            );
-        }
-
-        $message = 'Bağlantı başarılı.';
-        if (isset($decoded['body']['message']) && is_string($decoded['body']['message']) && $decoded['body']['message'] !== '') {
-            $message = $decoded['body']['message'];
-        }
-
-        return array(
-            'success' => true,
-            'message' => $message,
-            'status_code' => $decoded['status_code'] ?? null,
-            'body' => $decoded['body'] ?? null,
-            'data' => $decoded['data'] ?? array(),
-        );
-    }
-
-    /**
      * @param array<string,mixed> $provider
      * @param array<string,mixed> $payload
      * @return array<string,mixed>

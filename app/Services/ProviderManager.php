@@ -367,37 +367,7 @@ final class ProviderManager
     }
 
     /**
-     * Sağlayıcı kimlik doğrulamasını test eder ve sonucu kaydeder.
-     *
-     * @param array<string,mixed> $provider
-     * @return array<string,mixed>
-     */
-    public static function testConnection(array $provider): array
-    {
-        $provider = self::hydrate($provider);
-        if (empty($provider['id'])) {
-            return array('success' => false, 'error' => 'Sağlayıcı bulunamadı.');
-        }
 
-        $result = ProviderApiClient::testConnection($provider);
-
-        $settings = isset($provider['settings']) && is_array($provider['settings']) ? $provider['settings'] : array();
-        $settings['connection_test'] = array(
-            'checked_at' => date('c'),
-            'status' => !empty($result['success']) ? 'success' : 'error',
-            'message' => isset($result['message']) && is_string($result['message']) ? $result['message'] : (isset($result['error']) ? (string) $result['error'] : ''),
-        );
-
-        $pdo = Database::connection();
-        $pdo->prepare('UPDATE providers SET settings = :settings, updated_at = NOW() WHERE id = :id')->execute(array(
-            'id' => (int) $provider['id'],
-            'settings' => json_encode($settings, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-        ));
-
-        return $result;
-    }
-
-    /**
      * @param array<string,mixed> $provider
      * @return array<string,mixed>
      */
