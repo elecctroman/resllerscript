@@ -91,6 +91,7 @@ if ($user) {
                 'items' => array(
                     array('label' => 'Blog Yazıları', 'href' => '/admin/blog-posts.php', 'pattern' => '/admin/blog-posts.php', 'icon' => 'bi-journal-text', 'roles' => array('super_admin', 'admin', 'content')),
                     array('label' => 'Blog Kategorileri', 'href' => '/admin/blog-categories.php', 'pattern' => '/admin/blog-categories.php', 'icon' => 'bi-tags', 'roles' => array('super_admin', 'admin', 'content')),
+                    array('label' => 'Talimatlar', 'href' => '/admin/instructions.php', 'pattern' => '/admin/instructions.php', 'icon' => 'bi-card-checklist', 'roles' => array('super_admin', 'admin', 'content')),
                 ),
             ),
             array(
@@ -166,6 +167,8 @@ if ($user) {
         if (Helpers::featureEnabled('support')) {
             $resellerItems[] = array('label' => 'Destek', 'href' => '/support.php', 'pattern' => '/support.php', 'icon' => 'bi-life-preserver');
         }
+
+        $resellerItems[] = array('label' => 'Talimatlar', 'href' => '/instructions.php', 'pattern' => '/instructions.php', 'icon' => 'bi-journal-check');
 
         if (Helpers::featureEnabled('premium_modules')) {
             $resellerItems[] = array('label' => 'Premium Modüller', 'href' => '/premium-modules.php', 'pattern' => '/premium-modules.php', 'icon' => 'bi-gem');
