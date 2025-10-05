@@ -62,7 +62,8 @@ final class ProductOrderService
             }
 
             $providerCode = isset($product['provider_code']) ? strtolower((string)$product['provider_code']) : '';
-            $useLocalStock = ($providerCode === '' || $providerCode === 'stock' || $providerCode === 'panel');
+            $automaticDelivery = isset($product['automatic_delivery']) ? (int)$product['automatic_delivery'] === 1 : false;
+            $useLocalStock = ($providerCode === '' || $providerCode === 'stock' || $providerCode === 'panel') && !$automaticDelivery;
 
             if ($useLocalStock) {
                 $stockCheck = $pdo->prepare('SELECT COUNT(*) FROM product_stock_items WHERE product_id = :product_id AND status = "available" FOR UPDATE');
@@ -110,13 +111,17 @@ final class ProductOrderService
             ));
 
             $dispatchResult = ProviderDispatchService::dispatchProductOrder($orderId);
-            $message = 'Sipariş talebiniz alındı ve bakiyenizden düşüldü. ';
+            $message = $automaticDelivery
+                ? 'Siparişiniz otomatik teslimat için kuyruğa alındı. '
+                : 'Sipariş talebiniz alındı ve bakiyenizden düşüldü. ';
             if (is_array($dispatchResult)) {
                 if (!empty($dispatchResult['message'])) {
                     $message .= (string)$dispatchResult['message'];
                 }
                 if (!empty($dispatchResult['success']) && !empty($dispatchResult['status']) && $dispatchResult['status'] === 'completed') {
                     $message .= ' Teslimat tamamlandı, detayları siparişlerim bölümünde görüntüleyebilirsiniz.';
+                } elseif ($automaticDelivery) {
+                    $message .= ' Sipariş durumunu kısa süre içinde siparişlerim ekranından takip edebilirsiniz.';
                 }
             }
 
