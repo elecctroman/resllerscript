@@ -132,11 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 Helpers::includeTemplate('auth-header.php');
 ?>
-<div class="auth-wrapper">
-    <div class="auth-card shadow-sm">
-        <div class="text-center mb-4">
-            <div class="brand"><?= Helpers::sanitize($siteName) ?></div>
-            <p class="text-muted mt-2"><?= Helpers::sanitize($siteTagline !== '' ? $siteTagline : 'Bayi giriş paneli') ?></p>
+
         </div>
 
         <?php if ($flashSuccess): ?>
@@ -170,8 +166,7 @@ Helpers::includeTemplate('auth-header.php');
             <button type="submit" class="btn btn-primary w-100">Giriş Yap</button>
         </form>
 
-        <div class="mt-3 text-center">
-            <a href="/password-reset.php" class="small">Şifremi unuttum</a>
+
         </div>
     </div>
 </div>
