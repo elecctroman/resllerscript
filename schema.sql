@@ -27,6 +27,46 @@ CREATE TABLE IF NOT EXISTS api_tokens (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS languages (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(10) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    native_name VARCHAR(100) NOT NULL,
+    is_default TINYINT(1) NOT NULL DEFAULT 0,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_languages_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS language_translations (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    language_code VARCHAR(10) NOT NULL,
+    translation_key VARCHAR(255) NOT NULL,
+    translation_value TEXT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_language_key (language_code, translation_key),
+    KEY idx_language_code (language_code),
+    CONSTRAINT fk_language_code FOREIGN KEY (language_code) REFERENCES languages(code) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS currencies (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(3) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    symbol VARCHAR(10) NOT NULL,
+    rate DECIMAL(18,8) NOT NULL DEFAULT 1.00000000,
+    decimals TINYINT(1) NOT NULL DEFAULT 2,
+    is_default TINYINT(1) NOT NULL DEFAULT 0,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    auto_update TINYINT(1) NOT NULL DEFAULT 0,
+    last_rate_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_currencies_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS packages (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(150) NOT NULL,
@@ -80,11 +120,57 @@ CREATE TABLE IF NOT EXISTS products (
     cost_price_try DECIMAL(12,2) NULL,
     price DECIMAL(12,2) NOT NULL DEFAULT 0,
     status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    automatic_delivery TINYINT(1) NOT NULL DEFAULT 1,
     provider_code VARCHAR(100) NULL,
     provider_product_id VARCHAR(100) NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (category_id) REFERENCES categories(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS providers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(191) NOT NULL,
+    code VARCHAR(100) NOT NULL,
+    driver VARCHAR(50) NOT NULL DEFAULT 'generic',
+    base_url VARCHAR(255) NOT NULL,
+    api_key VARCHAR(191) NOT NULL,
+    status ENUM('active','inactive') NOT NULL DEFAULT 'inactive',
+    settings TEXT NULL,
+    last_synced_at DATETIME NULL,
+    last_sync_status VARCHAR(50) NULL,
+    last_sync_error TEXT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_provider_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS provider_products (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    provider_id INT NOT NULL,
+    external_id VARCHAR(191) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description MEDIUMTEXT NULL,
+    price DECIMAL(16,4) NULL,
+    currency VARCHAR(10) NULL,
+    stock INT NULL,
+    is_available TINYINT(1) NOT NULL DEFAULT 0,
+    payload MEDIUMTEXT NULL,
+    last_synced_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_provider_product (provider_id, external_id),
+    FOREIGN KEY (provider_id) REFERENCES providers(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS instructions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(191) NOT NULL,
+    summary VARCHAR(255) NULL,
+    content MEDIUMTEXT NOT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS product_orders (

@@ -90,7 +90,7 @@ $csrf = Helpers::csrfToken();
                                         <strong><?= Helpers::sanitize($module['name']) ?></strong>
                                         <div class="small text-muted"><?= nl2br(Helpers::sanitize($module['description'])) ?></div>
                                     </td>
-                                    <td><?= Helpers::formatCurrency((float) $module['price']) ?></td>
+                                    <td><?= Helpers::formatCurrencyHtml((float) $module['price']) ?></td>
                                     <td>
                                         <?php if ((int)$module['status'] === 1): ?>
                                             <span class="badge bg-success">Aktif</span>

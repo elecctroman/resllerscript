@@ -155,7 +155,7 @@ include __DIR__ . '/../templates/header.php';
                             <small class="text-muted"><?= Helpers::sanitize($order['email']) ?></small>
                         </td>
                         <td><?= Helpers::sanitize($order['package_name']) ?></td>
-                        <td><?= Helpers::sanitize(Helpers::formatCurrency((float)$order['total_amount'])) ?></td>
+                        <td><?= Helpers::formatCurrencyHtml((float)$order['total_amount']) ?></td>
                         <td><span class="badge-status <?= Helpers::sanitize($order['status']) ?>"><?= strtoupper(Helpers::sanitize($order['status'])) ?></span></td>
                         <td><?= date('d.m.Y H:i', strtotime($order['created_at'])) ?></td>
                         <td class="text-end">
