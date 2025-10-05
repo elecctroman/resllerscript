@@ -88,6 +88,7 @@ CREATE TABLE IF NOT EXISTS products (
     FOREIGN KEY (category_id) REFERENCES categories(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+
 CREATE TABLE IF NOT EXISTS instructions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(191) NOT NULL,

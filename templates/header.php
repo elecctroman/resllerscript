@@ -97,6 +97,7 @@ if ($user) {
             array(
                 'heading' => 'Entegrasyon & API',
                 'items' => array(
+                    array('label' => 'Sağlayıcılar', 'href' => '/admin/providers.php', 'pattern' => '/admin/providers.php', 'icon' => 'bi-hdd-network', 'roles' => array('super_admin', 'admin')),
                     array('label' => 'API Anahtarları', 'href' => '/admin/api-keys.php', 'pattern' => '/admin/api-keys.php', 'icon' => 'bi-key', 'roles' => array('super_admin', 'admin')),
                     array('label' => 'API Güvenliği', 'href' => '/admin/settings-general.php#api-security', 'pattern' => '/admin/settings-general.php', 'icon' => 'bi-shield-lock', 'roles' => array('super_admin', 'admin')),
                     array('label' => 'Telegram Entegrasyonu', 'href' => '/admin/settings-telegram.php', 'pattern' => '/admin/settings-telegram.php', 'icon' => 'bi-telegram', 'roles' => array('super_admin', 'admin')),

@@ -166,7 +166,6 @@ Helpers::includeTemplate('auth-header.php');
             <button type="submit" class="btn btn-primary w-100">Giriş Yap</button>
         </form>
 
-
         </div>
     </div>
 </div>

@@ -8,6 +8,7 @@ use App\Database;
 use App\Helpers;
 use App\Services\ProductStockService;
 use App\Settings;
+use App\Services\ProviderManager;
 
 Auth::requireRoles(array('super_admin', 'admin', 'content'));
 
@@ -15,6 +16,16 @@ $currentUser = $_SESSION['user'];
 $pdo = Database::connection();
 $errors = array();
 $success = '';
+$providerRecords = ProviderManager::all();
+$providerChoices = array();
+foreach ($providerRecords as $providerRecord) {
+    $code = isset($providerRecord['code']) ? strtolower((string) $providerRecord['code']) : '';
+    if ($code === '') {
+        continue;
+    }
+
+    $providerChoices[$code] = $providerRecord;
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = isset($_POST['action']) ? $_POST['action'] : '';
@@ -50,15 +61,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errors[] = 'Alış fiyatı 0’dan büyük olmalıdır.';
             }
 
-            if ($providerCode !== '' && $providerCode !== 'lotus') {
-                $errors[] = 'Desteklenmeyen sağlayıcı seçildi.';
+            $selectedProvider = null;
+            if ($providerCode !== '') {
+                if (!isset($providerChoices[$providerCode])) {
+                    $errors[] = 'Desteklenmeyen sağlayıcı seçildi.';
+                } else {
+                    $selectedProvider = $providerChoices[$providerCode];
+                    if (isset($selectedProvider['status']) && $selectedProvider['status'] !== 'active') {
+                        $errors[] = 'Seçilen sağlayıcı pasif durumda.';
+                    }
+                }
             }
 
-            if ($providerCode !== '' && $providerProductId === '') {
+            if ($selectedProvider && $providerProductId === '') {
                 $errors[] = 'Sağlayıcı ürün kimliği zorunludur.';
             }
 
-            if ($providerCode !== '') {
+
                 $automaticDelivery = 1;
             } elseif ($automaticDelivery === 0) {
                 $automaticDelivery = 1; // stok girişi yapılmadığında otomatik teslimat aktif kalır
@@ -119,16 +138,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errors[] = 'Alış fiyatı 0’dan büyük olmalıdır.';
             }
 
-            if ($providerCode !== '' && $providerCode !== 'lotus') {
-                $errors[] = 'Desteklenmeyen sağlayıcı seçildi.';
+            $selectedProvider = null;
+            if ($providerCode !== '') {
+                if (!isset($providerChoices[$providerCode])) {
+                    $errors[] = 'Desteklenmeyen sağlayıcı seçildi.';
+                } else {
+                    $selectedProvider = $providerChoices[$providerCode];
+                    if (isset($selectedProvider['status']) && $selectedProvider['status'] !== 'active') {
+                        $errors[] = 'Seçilen sağlayıcı pasif durumda.';
+                    }
+                }
             }
 
-            if ($providerCode !== '' && $providerProductId === '') {
+            if ($selectedProvider && $providerProductId === '') {
                 $errors[] = 'Sağlayıcı ürün kimliği zorunludur.';
             }
 
             if (!$errors) {
-                if ($providerCode !== '') {
+
                     $automaticDelivery = 1;
                 } elseif ($automaticDelivery === 0) {
                     $availableStock = 0;
@@ -318,7 +345,7 @@ include __DIR__ . '/../templates/header.php';
                             <label class="form-label">Sağlayıcı</label>
                             <select name="provider_code" class="form-select" data-provider-select="#createProviderProduct">
                                 <option value="">Panel (Stok Teslimatı)</option>
-                                <option value="lotus">Lotus Connect</option>
+
                             </select>
                             <small class="text-muted">Harici sağlayıcı seçtiğinizde siparişler otomatik olarak sağlayıcıya yönlendirilir.</small>
                         </div>
@@ -384,8 +411,11 @@ include __DIR__ . '/../templates/header.php';
                                     <td>
                                         <strong><?= Helpers::sanitize($product['name']) ?></strong><br>
                                         <small class="text-muted">SKU: <?= Helpers::sanitize(isset($product['sku']) ? $product['sku'] : '-') ?></small>
-                                        <?php if (!empty($product['provider_code'])): ?>
-                                            <div class="text-muted small">Sağlayıcı: <?= Helpers::sanitize(strtoupper($product['provider_code'])) ?><?php if (!empty($product['provider_product_id'])): ?> #<?= Helpers::sanitize($product['provider_product_id']) ?><?php endif; ?></div>
+                                        <?php if (!empty($product['provider_code'])):
+                                            $code = strtolower((string)$product['provider_code']);
+                                            $providerLabel = isset($providerChoices[$code]['name']) ? $providerChoices[$code]['name'] : strtoupper($code);
+                                        ?>
+                                            <div class="text-muted small">Sağlayıcı: <?= Helpers::sanitize($providerLabel) ?><?php if (!empty($product['provider_product_id'])): ?> #<?= Helpers::sanitize($product['provider_product_id']) ?><?php endif; ?></div>
                                         <?php endif; ?>
                                     </td>
                                     <td><?= Helpers::sanitize($categoryPath((int)$product['category_id'])) ?></td>
@@ -471,15 +501,14 @@ include __DIR__ . '/../templates/header.php';
                                                             <label class="form-label">SKU</label>
                                                             <input type="text" name="sku" class="form-control" value="<?= Helpers::sanitize(isset($product['sku']) ? $product['sku'] : '') ?>">
                                                         </div>
+                                                        <?php
+                                                        $selectedProviderCode = isset($product['provider_code']) ? strtolower((string)$product['provider_code']) : '';
+                                                        ?>
                                                         <div class="col-md-4">
                                                             <label class="form-label">Sağlayıcı</label>
                                                             <select name="provider_code" class="form-select" data-provider-select="#providerProduct<?= (int)$product['id'] ?>">
                                                                 <option value="">Panel (Stok Teslimatı)</option>
-                                                                <option value="lotus" <?= isset($product['provider_code']) && $product['provider_code'] === 'lotus' ? 'selected' : '' ?>>Lotus Connect</option>
-                                                            </select>
-                                                        </div>
-                                                        <?php
-                                                        $providerActive = isset($product['provider_code']) && $product['provider_code'];
+
                                                         ?>
                                                         <div class="col-md-4<?= $providerActive ? '' : ' d-none' ?>" id="providerProduct<?= (int)$product['id'] ?>">
                                                             <label class="form-label">Sağlayıcı Ürün ID</label>
