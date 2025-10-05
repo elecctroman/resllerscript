@@ -16,6 +16,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $items = isset($payload['items']) && is_array($payload['items']) ? $payload['items'] : array();
     $customer = isset($payload['customer']) && is_array($payload['customer']) ? $payload['customer'] : array();
     $currency = isset($payload['currency']) ? $payload['currency'] : 'USD';
+    $webhookOverride = isset($payload['webhook_override']) ? trim((string)$payload['webhook_override']) : '';
+    if ($webhookOverride !== '' && !filter_var($webhookOverride, FILTER_VALIDATE_URL)) {
+        json_response(array('success' => false, 'error' => "Geçerli bir webhook_override URL'si belirtiniz."), 422);
+    }
 
     if ($orderReference === '') {
         json_response(array('success' => false, 'error' => 'order_id alanı zorunludur.'), 422);
@@ -125,6 +129,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ),
             );
 
+            if ($webhookOverride !== '') {
+                $metadata['webhook_override'] = $webhookOverride;
+            }
+
             $orderInsert->execute(array(
                 'product_id' => (int)$product['id'],
                 'user_id' => $token['user_id'],
@@ -195,9 +203,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $query .= ' ORDER BY po.created_at DESC';
 
+    $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+    if ($page < 1) {
+        $page = 1;
+    }
+
+    $perPage = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 50;
+    if ($perPage < 1) {
+        $perPage = 50;
+    }
+    if ($perPage > 200) {
+        $perPage = 200;
+    }
+
+    $offset = ($page - 1) * $perPage;
+    $query .= ' LIMIT :limit OFFSET :offset';
+
+    $countQuery = 'SELECT COUNT(*) FROM product_orders po WHERE po.user_id = :user_id';
+    $countParams = array('user_id' => $token['user_id']);
+
+    if ($externalReference !== '') {
+        $countQuery .= ' AND po.external_reference = :external_reference';
+        $countParams['external_reference'] = $externalReference;
+    }
+
+    if ($statusFilter !== '') {
+        $countQuery .= ' AND po.status = :status';
+        $countParams['status'] = $statusFilter;
+    }
+
+    if ($since !== '') {
+        $countQuery .= ' AND po.updated_at >= :since';
+        $countParams['since'] = $since;
+    }
+
     try {
         $stmt = $pdo->prepare($query);
-        $stmt->execute($params);
+        foreach ($params as $key => $value) {
+            $paramType = $key === 'user_id' ? \PDO::PARAM_INT : \PDO::PARAM_STR;
+            $stmt->bindValue(':' . $key, $value, $paramType);
+        }
+        $stmt->bindValue(':limit', $perPage, \PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
+        $stmt->execute();
         $orders = $stmt->fetchAll();
 
         $responseOrders = array();
@@ -219,10 +267,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
         }
 
+        $countStmt = $pdo->prepare($countQuery);
+        foreach ($countParams as $key => $value) {
+            $paramType = $key === 'user_id' ? \PDO::PARAM_INT : \PDO::PARAM_STR;
+            $countStmt->bindValue(':' . $key, $value, $paramType);
+        }
+        $countStmt->execute();
+        $total = (int)$countStmt->fetchColumn();
+
         json_response(array(
             'success' => true,
             'data' => array(
                 'orders' => $responseOrders,
+                'pagination' => array(
+                    'page' => $page,
+                    'per_page' => $perPage,
+                    'total' => $total,
+                ),
             ),
         ));
     } catch (\PDOException $exception) {

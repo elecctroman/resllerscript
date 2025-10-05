@@ -388,7 +388,7 @@ include __DIR__ . '/templates/header.php';
                         <h6>Entegrasyon İpuçları</h6>
                         <ul class="small mb-3">
                             <li>Yetkilendirme: <code>Authorization: Bearer <?= Helpers::sanitize($activeToken['token']) ?></code> veya <code>X-API-Key</code> başlığını kullanın.</li>
-                            <li>API Dökümanı: <a href="/api/v1/" target="_blank" rel="noopener">JSON uç noktalarını görüntüleyin</a> veya Postman koleksiyonunu indirin.</li>
+                            <li>API Dökümanı: <a href="/api-documentation.php" target="_blank" rel="noopener">Tüm REST uç noktaları ve örnekleri inceleyin</a>.</li>
                             <li>Sandbox: Gerçek bakiye harcamadan test etmek için <strong>"test"</strong> parametresini kullanabilirsiniz.</li>
                         </ul>
                         <pre class="bg-dark text-white p-3 rounded small mb-0"><code>curl -X POST "<?= Helpers::sanitize(Helpers::apiBaseUrl()) ?>/orders"
