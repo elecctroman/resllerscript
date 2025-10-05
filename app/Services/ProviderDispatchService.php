@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Database;
 use App\Notifications\ResellerNotifier;
 use App\Telegram;
+use App\Services\ProviderManager;
+use App\Services\ProviderApiClient;
 use PDO;
 
 // reuse local stock fulfilment service
@@ -24,7 +26,7 @@ class ProviderDispatchService
         }
 
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('SELECT po.*, p.name AS product_name, p.provider_code, p.provider_product_id, u.name AS user_name, u.email AS user_email, u.notify_order_completed, u.telegram_bot_token, u.telegram_chat_id FROM product_orders po INNER JOIN products p ON po.product_id = p.id INNER JOIN users u ON po.user_id = u.id WHERE po.id = :id LIMIT 1');
+        $stmt = $pdo->prepare('SELECT po.*, p.name AS product_name, p.provider_code, p.provider_product_id, p.automatic_delivery, u.name AS user_name, u.email AS user_email, u.notify_order_completed, u.telegram_bot_token, u.telegram_chat_id FROM product_orders po INNER JOIN products p ON po.product_id = p.id INNER JOIN users u ON po.user_id = u.id WHERE po.id = :id LIMIT 1');
         $stmt->execute(array('id' => $orderId));
         $order = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -35,6 +37,21 @@ class ProviderDispatchService
         $providerCode = isset($order['provider_code']) ? strtolower((string) $order['provider_code']) : '';
         $providerProductId = isset($order['provider_product_id']) ? trim((string) $order['provider_product_id']) : '';
 
+        $automaticDelivery = isset($order['automatic_delivery']) ? (int)$order['automatic_delivery'] === 1 : false;
+
+        if ($automaticDelivery && ($providerCode === '' || $providerCode === 'panel' || $providerCode === 'stock')) {
+            $complete = $pdo->prepare('UPDATE product_orders SET status = :status, admin_note = :note, updated_at = NOW() WHERE id = :id');
+            $complete->execute(array(
+                'status' => 'completed',
+                'note' => 'Sipariş otomatik teslim edildi.',
+                'id' => $orderId,
+            ));
+
+            self::notifyIfCompleted($orderId);
+
+            return array('success' => true, 'status' => 'completed', 'message' => 'Sipariş otomatik teslim edildi.');
+        }
+
         if ($providerCode === '' || $providerCode === 'panel' || $providerCode === 'stock') {
             return ProductStockService::deliverOrderFromStock($orderId);
         }
@@ -43,28 +60,97 @@ class ProviderDispatchService
             return array('success' => false, 'reason' => 'Sağlayıcı ürünü eşlenmemiş.');
         }
 
-        // Şu anda harici sağlayıcı bulunmuyor. İleride yeniden yapılandırılabilir.
-        $metadata = array();
-        if (!empty($order['external_metadata'])) {
-            $decoded = json_decode((string) $order['external_metadata'], true);
-            if (is_array($decoded)) {
-                $metadata = $decoded;
-            }
+        $provider = ProviderManager::findByCode($providerCode);
+        if (!$provider) {
+            $metadata = self::mergeMetadata($order, array(
+                'provider' => $providerCode,
+                'provider_error' => array('message' => 'Sağlayıcı yapılandırması bulunamadı.'),
+            ));
+
+            self::updateOrderMetadata($orderId, 'pending', $order['external_reference'] ?? null, $metadata, 'Sağlayıcı tanımlı değil.');
+
+            return array('success' => false, 'reason' => 'Sağlayıcı yapılandırması bulunamadı.');
         }
 
-        $metadata['provider'] = $providerCode;
-        $metadata['message'] = 'Harici sağlayıcı entegrasyonu devre dışı bırakıldı.';
+        if (($provider['status'] ?? '') !== 'active') {
+            $metadata = self::mergeMetadata($order, array(
+                'provider' => $providerCode,
+                'provider_error' => array('message' => 'Sağlayıcı pasif durumda.'),
+            ));
 
-        $update = $pdo->prepare('UPDATE product_orders SET status = :status, external_reference = :reference, external_metadata = :metadata, admin_note = :admin_note, updated_at = NOW() WHERE id = :id');
-        $update->execute(array(
-            'status' => 'pending',
-            'reference' => $order['external_reference'] ?? null,
-            'metadata' => json_encode($metadata, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-            'admin_note' => 'Sağlayıcı devre dışı.',
-            'id' => $orderId,
+            self::updateOrderMetadata($orderId, 'pending', $order['external_reference'] ?? null, $metadata, 'Sağlayıcı pasif.');
+
+            return array('success' => false, 'reason' => 'Sağlayıcı pasif durumda.');
+        }
+
+        $payload = array('product_id' => $providerProductId);
+        $note = isset($order['note']) ? trim((string) $order['note']) : '';
+        if ($note !== '') {
+            $payload['note'] = $note;
+        }
+
+        $apiResult = ProviderApiClient::createOrder($provider, $payload);
+
+        $metadata = self::mergeMetadata($order, array(
+            'provider' => $providerCode,
+            'provider_payload' => $payload,
         ));
 
-        return array('success' => false, 'reason' => 'Sağlayıcı devre dışı.');
+        if (!empty($apiResult['success'])) {
+            $metadata['provider_response'] = $apiResult;
+
+            $responseBody = isset($apiResult['body']) && is_array($apiResult['body']) ? $apiResult['body'] : array();
+            $responseData = isset($responseBody['data']) && is_array($responseBody['data']) ? $responseBody['data'] : array();
+            $remoteStatus = isset($responseData['status']) ? strtolower((string) $responseData['status']) : '';
+            $remoteReference = isset($responseData['order_id']) ? (string) $responseData['order_id'] : ($responseBody['order_id'] ?? null);
+            $remoteContent = isset($responseData['content']) ? (string) $responseData['content'] : null;
+
+            $localStatus = 'processing';
+            $message = 'Sipariş sağlayıcıya iletildi.';
+            $adminNote = null;
+
+            if ($remoteStatus === 'completed') {
+                $localStatus = 'completed';
+                $message = 'Sipariş sağlayıcı tarafından tamamlandı.';
+                $adminNote = $remoteContent;
+            } elseif ($remoteStatus === 'pending' || $remoteStatus === 'processing' || $remoteStatus === '') {
+                $localStatus = 'processing';
+                $message = 'Sipariş sağlayıcı kuyruğuna alındı.';
+                if ($remoteContent) {
+                    $adminNote = $remoteContent;
+                }
+            } elseif ($remoteStatus === 'cancelled') {
+                $localStatus = 'pending';
+                $message = 'Sağlayıcı siparişi iptal etti.';
+                $adminNote = $remoteContent ?: 'Sağlayıcı siparişi iptal etti.';
+            } elseif ($remoteStatus === 'failed') {
+                $localStatus = 'pending';
+                $message = isset($responseBody['message']) ? (string) $responseBody['message'] : 'Sağlayıcı siparişi reddetti.';
+                $adminNote = $remoteContent ?: $message;
+            }
+
+            self::updateOrderMetadata($orderId, $localStatus, $remoteReference, $metadata, $adminNote);
+
+            if ($localStatus === 'completed') {
+                self::notifyIfCompleted($orderId);
+            }
+
+            return array('success' => true, 'status' => $localStatus, 'message' => $message);
+        }
+
+        $errorMessage = isset($apiResult['error']) ? (string) $apiResult['error'] : 'Sağlayıcı siparişi oluşturulamadı.';
+        if (isset($apiResult['body']['message'])) {
+            $errorMessage = (string) $apiResult['body']['message'];
+        }
+
+        $metadata['provider_error'] = array(
+            'message' => $errorMessage,
+            'status_code' => isset($apiResult['status_code']) ? (int) $apiResult['status_code'] : null,
+        );
+
+        self::updateOrderMetadata($orderId, 'pending', $order['external_reference'] ?? null, $metadata, $errorMessage);
+
+        return array('success' => false, 'reason' => $errorMessage);
     }
 
     /**
@@ -83,6 +169,36 @@ class ProviderDispatchService
                 error_log('[ProviderDispatch] Sipariş #' . (int) $orderId . ' gönderilemedi: ' . $exception->getMessage());
             }
         }
+    }
+
+    private static function mergeMetadata(array $order, array $updates): array
+    {
+        $metadata = array();
+        if (!empty($order['external_metadata'])) {
+            $decoded = json_decode((string) $order['external_metadata'], true);
+            if (is_array($decoded)) {
+                $metadata = $decoded;
+            }
+        }
+
+        foreach ($updates as $key => $value) {
+            $metadata[$key] = $value;
+        }
+
+        return $metadata;
+    }
+
+    private static function updateOrderMetadata(int $orderId, string $status, ?string $reference, array $metadata, ?string $adminNote): void
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('UPDATE product_orders SET status = :status, external_reference = :reference, external_metadata = :metadata, admin_note = :admin_note, updated_at = NOW() WHERE id = :id');
+        $stmt->execute(array(
+            'status' => $status,
+            'reference' => $reference,
+            'metadata' => json_encode($metadata, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'admin_note' => $adminNote,
+            'id' => $orderId,
+        ));
     }
 
     private static function notifyIfCompleted(int $orderId): void

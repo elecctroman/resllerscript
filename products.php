@@ -428,12 +428,17 @@ include __DIR__ . '/templates/header.php';
                         $shortDescription = Helpers::truncate($rawDescription, 140);
                         $skuValue = (isset($product['sku']) && $product['sku'] !== '') ? $product['sku'] : null;
                         $providerCode = isset($product['provider_code']) ? strtolower((string)$product['provider_code']) : '';
-                        $isStockBased = ($providerCode === '' || $providerCode === 'stock' || $providerCode === 'panel');
+                        $automaticDelivery = isset($product['automatic_delivery']) ? (int)$product['automatic_delivery'] === 1 : false;
+                        $isStockBased = ($providerCode === '' || $providerCode === 'stock' || $providerCode === 'panel') && !$automaticDelivery;
                         $availableStock = isset($product['available_stock']) ? (int)$product['available_stock'] : 0;
                         $stockBadgeClass = 'bg-info text-dark';
                         $stockLabel = 'Sağlayıcı teslimatı';
                         $restockHint = '';
-                        if ($isStockBased) {
+                        if ($automaticDelivery && !$isStockBased) {
+                            $stockBadgeClass = 'bg-primary';
+                            $stockLabel = 'Otomatik teslimat';
+                            $restockHint = '';
+                        } elseif ($isStockBased) {
                             if ($availableStock > 0) {
                                 $stockBadgeClass = 'bg-success';
                                 $stockLabel = sprintf('Stokta %d adet', $availableStock);

@@ -380,9 +380,23 @@ class Helpers
      */
     public static function sanitize($value)
     {
+        if ($value === null) {
+            $value = '';
+        }
+
         if (is_string($value)) {
             Lang::boot();
             $value = Lang::line($value);
+        } elseif (is_bool($value) || is_numeric($value)) {
+            $value = (string) $value;
+        } elseif (is_object($value) && method_exists($value, '__toString')) {
+            $value = (string) $value;
+        } elseif (!is_string($value)) {
+            $value = '';
+        }
+
+        if (!is_string($value)) {
+            $value = (string) $value;
         }
 
         return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
