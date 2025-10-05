@@ -9,6 +9,7 @@ use PDO;
 final class ProviderManager
 {
 
+
     /**
      * @return array<int,array<string,mixed>>
      */

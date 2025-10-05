@@ -99,7 +99,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $productsEndpoint = isset($_POST['products_endpoint']) ? trim((string) $_POST['products_endpoint']) : '/api/products';
             $ordersEndpoint = isset($_POST['orders_endpoint']) ? trim((string) $_POST['orders_endpoint']) : '/api/orders';
 
-
             $code = strtolower(str_replace(' ', '-', $codeInput));
             $code = preg_replace('/[^a-z0-9_-]/', '', $code);
 
