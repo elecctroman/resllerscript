@@ -98,12 +98,47 @@ if (!App\FeatureToggle::isEnabled('api')) {
 
 function json_response($data, $statusCode = 200)
 {
-    global $__apiSecurityContext;
+    global $__apiSecurityContext, $__apiRequestId;
+
     if (isset($__apiSecurityContext)) {
         $__apiSecurityContext['status'] = $statusCode;
     }
+
+    if ($statusCode === 429 && !headers_sent()) {
+        if (empty($__apiSecurityContext['retry_after'])) {
+            header('Retry-After: 60');
+        }
+    }
+
+    $payload = $data;
+
+    if (is_array($payload)) {
+        if (!array_key_exists('success', $payload)) {
+            $payload['success'] = $statusCode >= 200 && $statusCode < 400;
+        }
+
+        $meta = array();
+        if (isset($payload['meta']) && is_array($payload['meta'])) {
+            $meta = $payload['meta'];
+        }
+
+        if (!isset($__apiRequestId) || $__apiRequestId === '') {
+            $__apiRequestId = bin2hex(random_bytes(16));
+        }
+
+        if (!isset($meta['request_id'])) {
+            $meta['request_id'] = $__apiRequestId;
+        }
+
+        if (!isset($meta['timestamp'])) {
+            $meta['timestamp'] = gmdate('c');
+        }
+
+        $payload['meta'] = $meta;
+    }
+
     http_response_code($statusCode);
-    echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
 
@@ -244,7 +279,14 @@ $__apiSecurityContext = array(
     'endpoint' => (string)(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/'),
     'method' => $_SERVER['REQUEST_METHOD'] ?? 'GET',
     'status' => 200,
+    'retry_after' => null,
 );
+
+try {
+    $__apiRequestId = bin2hex(random_bytes(16));
+} catch (\Throwable $requestIdException) {
+    $__apiRequestId = md5(uniqid('', true));
+}
 
 register_shutdown_function(function () use (&$__apiSecurityContext) {
     try {

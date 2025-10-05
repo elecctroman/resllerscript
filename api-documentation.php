@@ -20,11 +20,6 @@ Helpers::includeTemplate('public-header.php', array(
 ?>
 
 <pre class="api-doc-code"><code>{
-  "success": false,
-  "error": "API anahtarı doğrulanamadı."
-}</code></pre>
-
-<pre class="api-doc-code"><code>{
   "success": true,
   "data": {
     "reseller": {
@@ -40,9 +35,7 @@ Helpers::includeTemplate('public-header.php', array(
         "id": 24,
         "name": "Steam Cüzdan 100 TL",
         "sku": "STM-100",
-        "price": 89.90,
-        "category_id": 1,
-        "category_name": "Oyun"
+
       }
     ]
   }
@@ -60,8 +53,6 @@ Content-Type: application/json
   },
   "items": [
     {"sku": "STM-100", "quantity": 1, "note": "Hediye"}
-  ]
-}</code></pre>
 
 <pre class="api-doc-code"><code>{
   "success": true,
@@ -95,6 +86,4 @@ Content-Type: application/json
     "customer": {
       "name": "Ahmet Yılmaz"
     }
-  }
-}</code></pre>
 

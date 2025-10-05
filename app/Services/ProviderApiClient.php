@@ -8,6 +8,7 @@ use GuzzleHttp\Exception\GuzzleException;
 final class ProviderApiClient
 {
 
+
     /**
      * @param array<string,mixed> $provider
      * @return array<string,mixed>

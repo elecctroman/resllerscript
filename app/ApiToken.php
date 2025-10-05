@@ -210,9 +210,10 @@ class ApiToken
      *
      * @param int $tokenId
      * @param array $payload
+     * @param string|null $overrideUrl
      * @return array{success:bool,skipped?:bool,error?:string,status?:int}
      */
-    public static function notifyWebhook($tokenId, array $payload)
+    public static function notifyWebhook($tokenId, array $payload, $overrideUrl = null)
     {
         $pdo = Database::connection();
         $stmt = $pdo->prepare('SELECT webhook_url, token FROM api_tokens WHERE id = :id LIMIT 1');
@@ -224,6 +225,9 @@ class ApiToken
         }
 
         $webhookUrl = isset($tokenRow['webhook_url']) ? trim($tokenRow['webhook_url']) : '';
+        if ($overrideUrl !== null && trim($overrideUrl) !== '') {
+            $webhookUrl = trim($overrideUrl);
+        }
         if ($webhookUrl === '') {
             return array('success' => true, 'skipped' => true);
         }
