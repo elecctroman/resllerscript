@@ -1,0 +1,23 @@
+.reseller-api-wrap {
+    max-width: 960px;
+}
+
+.reseller-api-actions {
+    margin: 1.5rem 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+#reseller-api-console {
+    margin-top: 1.5rem;
+}
+
+#reseller-api-console .notice {
+    margin-bottom: 0.75rem;
+}
+
+.reseller-api-settings-form .form-table th {
+    width: 220px;
+}
+
