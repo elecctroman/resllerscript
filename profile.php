@@ -198,34 +198,34 @@ $pageTitle = 'Profilim';
 
 include __DIR__ . '/templates/header.php';
 ?>
+<?php if ($errors): ?>
+    <div class="alert alert-danger">
+        <ul class="mb-0">
+            <?php foreach ($errors as $error): ?>
+                <li><?= Helpers::sanitize($error) ?></li>
+            <?php endforeach; ?>
+        </ul>
+    </div>
+<?php endif; ?>
+
+<?php if ($successMessages): ?>
+    <div class="alert alert-success">
+        <ul class="mb-0">
+            <?php foreach ($successMessages as $message): ?>
+                <li><?= Helpers::sanitize($message) ?></li>
+            <?php endforeach; ?>
+        </ul>
+    </div>
+<?php endif; ?>
+
 <div class="row g-4">
-    <div class="col-12 col-lg-6">
+    <div class="col-12 col-xl-7">
         <div class="card border-0 shadow-sm h-100">
             <div class="card-header bg-white">
                 <h5 class="mb-0">Profil Bilgileri</h5>
                 <small class="text-muted">Bayi iletişim ve şifre ayarlarınızı güncelleyin.</small>
             </div>
             <div class="card-body">
-                <?php if ($errors): ?>
-                    <div class="alert alert-danger">
-                        <ul class="mb-0">
-                            <?php foreach ($errors as $error): ?>
-                                <li><?= Helpers::sanitize($error) ?></li>
-                            <?php endforeach; ?>
-                        </ul>
-                    </div>
-                <?php endif; ?>
-
-                <?php if ($successMessages): ?>
-                    <div class="alert alert-success">
-                        <ul class="mb-0">
-                            <?php foreach ($successMessages as $message): ?>
-                                <li><?= Helpers::sanitize($message) ?></li>
-                            <?php endforeach; ?>
-                        </ul>
-                    </div>
-                <?php endif; ?>
-
                 <form method="post" class="mb-4">
                     <input type="hidden" name="csrf_token" value="<?= Helpers::sanitize(Helpers::csrfToken()) ?>">
                     <input type="hidden" name="action" value="profile">
@@ -295,7 +295,9 @@ include __DIR__ . '/templates/header.php';
                 </dl>
             </div>
         </div>
-        <div class="card border-0 shadow-sm mt-4">
+    </div>
+    <div class="col-12 col-xl-5">
+        <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-white">
                 <h5 class="mb-0">Telegram Bildirimleri</h5>
                 <small class="text-muted">Telegram üzerinden hangi bildirimleri almak istediğinizi seçin.</small>
@@ -329,8 +331,7 @@ include __DIR__ . '/templates/header.php';
                 </form>
             </div>
         </div>
-    </div>
-    <div class="col-12 col-lg-6">
+
         <div class="card border-0 shadow-sm h-100">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <div>
@@ -388,7 +389,7 @@ include __DIR__ . '/templates/header.php';
                         <h6>Entegrasyon İpuçları</h6>
                         <ul class="small mb-3">
                             <li>Yetkilendirme: <code>Authorization: Bearer <?= Helpers::sanitize($activeToken['token']) ?></code> veya <code>X-API-Key</code> başlığını kullanın.</li>
-                            <li>API Dökümanı: <a href="/api/v1/" target="_blank" rel="noopener">JSON uç noktalarını görüntüleyin</a> veya Postman koleksiyonunu indirin.</li>
+                            <li>API Dökümanı: <a href="/api-documentation.php" target="_blank" rel="noopener">Tüm REST uç noktaları ve örnekleri inceleyin</a>.</li>
                             <li>Sandbox: Gerçek bakiye harcamadan test etmek için <strong>"test"</strong> parametresini kullanabilirsiniz.</li>
                         </ul>
                         <pre class="bg-dark text-white p-3 rounded small mb-0"><code>curl -X POST "<?= Helpers::sanitize(Helpers::apiBaseUrl()) ?>/orders"

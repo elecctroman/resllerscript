@@ -89,19 +89,65 @@ if (isset($gateways['bank-transfer'])) {
 }
 
 if (!Helpers::featureEnabled('packages')) {
-    Helpers::includeTemplate('auth-header.php');
     ?>
-    <div class="auth-wrapper">
+    <!DOCTYPE html>
+    <html lang="tr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Authero - Başvuru Kapalı</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 2rem;
+            }
+            
+            .auth-card {
+                background: white;
+                border-radius: 1rem;
+                padding: 2rem;
+                max-width: 500px;
+                width: 100%;
+                box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+                text-align: center;
+            }
+            
+            .brand {
+                color: #3b82f6;
+                font-size: 2rem;
+                font-weight: bold;
+                margin-bottom: 1rem;
+            }
+            
+            .alert {
+                padding: 1rem;
+                border-radius: 0.5rem;
+                background: #dbeafe;
+                border: 1px solid #3b82f6;
+                color: #1e40af;
+            }
+        </style>
+    </head>
+    <body>
         <div class="auth-card">
-            <div class="text-center mb-4">
-                <div class="brand"><?= Helpers::sanitize(Helpers::siteName()) ?></div>
-                <p class="text-muted mt-2">Yeni bayilik başvuruları şu anda kapalı.</p>
-            </div>
-            <div class="alert alert-info mb-0">Lütfen daha sonra tekrar deneyin veya destek ekibimizle iletişime geçin.</div>
+            <div class="brand">Authero</div>
+            <p style="color: #6b7280; margin-bottom: 1.5rem;">Yeni bayilik başvuruları şu anda kapalı.</p>
+            <div class="alert">Lütfen daha sonra tekrar deneyin veya destek ekibimizle iletişime geçin.</div>
         </div>
-    </div>
+    </body>
+    </html>
     <?php
-    Helpers::includeTemplate('auth-footer.php');
     exit;
 }
 
@@ -245,7 +291,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $orderPersisted = true;
 
                 Telegram::notify(sprintf(
-                    "🧾 Test modunda bayilik başvurusu tamamlandı!\nAd: %s\nE-posta: %s\nPaket: %s\nTutar: %s\nBaşvuru No: %s",
+                    "🧾 Test modunda bayilik başvurusu tamamlandı!
+Ad: %s
+E-posta: %s
+Paket: %s
+Tutar: %s
+Başvuru No: %s",
                     $name,
                     $email,
                     $selectedPackage['name'],
@@ -362,7 +413,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
 
                 Telegram::notify(sprintf(
-                    "🧾 Yeni bayilik başvurusu alındı!\nAd: %s\nE-posta: %s\nPaket: %s\nTutar: %s\nBaşvuru No: %s",
+                    "🧾 Yeni bayilik başvurusu alındı!
+Ad: %s
+E-posta: %s
+Paket: %s
+Tutar: %s
+Başvuru No: %s",
                     $name,
                     $email,
                     $selectedPackage['name'],
@@ -428,7 +484,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
 
             Telegram::notify(sprintf(
-                "🧾 Yeni bayilik başvurusu alındı!\nAd: %s\nE-posta: %s\nPaket: %s\nTutar: %s\nBaşvuru No: %s",
+                "🧾 Yeni bayilik başvurusu alındı!
+Ad: %s
+E-posta: %s
+Paket: %s
+Tutar: %s
+Başvuru No: %s",
                 $name,
                 $email,
                 $selectedPackage['name'],
@@ -457,231 +518,847 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
-
-Helpers::includeTemplate('auth-header.php');
 ?>
-<div class="auth-wrapper">
-    <div class="auth-card" style="max-width: 720px;">
-        <div class="mb-4 text-center">
-            <div class="brand">Bayi Başvurusu</div>
-            <p class="text-muted">Aşağıdan uygun paketi seçerek başvurunuzu iletebilirsiniz.</p>
-        </div>
 
-        <?php if ($flashSuccess): ?>
-            <div class="alert alert-success"><?= Helpers::sanitize($flashSuccess) ?></div>
-        <?php endif; ?>
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authero - Yeni Bayi Başvurusu</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+        }
+        
+        .container {
+            display: flex;
+            width: 100%;
+            min-height: 100vh;
+        }
+        
+        .left-panel {
+            flex: 1;
+            background: white;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+        
+        .right-panel {
+            flex: 1;
+            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), #364352;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            position: relative;
+        }
+        
+        .form-container {
+            width: 100%;
+            max-width: 600px;
+            margin-top: 2rem;
+        }
+        
+        .logo {
+            color: #3b82f6;
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 2rem;
+        }
+        
+        .form-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 0.5rem;
+        }
+        
+        .form-subtitle {
+            color: #6b7280;
+            margin-bottom: 2rem;
+        }
+        
+        .form-subtitle a {
+            color: #3b82f6;
+            text-decoration: none;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #374151;
+            font-weight: 500;
+        }
+        
+        .form-input, .form-select, .form-textarea {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+            background: #f9fafb;
+        }
+        
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+            background: white;
+        }
+        
+        .form-input::placeholder, .form-textarea::placeholder {
+            color: #9ca3af;
+        }
+        
+        .form-textarea {
+            min-height: 120px;
+            resize: vertical;
+            font-family: inherit;
+        }
+        
+        .input-group {
+            display: flex;
+        }
+        
+        .input-group .form-select {
+            border-radius: 0.5rem 0 0 0.5rem;
+            border-right: none;
+            max-width: 150px;
+        }
+        
+        .input-group .form-input {
+            border-radius: 0 0.5rem 0.5rem 0;
+            border-left: 1px solid #e5e7eb;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .checkbox-input {
+            margin-top: 0.25rem;
+            width: 18px;
+            height: 18px;
+            accent-color: #3b82f6;
+        }
+        
+        .checkbox-label {
+            color: #374151;
+            font-size: 0.875rem;
+            line-height: 1.4;
+        }
+        
+        .checkbox-label a {
+            color: #3b82f6;
+            text-decoration: none;
+        }
+        
+        .btn-primary {
+            width: 100%;
+            padding: 0.875rem;
+            background: linear-gradient(135deg, #8b5cf6, #3b82f6);
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin-bottom: 1.5rem;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-1px);
+        }
+        
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-secondary {
+            width: 100%;
+            padding: 0.875rem;
+            background: white;
+            color: #374151;
+            border: 2px solid #e5e7eb;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: background-color 0.2s;
+        }
+        
+        .btn-secondary:hover {
+            background: #f9fafb;
+        }
+        
+        .btn-outline-secondary {
+            padding: 0.5rem 1rem;
+            background: transparent;
+            color: #6b7280;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-outline-secondary:hover {
+            background: #f9fafb;
+            border-color: #9ca3af;
+        }
+        
+        .promo-content {
+            text-align: center;
+            z-index: 1;
+            position: relative;
+        }
+        
+        .promo-title {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 2rem;
+            line-height: 1.2;
+        }
+        
+        .features {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1rem;
+        }
+        
+        .feature-icon {
+            width: 20px;
+            height: 20px;
+            background: #3b82f6;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .feature-icon::after {
+            content: '✓';
+            color: white;
+            font-size: 0.75rem;
+        }
+        
+        .alert {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid;
+        }
+        
+        .alert-success {
+            background: #dcfce7;
+            border-color: #16a34a;
+            color: #166534;
+        }
+        
+        .alert-warning {
+            background: #fef3c7;
+            border-color: #d97706;
+            color: #92400e;
+        }
+        
+        .alert-danger {
+            background: #fee2e2;
+            border-color: #dc2626;
+            color: #991b1b;
+        }
+        
+        .alert-info {
+            background: #dbeafe;
+            border-color: #3b82f6;
+            color: #1e40af;
+        }
+        
+        .alert ul {
+            margin: 0;
+            padding-left: 1rem;
+        }
+        
+        .info-box {
+            background: #f0f9ff;
+            border: 1px solid #0ea5e9;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 2rem;
+            color: #0369a1;
+            font-size: 0.875rem;
+        }
+        
+        .info-box h3 {
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+            color: #0c4a6e;
+        }
+        
+        .package-grid {
+            display: grid;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .package-card {
+            display: block;
+            padding: 1.5rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 0.75rem;
+            background: #f9fafb;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            color: inherit;
+        }
+        
+        .package-card:hover {
+            border-color: #3b82f6;
+            background: #f0f9ff;
+        }
+        
+        .btn-check:checked + .package-card {
+            border-color: #3b82f6;
+            background: #f0f9ff;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .package-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+        
+        .package-name {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #1f2937;
+        }
+        
+        .package-description {
+            color: #6b7280;
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+        }
+        
+        .package-price {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #3b82f6;
+        }
+        
+        .package-feature-list {
+            list-style: none;
+            margin: 1rem 0;
+            padding: 0;
+        }
+        
+        .package-feature-list li {
+            padding: 0.25rem 0;
+            color: #4b5563;
+            font-size: 0.875rem;
+        }
+        
+        .package-feature-list li::before {
+            content: '✓';
+            color: #10b981;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+        
+        .package-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e5e7eb;
+        }
+        
+        .package-tag {
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+        
+        .badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .bg-light {
+            background: #f3f4f6;
+        }
+        
+        .text-dark {
+            color: #1f2937;
+        }
+        
+        .form-check {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+        
+        .form-check-input {
+            margin-top: 0.25rem;
+            width: 18px;
+            height: 18px;
+            accent-color: #3b82f6;
+        }
+        
+        .form-check-label {
+            color: #374151;
+            font-size: 0.875rem;
+            line-height: 1.4;
+        }
+        
+        .btn-check {
+            display: none;
+        }
+        
+        .form-text {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-top: 0.25rem;
+        }
+        
+        .text-center {
+            text-align: center;
+        }
+        
+        .text-muted {
+            color: #6b7280;
+        }
+        
+        .small {
+            font-size: 0.875rem;
+        }
+        
+        .collapse {
+            display: none;
+        }
+        
+        .collapse.show {
+            display: block;
+        }
+        
+        .card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+        }
+        
+        .card-body {
+            padding: 1rem;
+        }
+        
+        .card-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 1rem;
+        }
+        
+        .bg-light {
+            background: #f9fafb;
+        }
+        
+        .border-0 {
+            border: none !important;
+        }
+        
+        .shadow-sm {
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+        
+        .text-danger {
+            color: #dc2626;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .right-panel {
+                order: -1;
+                min-height: 300px;
+            }
+            
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .promo-title {
+                font-size: 1.8rem;
+            }
+            
+            .features {
+                grid-template-columns: 1fr;
+            }
+            
+            .input-group {
+                flex-direction: column;
+            }
+            
+            .input-group .form-select,
+            .input-group .form-input {
+                border-radius: 0.5rem;
+                border: 2px solid #e5e7eb;
+            }
+            
+            .form-container {
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="left-panel">
+            <div class="form-container">
+                <div class="logo">Authero</div>
+                
+                <h1 class="form-title">Yeni Bayi Başvurusu</h1>
+                <p class="form-subtitle">
+                    Zaten bayimiz misiniz? <a href="index.php">Giriş Yapın</a>
+                </p>
+                
+                <?php if ($flashSuccess): ?>
+                    <div class="alert alert-success"><?= Helpers::sanitize($flashSuccess) ?></div>
+                <?php endif; ?>
 
-        <?php if ($registerBankNotice): ?>
-            <div class="alert alert-info">
-                <h6 class="mb-2">Banka Havalesi Talimatı</h6>
-                <ul class="mb-0">
-                    <?php foreach ($registerBankNotice as $line): ?>
-                        <li><?= Helpers::sanitize($line) ?></li>
-                    <?php endforeach; ?>
-                </ul>
-            </div>
-        <?php endif; ?>
+                <?php if ($registerBankNotice): ?>
+                    <div class="alert alert-info">
+                        <h6 style="margin-bottom: 0.5rem; font-weight: 600;">Banka Havalesi Talimatı</h6>
+                        <ul style="margin-bottom: 0;">
+                            <?php foreach ($registerBankNotice as $line): ?>
+                                <li><?= Helpers::sanitize($line) ?></li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
+                <?php endif; ?>
 
-        <?php if (!$paymentTestMode && !$hasLiveGateway): ?>
-            <div class="alert alert-warning">
-                Ödeme sağlayıcısı henüz yapılandırılmadığı için başvuru işlemi geçici olarak kapalıdır.
-            </div>
-        <?php endif; ?>
+                <?php if (!$paymentTestMode && !$hasLiveGateway): ?>
+                    <div class="alert alert-warning">
+                        Ödeme sağlayıcısı henüz yapılandırılmadığı için başvuru işlemi geçici olarak kapalıdır.
+                    </div>
+                <?php endif; ?>
 
-        <?php if ($errors): ?>
-            <div class="alert alert-danger">
-                <ul class="mb-0">
-                    <?php foreach ($errors as $error): ?>
-                        <li><?= Helpers::sanitize($error) ?></li>
-                    <?php endforeach; ?>
-                </ul>
-            </div>
-        <?php endif; ?>
-
-        <form method="post" class="row g-3">
-            <div class="col-12">
-                <label class="form-label">Paket Seçimi</label>
-                <?php if ($packages): ?>
-                    <div class="package-grid">
-                        <?php foreach ($packages as $package): ?>
-                            <?php
-                            $packageId = (int)$package['id'];
-                            $packageInputId = 'package-option-' . $packageId;
-                            $features = isset($package['features']) ? array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', (string)$package['features']))) : array();
-                            $isSelected = $selectedPackageId === $packageId;
-                            ?>
-                            <input type="radio" class="btn-check" name="package_id" id="<?= Helpers::sanitize($packageInputId) ?>" value="<?= $packageId ?>" <?= $isSelected ? 'checked' : '' ?> required>
-                            <label class="package-card" for="<?= Helpers::sanitize($packageInputId) ?>">
-                                <div class="package-card-header">
-                                    <div>
-                                        <span class="package-name"><?= Helpers::sanitize($package['name']) ?></span>
-                                        <?php if (!empty($package['description'])): ?>
-                                            <p class="package-description mb-0"><?= Helpers::sanitize($package['description']) ?></p>
+                <?php if ($errors): ?>
+                    <div class="alert alert-danger">
+                        <ul style="margin-bottom: 0;">
+                            <?php foreach ($errors as $error): ?>
+                                <li><?= Helpers::sanitize($error) ?></li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
+                <?php endif; ?>
+                
+                <div class="info-box">
+                    <h3>Bayi Olmak İçin</h3>
+                    Aşağıdaki formu eksiksiz doldurmanız gerekmektedir. Başvurunuz değerlendirildikten sonra size geri dönüş yapılacaktır.
+                </div>
+                
+                <form method="post">
+                    <!-- Paket Seçimi -->
+                    <div class="form-group">
+                        <label class="form-label">Paket Seçimi *</label>
+                        <?php if ($packages): ?>
+                            <div class="package-grid">
+                                <?php foreach ($packages as $package): ?>
+                                    <?php
+                                    $packageId = (int)$package['id'];
+                                    $packageInputId = 'package-option-' . $packageId;
+                                    $features = isset($package['features']) ? array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', (string)$package['features']))) : array();
+                                    $isSelected = $selectedPackageId === $packageId;
+                                    ?>
+                                    <input type="radio" class="btn-check" name="package_id" id="<?= Helpers::sanitize($packageInputId) ?>" value="<?= $packageId ?>" <?= $isSelected ? 'checked' : '' ?> required>
+                                    <label class="package-card" for="<?= Helpers::sanitize($packageInputId) ?>">
+                                        <div class="package-card-header">
+                                            <div>
+                                                <span class="package-name"><?= Helpers::sanitize($package['name']) ?></span>
+                                                <?php if (!empty($package['description'])): ?>
+                                                    <p class="package-description"><?= Helpers::sanitize($package['description']) ?></p>
+                                                <?php endif; ?>
+                                            </div>
+                                            <span class="package-price"><?= Helpers::formatCurrencyHtml((float)$package['price']) ?></span>
+                                        </div>
+                                        <?php if ($features): ?>
+                                            <ul class="package-feature-list">
+                                                <?php foreach ($features as $feature): ?>
+                                                    <li><?= Helpers::sanitize($feature) ?></li>
+                                                <?php endforeach; ?>
+                                            </ul>
                                         <?php endif; ?>
-                                    </div>
-                                    <span class="package-price"><?= Helpers::sanitize(Helpers::formatCurrency((float)$package['price'])) ?></span>
-                                </div>
-                                <?php if ($features): ?>
-                                    <ul class="package-feature-list">
-                                        <?php foreach ($features as $feature): ?>
-                                            <li><?= Helpers::sanitize($feature) ?></li>
-                                        <?php endforeach; ?>
-                                    </ul>
-                                <?php endif; ?>
-                                <div class="package-footer d-flex justify-content-between align-items-center">
-                                    <span class="badge bg-light text-dark">Başlangıç Bakiyesi: <?= Helpers::sanitize(Helpers::formatCurrency((float)$package['initial_balance'])) ?></span>
-                                    <span class="package-tag">ID #<?= $packageId ?></span>
-                                </div>
-                            </label>
-                        <?php endforeach; ?>
-                    </div>
-                <?php else: ?>
-                    <div class="alert alert-warning">Şu anda başvuruya açık paket bulunmuyor. Lütfen daha sonra tekrar deneyin.</div>
-                <?php endif; ?>
-            </div>
-            <?php if ($paymentTestMode): ?>
-                <div class="col-12">
-                    <div class="alert alert-info mb-0">Test modu aktif. Ödeme adımı otomatik onaylanır ve giriş bilgileriniz Telegram botunuza gönderilir.</div>
-                </div>
-            <?php endif; ?>
-            <?php if ($hasLiveGateway): ?>
-                <div class="col-12">
-                    <label class="form-label">Ödeme Sağlayıcısı</label>
-                    <?php foreach ($gateways as $identifier => $gateway): ?>
-                        <?php $checked = $selectedGateway === $identifier ? 'checked' : ''; ?>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="payment_provider" id="package-gateway-<?= Helpers::sanitize($identifier) ?>" value="<?= Helpers::sanitize($identifier) ?>" <?= $checked ?>>
-                            <label class="form-check-label" for="package-gateway-<?= Helpers::sanitize($identifier) ?>"><?= Helpers::sanitize($gateway['label']) ?></label>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-                <?php if ($bankTransferSummary): ?>
-                    <div class="col-12">
-                        <div class="alert alert-secondary small mb-0">
-                            <strong>Banka Havalesi Talimatı</strong>
-                            <ul class="mb-0">
-                                <?php foreach ($bankTransferSummary as $line): ?>
-                                    <li><?= Helpers::sanitize($line) ?></li>
+                                        <div class="package-footer">
+                                            <span class="badge bg-light text-dark">Başlangıç Bakiyesi: <?= Helpers::formatCurrencyHtml((float)$package['initial_balance']) ?></span>
+                                            <span class="package-tag">ID #<?= $packageId ?></span>
+                                        </div>
+                                    </label>
                                 <?php endforeach; ?>
-                            </ul>
+                            </div>
+                        <?php else: ?>
+                            <div class="alert alert-warning">Şu anda başvuruya açık paket bulunmuyor. Lütfen daha sonra tekrar deneyin.</div>
+                        <?php endif; ?>
+                    </div>
+
+                    <!-- Test Modu Uyarısı -->
+                    <?php if ($paymentTestMode): ?>
+                        <div class="alert alert-info">Test modu aktif. Ödeme adımı otomatik onaylanır ve giriş bilgileriniz Telegram botunuza gönderilir.</div>
+                    <?php endif; ?>
+
+                    <!-- Ödeme Sağlayıcısı -->
+                    <?php if ($hasLiveGateway): ?>
+                        <div class="form-group">
+                            <label class="form-label">Ödeme Sağlayıcısı *</label>
+                            <?php foreach ($gateways as $identifier => $gateway): ?>
+                                <?php $checked = $selectedGateway === $identifier ? 'checked' : ''; ?>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="payment_provider" id="package-gateway-<?= Helpers::sanitize($identifier) ?>" value="<?= Helpers::sanitize($identifier) ?>" <?= $checked ?>>
+                                    <label class="form-check-label" for="package-gateway-<?= Helpers::sanitize($identifier) ?>"><?= Helpers::sanitize($gateway['label']) ?></label>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+
+                        <!-- Banka Havalesi Bilgileri -->
+                        <?php if ($bankTransferSummary): ?>
+                            <div class="alert alert-info" style="font-size: 0.875rem;">
+                                <strong>Banka Havalesi Talimatı</strong>
+                                <ul style="margin-bottom: 0;">
+                                    <?php foreach ($bankTransferSummary as $line): ?>
+                                        <li><?= Helpers::sanitize($line) ?></li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            </div>
+                        <?php endif; ?>
+
+                        <!-- Banka Havalesi Alanları -->
+                        <?php if (isset($gateways['bank-transfer'])): ?>
+                            <div id="bank-transfer-fields" <?= $selectedGateway === 'bank-transfer' ? '' : 'style="display:none;"' ?>>
+                                <div class="card border-0 shadow-sm" style="margin-bottom: 1.5rem;">
+                                    <div class="card-body">
+                                        <h6 class="card-title">Ödeme Bildirimi</h6>
+                                        <div class="form-row">
+                                            <div class="form-group">
+                                                <label class="form-label">Dekont / Referans Numarası</label>
+                                                <input type="text" class="form-input" name="payment_reference" value="<?= Helpers::sanitize($paymentReferenceInput) ?>" placeholder="Örn. EFT referansı">
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="form-label">Ödeme Açıklaması <span class="text-danger">*</span></label>
+                                            <textarea class="form-textarea" name="payment_notice" rows="3" placeholder="Havale bilgilerinizi paylaşın" <?= $selectedGateway === 'bank-transfer' ? 'required' : '' ?>><?= Helpers::sanitize($paymentNoticeInput) ?></textarea>
+                                            <div class="form-text">Hangi bankadan, hangi adla ve ne zaman gönderim yaptığınızı belirtmeniz değerlendirmeyi hızlandırır.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+                    <?php endif; ?>
+
+                    <!-- Kişisel Bilgiler -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Ad Soyad *</label>
+                            <input type="text" class="form-input" name="name" value="<?= Helpers::sanitize(isset($_POST['name']) ? $_POST['name'] : '') ?>" placeholder="Ad ve soyadınızı girin" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">E-posta Adresi *</label>
+                            <input type="email" class="form-input" name="email" value="<?= Helpers::sanitize(isset($_POST['email']) ? $_POST['email'] : '') ?>" placeholder="ornek@firma.com" required>
                         </div>
                     </div>
-                <?php endif; ?>
-                <?php if (isset($gateways['bank-transfer'])): ?>
-                    <div class="col-12" id="bank-transfer-fields" <?= $selectedGateway === 'bank-transfer' ? '' : 'style="display:none;"' ?>>
-                        <div class="card border-0 shadow-sm">
-                            <div class="card-body">
-                                <h6 class="card-title mb-3">Ödeme Bildirimi</h6>
-                                <div class="row g-3">
-                                    <div class="col-md-6">
-                                        <label class="form-label">Dekont / Referans Numarası</label>
-                                        <input type="text" class="form-control" name="payment_reference" value="<?= Helpers::sanitize($paymentReferenceInput) ?>" placeholder="Örn. EFT referansı">
-                                    </div>
-                                    <div class="col-12">
-                                        <label class="form-label">Ödeme Açıklaması <span class="text-danger">*</span></label>
-                                        <textarea class="form-control" name="payment_notice" rows="3" placeholder="Havale bilgilerinizi paylaşın" <?= $selectedGateway === 'bank-transfer' ? 'required' : '' ?>><?= Helpers::sanitize($paymentNoticeInput) ?></textarea>
-                                        <small class="text-muted">Hangi bankadan, hangi adla ve ne zaman gönderim yaptığınızı belirtmeniz değerlendirmeyi hızlandırır.</small>
-                                    </div>
+
+                    <!-- Şifre -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Şifre *</label>
+                            <input type="password" class="form-input" name="password" placeholder="En az 8 karakter" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Şifre Tekrarı *</label>
+                            <input type="password" class="form-input" name="password_confirmation" placeholder="Şifrenizi doğrulayın" required>
+                        </div>
+                    </div>
+
+                    <!-- Telefon ve Firma -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Telefon Numarası *</label>
+                            <div class="input-group">
+                                <select class="form-select" name="phone_country_code">
+                                    <?php foreach ($phoneCountryOptions as $code => $label): ?>
+                                        <option value="<?= Helpers::sanitize($code) ?>" <?= $code === $phoneCountryCodeInput ? 'selected' : '' ?>><?= Helpers::sanitize($label) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <input type="tel" class="form-input" name="phone_number" value="<?= Helpers::sanitize($phoneNumberInput) ?>" placeholder="555 123 4567" required>
+                            </div>
+                            <div class="form-text">Lütfen alan kodu seçip telefon numaranızı girin. Bildirimler bu numara üzerinden iletilecektir.</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Firma Adı</label>
+                            <input type="text" class="form-input" name="company" value="<?= Helpers::sanitize(isset($_POST['company']) ? $_POST['company'] : '') ?>" placeholder="Firma adınızı girin">
+                        </div>
+                    </div>
+
+                    <!-- Telegram Bilgileri -->
+                    <div class="form-group">
+                        <label class="form-label">Telegram Bot Tokenı *</label>
+                        <input type="text" class="form-input" name="telegram_bot_token" value="<?= Helpers::sanitize($telegramBotTokenInput) ?>" placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11" required>
+                        <div class="form-text">BotFather üzerinden oluşturduğunuz botun erişim tokenını girin.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <label class="form-label" style="margin-bottom: 0;">Telegram Chat ID *</label>
+                            <button type="button" class="btn-outline-secondary" onclick="toggleTelegramGuide()">Rehberi Aç</button>
+                        </div>
+                        <input type="text" class="form-input" name="telegram_chat_id" value="<?= Helpers::sanitize($telegramChatIdInput) ?>" placeholder="@kullanici veya numerik ID" required>
+                        <div class="form-text">Bildirimlerin gönderileceği kullanıcı veya kanal kimliği.</div>
+                        
+                        <div class="collapse" id="telegramGuide">
+                            <div class="card bg-light border-0" style="margin-top: 1rem;">
+                                <div class="card-body">
+                                    <ol style="margin-bottom: 0; font-size: 0.875rem;">
+                                        <li><strong>@BotFather</strong> üzerinden <code>/newbot</code> komutuyla bir bot oluşturun ve verdiği tokenı kopyalayın.</li>
+                                        <li>Oluşturduğunuz bot ile konuşmayı başlatıp <code>/start</code> mesajı gönderin.</li>
+                                        <li><a href="https://t.me/get_id_bot" target="_blank" rel="noopener">@get_id_bot</a> gibi bir araçla kullanıcı ID'nizi öğrenin veya botu eklediğiniz kanalın ID'sini alın.</li>
+                                        <li>Tokenı ve chat ID'yi yukarıdaki alanlara girerek bildirimlerin Telegram üzerinden gelmesini sağlayın.</li>
+                                    </ol>
                                 </div>
                             </div>
                         </div>
                     </div>
-                <?php endif; ?>
-            <?php endif; ?>
-            <div class="col-md-6">
-                <label class="form-label">Ad Soyad</label>
-                <input type="text" class="form-control" name="name" value="<?= Helpers::sanitize(isset($_POST['name']) ? $_POST['name'] : '') ?>" required>
+
+                    <!-- Notlar -->
+                    <div class="form-group">
+                        <label class="form-label">Notlar</label>
+                        <textarea class="form-textarea" name="notes" placeholder="Eklemek istediğiniz notlar..."><?= Helpers::sanitize(isset($_POST['notes']) ? $_POST['notes'] : '') ?></textarea>
+                    </div>
+
+                    <input type="hidden" name="csrf_token" value="<?= Helpers::sanitize(Helpers::csrfToken()) ?>">
+
+                    <!-- Gönder Butonu -->
+                    <button type="submit" class="btn-primary" <?= (!$packages || (!$paymentTestMode && !$hasLiveGateway)) ? 'disabled' : '' ?>>
+                        Ödemeyi Tamamla
+                    </button>
+                    
+                    <div class="text-center">
+                        <a href="index.php" style="color: #6b7280; font-size: 0.875rem; text-decoration: none;">Giriş sayfasına dön</a>
+                    </div>
+                </form>
             </div>
-            <div class="col-md-6">
-                <label class="form-label">E-posta</label>
-                <input type="email" class="form-control" name="email" value="<?= Helpers::sanitize(isset($_POST['email']) ? $_POST['email'] : '') ?>" required>
-            </div>
-            <div class="col-md-6">
-                <label class="form-label">Şifre</label>
-                <input type="password" class="form-control" name="password" placeholder="En az 8 karakter" required>
-            </div>
-            <div class="col-md-6">
-                <label class="form-label">Şifre (Tekrar)</label>
-                <input type="password" class="form-control" name="password_confirmation" placeholder="Şifrenizi doğrulayın" required>
-            </div>
-            <div class="col-md-6">
-                <label class="form-label">Telefon</label>
-                <div class="input-group">
-                    <select class="form-select" name="phone_country_code">
-                        <?php foreach ($phoneCountryOptions as $code => $label): ?>
-                            <option value="<?= Helpers::sanitize($code) ?>" <?= $code === $phoneCountryCodeInput ? 'selected' : '' ?>><?= Helpers::sanitize($label) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    <input type="tel" class="form-control" name="phone_number" value="<?= Helpers::sanitize($phoneNumberInput) ?>" placeholder="555 123 4567" required>
-                </div>
-                <div class="form-text">Lütfen alan kodu seçip telefon numaranızı girin. Bildirimler bu numara üzerinden iletilecektir.</div>
-            </div>
-            <div class="col-md-6">
-                <label class="form-label">Firma Adı</label>
-                <input type="text" class="form-control" name="company" value="<?= Helpers::sanitize(isset($_POST['company']) ? $_POST['company'] : '') ?>">
-            </div>
-            <div class="col-12">
-                <label class="form-label">Telegram Bot Tokenı</label>
-                <input type="text" class="form-control" name="telegram_bot_token" value="<?= Helpers::sanitize($telegramBotTokenInput) ?>" placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11" required>
-                <small class="text-muted">BotFather üzerinden oluşturduğunuz botun erişim tokenını girin.</small>
-            </div>
-            <div class="col-12">
-                <div class="d-flex justify-content-between align-items-center">
-                    <label class="form-label mb-0">Telegram Chat ID</label>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#telegramGuide" aria-expanded="false" aria-controls="telegramGuide">Rehberi Aç</button>
-                </div>
-                <input type="text" class="form-control mt-2" name="telegram_chat_id" value="<?= Helpers::sanitize($telegramChatIdInput) ?>" placeholder="@kullanici veya numerik ID" required>
-                <small class="text-muted">Bildirimlerin gönderileceği kullanıcı veya kanal kimliği.</small>
-                <div class="collapse mt-3" id="telegramGuide">
-                    <div class="card card-body bg-light border-0">
-                        <ol class="mb-0 small">
-                            <li><strong>@BotFather</strong> üzerinden <code>/newbot</code> komutuyla bir bot oluşturun ve verdiği tokenı kopyalayın.</li>
-                            <li>Oluşturduğunuz bot ile konuşmayı başlatıp <code>/start</code> mesajı gönderin.</li>
-                            <li><a href="https://t.me/get_id_bot" target="_blank" rel="noopener">@get_id_bot</a> gibi bir araçla kullanıcı ID'nizi öğrenin veya botu eklediğiniz kanalın ID'sini alın.</li>
-                            <li>Tokenı ve chat ID'yi yukarıdaki alanlara girerek bildirimlerin Telegram üzerinden gelmesini sağlayın.</li>
-                        </ol>
+        </div>
+        
+        <div class="right-panel">
+            <div class="promo-content">
+                <h2 class="promo-title">Bayi Yönetim Sistemi</h2>
+                <div class="features">
+                    <div class="feature-item">
+                        <div class="feature-icon"></div>
+                        Esnek Paketler
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon"></div>
+                        Kolay Ödeme
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon"></div>
+                        Telegram Bildirimleri
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon"></div>
+                        7/24 Destek
                     </div>
                 </div>
             </div>
-            <div class="col-12">
-                <label class="form-label">Notlar</label>
-                <textarea class="form-control" rows="3" name="notes" placeholder="Eklemek istediğiniz notlar..."><?= Helpers::sanitize(isset($_POST['notes']) ? $_POST['notes'] : '') ?></textarea>
-            </div>
-            <div class="col-12">
-                <button type="submit" class="btn btn-primary w-100" <?= (!$packages || (!$paymentTestMode && !$hasLiveGateway)) ? 'disabled' : '' ?>>Ödemeyi Tamamla</button>
-            </div>
-            <div class="col-12 text-center">
-                <a href="/" class="small">Giriş sayfasına dön</a>
-            </div>
-        </form>
-</div>
-</div>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    var gatewayInputs = document.querySelectorAll('input[name="payment_provider"]');
-    var bankFields = document.getElementById('bank-transfer-fields');
-    var noticeField = bankFields ? bankFields.querySelector('textarea[name="payment_notice"]') : null;
+        </div>
+    </div>
 
-    function toggleBankFields() {
-        if (!bankFields) {
-            return;
+    <script>
+        function toggleTelegramGuide() {
+            const guide = document.getElementById('telegramGuide');
+            if (guide.style.display === 'none' || guide.style.display === '') {
+                guide.style.display = 'block';
+            } else {
+                guide.style.display = 'none';
+            }
         }
 
-        var selected = document.querySelector('input[name="payment_provider"]:checked');
-        var isBankTransfer = selected && selected.value === 'bank-transfer';
+        document.addEventListener('DOMContentLoaded', function () {
+            var gatewayInputs = document.querySelectorAll('input[name="payment_provider"]');
+            var bankFields = document.getElementById('bank-transfer-fields');
+            var noticeField = bankFields ? bankFields.querySelector('textarea[name="payment_notice"]') : null;
 
-        bankFields.style.display = isBankTransfer ? '' : 'none';
+            function toggleBankFields() {
+                if (!bankFields) {
+                    return;
+                }
 
-        if (noticeField) {
-            noticeField.required = !!isBankTransfer;
-        }
-    }
+                var selected = document.querySelector('input[name="payment_provider"]:checked');
+                var isBankTransfer = selected && selected.value === 'bank-transfer';
 
-    gatewayInputs.forEach(function (input) {
-        input.addEventListener('change', toggleBankFields);
-    });
+                bankFields.style.display = isBankTransfer ? '' : 'none';
 
-    toggleBankFields();
-});
-</script>
-<?php Helpers::includeTemplate('auth-footer.php'); ?>
+                if (noticeField) {
+                    noticeField.required = !!isBankTransfer;
+                }
+            }
+
+            gatewayInputs.forEach(function (input) {
+                input.addEventListener('change', toggleBankFields);
+            });
+
+            toggleBankFields();
+        });
+    </script>
+</body>
+</html>

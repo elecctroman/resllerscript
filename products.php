@@ -38,6 +38,7 @@ $pdo = Database::connection();
 
 $favoriteProductIds = array();
 $watchingProductIds = array();
+$favoriteProductsData = array();
 $autoTopupConfig = null;
 
 try {
@@ -52,9 +53,27 @@ try {
     $autoStmt = $pdo->prepare('SELECT threshold, topup_amount, payment_method, status FROM balance_auto_topups WHERE user_id = :user_id LIMIT 1');
     $autoStmt->execute(array('user_id' => $user['id']));
     $autoTopupConfig = $autoStmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+
+    if ($favoriteProductIds) {
+        $favoritePlaceholders = implode(',', array_fill(0, count($favoriteProductIds), '?'));
+        $favoriteQuery = 'SELECT pr.*, cat.name AS category_name, (
+                SELECT COUNT(*) FROM product_stock_items psi
+                WHERE psi.product_id = pr.id AND psi.status = "available"
+            ) AS available_stock
+            FROM products pr
+            INNER JOIN categories cat ON pr.category_id = cat.id
+            WHERE pr.status = ? AND pr.id IN (' . $favoritePlaceholders . ')
+            ORDER BY pr.name ASC';
+
+        $favoriteStmt = $pdo->prepare($favoriteQuery);
+        $favoriteParams = array_merge(array('active'), $favoriteProductIds);
+        $favoriteStmt->execute($favoriteParams);
+        $favoriteProductsData = $favoriteStmt->fetchAll();
+    }
 } catch (\PDOException $exception) {
     $favoriteProductIds = array();
     $watchingProductIds = array();
+    $favoriteProductsData = array();
     $autoTopupConfig = null;
 }
 
@@ -273,6 +292,124 @@ if ($showAllCategories) {
     $products = [];
 }
 
+$favoritesSectionProducts = array();
+if ($showAllCategories) {
+    $favoritesSectionProducts = $favoriteProductsData;
+} else {
+    foreach ($products as $index => $product) {
+        $productId = isset($product['id']) ? (int)$product['id'] : 0;
+        if ($productId && in_array($productId, $favoriteProductIds, true)) {
+            $favoritesSectionProducts[] = $product;
+            unset($products[$index]);
+        }
+    }
+    $products = array_values($products);
+}
+
+$hasFavoritesSection = !empty($favoritesSectionProducts);
+
+$renderProductCard = function (array $product, $highlight = false) use ($categoryPath, $favoriteProductIds, $watchingProductIds) {
+    $productId = isset($product['id']) ? (int)$product['id'] : 0;
+    $productName = isset($product['name']) ? $product['name'] : (isset($product['title']) ? $product['title'] : 'Servis');
+    $productBaseAmount = isset($product['price']) ? (float)$product['price'] : (isset($product['amount']) ? (float)$product['amount'] : 0.0);
+    $productBaseCurrency = isset($product['currency']) && $product['currency'] !== '' ? strtoupper($product['currency']) : 'USD';
+    $productPriceHtml = Helpers::formatCurrencyHtml($productBaseAmount, $productBaseCurrency);
+    $categoryTrail = isset($product['category_id']) ? $categoryPath((int)$product['category_id']) : (isset($product['category_name']) ? $product['category_name'] : 'Kategori');
+    $rawDescription = isset($product['description']) ? trim((string)$product['description']) : '';
+    if ($rawDescription === '') {
+        $rawDescription = Helpers::defaultProductDescription();
+    }
+    $shortDescription = Helpers::truncate($rawDescription, 140);
+    $skuValue = (isset($product['sku']) && $product['sku'] !== '') ? $product['sku'] : null;
+    $providerCode = isset($product['provider_code']) ? strtolower((string)$product['provider_code']) : '';
+    $automaticDelivery = isset($product['automatic_delivery']) ? (int)$product['automatic_delivery'] === 1 : false;
+    $isStockBased = ($providerCode === '' || $providerCode === 'stock' || $providerCode === 'panel') && !$automaticDelivery;
+    $availableStock = isset($product['available_stock']) ? (int)$product['available_stock'] : 0;
+    $stockBadgeClass = 'bg-info text-dark';
+    $stockLabel = 'Sağlayıcı teslimatı';
+    $restockHint = '';
+
+    if ($automaticDelivery && !$isStockBased) {
+        $stockBadgeClass = 'bg-primary';
+        $stockLabel = 'Otomatik teslimat';
+    } elseif ($isStockBased) {
+        if ($availableStock > 0) {
+            $stockBadgeClass = 'bg-success';
+            $stockLabel = sprintf('Stokta %d adet', $availableStock);
+            if ($availableStock <= 3) {
+                $restockHint = 'Stok seviyesi kritik, yöneticinizden yenileme talep edin.';
+            }
+        } else {
+            $stockBadgeClass = 'bg-danger';
+            $stockLabel = 'Stok tükendi';
+            $restockHint = 'Bu ürün için stok bildirimi ayarlayabilirsiniz.';
+        }
+    }
+
+    $isFavorited = in_array($productId, $favoriteProductIds, true) || $highlight;
+    $isWatching = in_array($productId, $watchingProductIds, true);
+    $buttonDisabled = $isStockBased && $availableStock <= 0;
+
+    $cardClasses = 'product-card';
+    if ($highlight) {
+        $cardClasses .= ' product-card--favorite';
+    }
+
+    ob_start();
+    ?>
+    <div class="<?= $cardClasses ?>" data-product-card="<?= $productId ?>"<?= $highlight ? ' data-favorite-card="1"' : '' ?>>
+        <div class="product-card__header">
+            <div>
+                <h3 class="product-card__title"><?= Helpers::sanitize($productName) ?></h3>
+                <div class="product-card__category"><?= Helpers::sanitize($categoryTrail) ?></div>
+            </div>
+            <div class="product-card__price"><?= $productPriceHtml ?></div>
+        </div>
+        <?php if ($skuValue): ?>
+            <div class="product-card__sku">SKU: <?= Helpers::sanitize($skuValue) ?></div>
+        <?php endif; ?>
+        <div class="product-card__stock">
+            <span class="badge <?= htmlspecialchars($stockBadgeClass, ENT_QUOTES, 'UTF-8') ?>"><?= Helpers::sanitize($stockLabel) ?></span>
+        </div>
+        <p class="product-card__description"><?= Helpers::sanitize($shortDescription) ?></p>
+        <?php if ($restockHint !== ''): ?>
+            <div class="product-card__hint text-muted small mb-2">
+                <i class="bi bi-lightbulb me-1"></i><?= Helpers::sanitize($restockHint) ?>
+            </div>
+        <?php endif; ?>
+        <div class="product-card__actions">
+            <button type="button"
+                    class="product-card__button<?= $buttonDisabled ? ' is-disabled' : '' ?>"
+                    data-bs-toggle="modal"
+                    data-bs-target="#orderModal"
+                    data-product-id="<?= $productId ?>"
+                    data-product-name="<?= Helpers::sanitize($productName) ?>"
+                    data-product-price-html="<?= htmlspecialchars($productPriceHtml, ENT_QUOTES, 'UTF-8') ?>"
+                    data-product-base-amount="<?= Helpers::sanitize(number_format($productBaseAmount, 6, '.', '')) ?>"
+                    data-product-base-currency="<?= Helpers::sanitize($productBaseCurrency) ?>"
+                    data-product-sku="<?= Helpers::sanitize($skuValue ?: '-') ?>"
+                    data-product-category="<?= Helpers::sanitize($categoryTrail) ?>"
+                    <?= $buttonDisabled ? 'disabled aria-disabled="true" title="Stok tükendi"' : '' ?>>
+                Sipariş ver
+            </button>
+            <button type="button"
+                    class="btn btn-outline-secondary btn-sm ms-2 js-favorite-toggle<?= $isFavorited ? ' active' : '' ?>"
+                    data-product-id="<?= $productId ?>"
+                    title="<?= $isFavorited ? 'Favorilerden çıkar' : 'Favorilere ekle' ?>">
+                <i class="bi <?= $isFavorited ? 'bi-heart-fill text-danger' : 'bi-heart' ?>"></i>
+            </button>
+            <button type="button"
+                    class="btn btn-outline-warning btn-sm ms-2 js-watch-toggle<?= $isWatching ? ' active' : '' ?>"
+                    data-product-id="<?= $productId ?>"
+                    title="Stok bildirimi">
+                <i class="bi <?= $isWatching ? 'bi-bell-fill' : 'bi-bell' ?>"></i>
+            </button>
+        </div>
+    </div>
+    <?php
+    return ob_get_clean();
+};
+
 $categoryCountResolver = null;
 $categoryCountResolver = function ($categoryId) use (&$categoryChildren, &$categoryProductCounts, &$categoryCountResolver) {
     $total = isset($categoryProductCounts[$categoryId]) ? (int)$categoryProductCounts[$categoryId] : 0;
@@ -341,6 +478,20 @@ include __DIR__ . '/templates/header.php';
             </div>
         </form>
     </div>
+
+    <section class="catalog-section catalog-section--favorites<?= $hasFavoritesSection ? ' is-visible' : ' is-empty' ?>">
+        <div class="catalog-section__header">
+            <h2 class="catalog-section__title"><i class="bi bi-heart-fill text-danger me-2"></i>Favorilerim</h2>
+        </div>
+        <div class="favorites-rail" id="favoritesRail">
+            <?php foreach ($favoritesSectionProducts as $favoriteProduct): ?>
+                <?= $renderProductCard($favoriteProduct, true) ?>
+            <?php endforeach; ?>
+        </div>
+        <div class="favorites-empty-message<?= $hasFavoritesSection ? ' d-none' : '' ?>" id="favoritesEmptyMessage">
+            Henüz favori ürün eklemediniz. Beğendiğiniz ürünlerde kalp simgesine tıklayarak hızlı erişim sağlayabilirsiniz.
+        </div>
+    </section>
 
     <?php if ($showAllCategories): ?>
         <section class="catalog-section">
@@ -414,89 +565,9 @@ include __DIR__ . '/templates/header.php';
             <div class="catalog-subheader">Ürünler</div>
 
             <?php if ($products): ?>
-                <div class="product-grid">
+                <div class="catalog-products">
                     <?php foreach ($products as $product): ?>
-                        <?php
-                        $productId = isset($product['id']) ? (int)$product['id'] : 0;
-                        $productName = isset($product['name']) ? $product['name'] : 'Servis';
-                        $productPrice = Helpers::formatCurrency(isset($product['price']) ? (float)$product['price'] : 0);
-                        $categoryTrail = isset($product['category_id']) ? $categoryPath((int)$product['category_id']) : (isset($product['category_name']) ? $product['category_name'] : 'Kategori');
-                        $rawDescription = isset($product['description']) ? trim($product['description']) : '';
-                        if ($rawDescription === '') {
-                            $rawDescription = Helpers::defaultProductDescription();
-                        }
-                        $shortDescription = Helpers::truncate($rawDescription, 140);
-                        $skuValue = (isset($product['sku']) && $product['sku'] !== '') ? $product['sku'] : null;
-                        $providerCode = isset($product['provider_code']) ? strtolower((string)$product['provider_code']) : '';
-                        $isStockBased = ($providerCode === '' || $providerCode === 'stock' || $providerCode === 'panel');
-                        $availableStock = isset($product['available_stock']) ? (int)$product['available_stock'] : 0;
-                        $stockBadgeClass = 'bg-info text-dark';
-                        $stockLabel = 'Sağlayıcı teslimatı';
-                        $restockHint = '';
-                        if ($isStockBased) {
-                            if ($availableStock > 0) {
-                                $stockBadgeClass = 'bg-success';
-                                $stockLabel = sprintf('Stokta %d adet', $availableStock);
-                                if ($availableStock <= 3) {
-                                    $restockHint = 'Stok seviyesi kritik, yöneticinizden yenileme talep edin.';
-                                }
-                            } else {
-                                $stockBadgeClass = 'bg-danger';
-                                $stockLabel = 'Stok tükendi';
-                                $restockHint = 'Bu ürün için stok bildirimi ayarlayabilirsiniz.';
-                            }
-                        }
-                        $isFavorited = in_array($productId, $favoriteProductIds, true);
-                        $isWatching = in_array($productId, $watchingProductIds, true);
-                        $buttonDisabled = $isStockBased && $availableStock <= 0;
-                        ?>
-                        <div class="product-card">
-                            <div class="product-card__header">
-                                <div>
-                                    <h3 class="product-card__title"><?= Helpers::sanitize($productName) ?></h3>
-                                    <div class="product-card__category"><?= Helpers::sanitize($categoryTrail) ?></div>
-                                </div>
-                                <div class="product-card__price"><?= Helpers::sanitize($productPrice) ?></div>
-                            </div>
-                            <?php if ($skuValue): ?>
-                                <div class="product-card__sku">SKU: <?= Helpers::sanitize($skuValue) ?></div>
-                            <?php endif; ?>
-                            <div class="product-card__stock">
-                                <span class="badge <?= htmlspecialchars($stockBadgeClass, ENT_QUOTES, 'UTF-8') ?>"><?= Helpers::sanitize($stockLabel) ?></span>
-                            </div>
-                            <p class="product-card__description"><?= Helpers::sanitize($shortDescription) ?></p>
-                            <?php if ($restockHint !== ''): ?>
-                                <div class="product-card__hint text-muted small mb-2">
-                                    <i class="bi bi-lightbulb me-1"></i><?= Helpers::sanitize($restockHint) ?>
-                                </div>
-                            <?php endif; ?>
-                            <div class="product-card__actions">
-                                <button type="button"
-                                        class="product-card__button<?= $buttonDisabled ? ' is-disabled' : '' ?>"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#orderModal"
-                                        data-product-id="<?= $productId ?>"
-                                        data-product-name="<?= Helpers::sanitize($productName) ?>"
-                                        data-product-price="<?= Helpers::sanitize($productPrice) ?>"
-                                        data-product-sku="<?= Helpers::sanitize($skuValue ?: '-') ?>"
-                                        data-product-category="<?= Helpers::sanitize($categoryTrail) ?>"
-                                        <?= $buttonDisabled ? 'disabled aria-disabled="true" title="Stok tükendi"' : '' ?>>
-                                    Sipariş ver
-                                </button>
-                                <button type="button"
-                                        class="btn btn-outline-secondary btn-sm ms-2 js-favorite-toggle<?= $isFavorited ? ' active' : '' ?>"
-                                        data-product-id="<?= $productId ?>"
-                                        title="<?= $isFavorited ? 'Favorilerden çıkar' : 'Favorilere ekle' ?>">
-                                    <i class="bi <?= $isFavorited ? 'bi-heart-fill text-danger' : 'bi-heart' ?>"></i>
-                                </button>
-                                <button type="button"
-                                        class="btn btn-outline-warning btn-sm ms-2 js-watch-toggle<?= $isWatching ? ' active' : '' ?>"
-                                        data-product-id="<?= $productId ?>"
-                                        title="Stok bildirimi">
-                                    <i class="bi <?= $isWatching ? 'bi-bell-fill' : 'bi-bell' ?>"></i>
-                                </button>
-                            </div>
-                        </div>
+                        <?= $renderProductCard($product) ?>
                     <?php endforeach; ?>
                 </div>
             <?php else: ?>
@@ -538,7 +609,7 @@ include __DIR__ . '/templates/header.php';
                         </div>
                         <div class="col-6 text-end">
                             <div class="fw-semibold"><?= Helpers::sanitize('Fiyat') ?></div>
-                            <div id="orderProductPrice"><?= Helpers::sanitize(Helpers::formatCurrency(0)) ?></div>
+                            <div id="orderProductPrice"><?= Helpers::formatCurrencyHtml(0) ?></div>
                         </div>
                         <div class="col-12">
                             <div class="fw-semibold">SKU</div>
@@ -593,41 +664,115 @@ include __DIR__ . '/templates/header.php';
             });
         }
 
-        document.querySelectorAll('.js-favorite-toggle').forEach(function (button) {
-            button.addEventListener('click', function () {
-                var productId = button.getAttribute('data-product-id');
-                postResellerAction('toggle_favorite', { product_id: productId }, function (data) {
-                    button.classList.toggle('active', !!data.favorited);
-                    var icon = button.querySelector('i');
-                    if (!icon) { return; }
-                    if (data.favorited) {
-                        icon.className = 'bi bi-heart-fill text-danger';
-                        button.setAttribute('title', 'Favorilerden çıkar');
-                    } else {
-                        icon.className = 'bi bi-heart';
-                        button.setAttribute('title', 'Favorilere ekle');
-                    }
-                });
-            });
-        });
+        var favoritesRail = document.getElementById('favoritesRail');
+        var favoritesSection = document.querySelector('.catalog-section--favorites');
+        var favoritesEmptyMessage = document.getElementById('favoritesEmptyMessage');
 
-        document.querySelectorAll('.js-watch-toggle').forEach(function (button) {
-            button.addEventListener('click', function () {
-                var productId = button.getAttribute('data-product-id');
-                postResellerAction('toggle_watch', { product_id: productId }, function (data) {
-                    button.classList.toggle('active', !!data.watching);
-                    var icon = button.querySelector('i');
-                    if (!icon) { return; }
-                    if (data.watching) {
-                        icon.className = 'bi bi-bell-fill';
-                        button.setAttribute('title', 'Bildirimi kapat');
-                    } else {
-                        icon.className = 'bi bi-bell';
-                        button.setAttribute('title', 'Stok bildirimi');
+        function setFavoriteButtonState(button, isFavorited) {
+            if (!button) { return; }
+            button.classList.toggle('active', !!isFavorited);
+            var icon = button.querySelector('i');
+            if (icon) {
+                icon.className = isFavorited ? 'bi bi-heart-fill text-danger' : 'bi bi-heart';
+            }
+            button.setAttribute('title', isFavorited ? 'Favorilerden çıkar' : 'Favorilere ekle');
+        }
+
+        function setWatchButtonState(button, isWatching) {
+            if (!button) { return; }
+            button.classList.toggle('active', !!isWatching);
+            var icon = button.querySelector('i');
+            if (icon) {
+                icon.className = isWatching ? 'bi bi-bell-fill' : 'bi bi-bell';
+            }
+            button.setAttribute('title', isWatching ? 'Bildirimi kapat' : 'Stok bildirimi');
+        }
+
+        function updateFavoriteState(productId, isFavorited, originCard) {
+            if (!productId) { return; }
+
+            if (originCard) {
+                originCard.classList.toggle('product-card--favorite', !!isFavorited);
+                if (isFavorited) {
+                    originCard.setAttribute('data-favorite-card', '1');
+                } else {
+                    originCard.removeAttribute('data-favorite-card');
+                }
+            }
+
+            if (!favoritesRail) {
+                return;
+            }
+
+            if (isFavorited) {
+                var existing = favoritesRail.querySelector('[data-product-card="' + productId + '"]');
+                if (!existing && originCard) {
+                    var clone = originCard.cloneNode(true);
+                    clone.classList.add('product-card--favorite');
+                    clone.setAttribute('data-favorite-card', '1');
+                    favoritesRail.appendChild(clone);
+                    bindFavoriteHandlers(clone);
+                    bindWatchHandlers(clone);
+                }
+                if (favoritesSection) {
+                    favoritesSection.classList.remove('is-empty');
+                    favoritesSection.classList.add('is-visible');
+                }
+                if (favoritesEmptyMessage) {
+                    favoritesEmptyMessage.classList.add('d-none');
+                }
+            } else {
+                var favoriteCard = favoritesRail.querySelector('[data-product-card="' + productId + '"]');
+                if (favoriteCard) {
+                    favoriteCard.remove();
+                }
+                if (favoritesRail.children.length === 0) {
+                    if (favoritesSection) {
+                        favoritesSection.classList.add('is-empty');
+                        favoritesSection.classList.remove('is-visible');
                     }
+                    if (favoritesEmptyMessage) {
+                        favoritesEmptyMessage.classList.remove('d-none');
+                    }
+                }
+            }
+        }
+
+        function bindFavoriteHandlers(scope) {
+            (scope || document).querySelectorAll('.js-favorite-toggle').forEach(function (button) {
+                if (button.dataset.boundFavorite === '1') {
+                    return;
+                }
+                button.dataset.boundFavorite = '1';
+                button.addEventListener('click', function () {
+                    var productId = button.getAttribute('data-product-id');
+                    var card = button.closest('[data-product-card]');
+                    postResellerAction('toggle_favorite', { product_id: productId }, function (data) {
+                        var favorited = !!data.favorited;
+                        setFavoriteButtonState(button, favorited);
+                        updateFavoriteState(productId, favorited, card);
+                    });
                 });
             });
-        });
+        }
+
+        function bindWatchHandlers(scope) {
+            (scope || document).querySelectorAll('.js-watch-toggle').forEach(function (button) {
+                if (button.dataset.boundWatch === '1') {
+                    return;
+                }
+                button.dataset.boundWatch = '1';
+                button.addEventListener('click', function () {
+                    var productId = button.getAttribute('data-product-id');
+                    postResellerAction('toggle_watch', { product_id: productId }, function (data) {
+                        setWatchButtonState(button, !!data.watching);
+                    });
+                });
+            });
+        }
+
+        bindFavoriteHandlers(document);
+        bindWatchHandlers(document);
 
         if (!orderModal) {
             return;
@@ -643,7 +788,14 @@ include __DIR__ . '/templates/header.php';
 
             orderModal.querySelector('#orderProductId').value = dataset.productId || '';
             orderModal.querySelector('#orderProductName').value = dataset.productName || '';
-            orderModal.querySelector('#orderProductPrice').textContent = dataset.productPrice || '<?= Helpers::sanitize(Helpers::formatCurrency(0)) ?>';
+            var priceNode = orderModal.querySelector('#orderProductPrice');
+            if (priceNode) {
+                var priceHtml = dataset.productPriceHtml || '<?= htmlspecialchars(Helpers::formatCurrencyHtml(0), ENT_QUOTES, 'UTF-8') ?>';
+                priceNode.innerHTML = priceHtml;
+                if (window.App && typeof window.App.refreshMoney === 'function') {
+                    window.App.refreshMoney();
+                }
+            }
             orderModal.querySelector('#orderProductSku').textContent = dataset.productSku || '-';
             orderModal.querySelector('#orderProductCategory').textContent = dataset.productCategory || '-';
 
