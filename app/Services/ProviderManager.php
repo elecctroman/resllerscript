@@ -367,6 +367,7 @@ final class ProviderManager
     }
 
     /**
+
      * @param array<string,mixed> $provider
      * @return array<string,mixed>
      */

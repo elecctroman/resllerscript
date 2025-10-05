@@ -20,6 +20,7 @@ if ($errorFlash) {
 }
 $success = is_string($success) ? $success : '';
 
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = isset($_POST['action']) ? $_POST['action'] : '';
     $token = isset($_POST['csrf_token']) ? $_POST['csrf_token'] : '';
@@ -36,12 +37,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $productsEndpoint = isset($_POST['products_endpoint']) ? trim((string) $_POST['products_endpoint']) : '/api/products';
             $ordersEndpoint = isset($_POST['orders_endpoint']) ? trim((string) $_POST['orders_endpoint']) : '/api/orders';
 
+
             $code = strtolower(str_replace(' ', '-', $codeInput));
             $code = preg_replace('/[^a-z0-9_-]/', '', $code);
 
-            if ($name === '' || $codeInput === '') {
-                $errors[] = 'Sağlayıcı adı ve kodu zorunludur.';
-            }
 
             if ($code === '') {
                 $errors[] = 'Sağlayıcı kodu yalnızca harf, rakam, tire ve alt çizgi içerebilir.';
@@ -57,6 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errors[] = 'API anahtarı zorunludur.';
             }
 
+
             if (!$errors) {
                 $check = $pdo->prepare('SELECT id FROM providers WHERE code = :code LIMIT 1');
                 $check->execute(array('code' => $code));
@@ -69,6 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $settings = array(
                     'products_endpoint' => $productsEndpoint !== '' ? $productsEndpoint : '/api/products',
                     'orders_endpoint' => $ordersEndpoint !== '' ? $ordersEndpoint : '/api/orders',
+
                 );
 
                 $stmt = $pdo->prepare('INSERT INTO providers (name, code, base_url, api_key, status, settings, created_at) VALUES (:name, :code, :base_url, :api_key, :status, :settings, NOW())');
@@ -104,6 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $productsEndpoint = isset($_POST['products_endpoint']) ? trim((string) $_POST['products_endpoint']) : '/api/products';
             $ordersEndpoint = isset($_POST['orders_endpoint']) ? trim((string) $_POST['orders_endpoint']) : '/api/orders';
 
+
             $code = strtolower(str_replace(' ', '-', $codeInput));
             $code = preg_replace('/[^a-z0-9_-]/', '', $code);
 
@@ -116,9 +118,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errors[] = 'Sağlayıcı kaydı bulunamadı.';
             }
 
-            if ($name === '' || $codeInput === '') {
-                $errors[] = 'Sağlayıcı adı ve kodu zorunludur.';
-            }
 
             if ($code === '') {
                 $errors[] = 'Sağlayıcı kodu yalnızca harf, rakam, tire ve alt çizgi içerebilir.';
@@ -134,6 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errors[] = 'API anahtarı zorunludur.';
             }
 
+
             if (!$errors) {
                 $check = $pdo->prepare('SELECT id FROM providers WHERE code = :code AND id <> :id LIMIT 1');
                 $check->execute(array('code' => $code, 'id' => $providerId));
@@ -146,7 +146,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $settings = array(
                     'products_endpoint' => $productsEndpoint !== '' ? $productsEndpoint : '/api/products',
                     'orders_endpoint' => $ordersEndpoint !== '' ? $ordersEndpoint : '/api/orders',
-                );
 
                 $stmt = $pdo->prepare('UPDATE providers SET name = :name, code = :code, base_url = :base_url, api_key = :api_key, status = :status, settings = :settings, updated_at = NOW() WHERE id = :id');
                 $stmt->execute(array(
@@ -276,6 +275,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $errors[] = isset($result['error']) ? (string) $result['error'] : 'Ürünler içe aktarılırken hata oluştu.';
                 }
             }
+
         }
     }
 }
@@ -359,43 +359,7 @@ include __DIR__ . '/../templates/header.php';
                     <div class="alert alert-success mb-3"><?= Helpers::sanitize($success) ?></div>
                 <?php endif; ?>
 
-                <form method="post" class="vstack gap-3">
-                    <input type="hidden" name="action" value="create_provider">
-                    <input type="hidden" name="csrf_token" value="<?= Helpers::sanitize(Helpers::csrfToken()) ?>">
-                    <div>
-                        <label class="form-label">Sağlayıcı Adı</label>
-                        <input type="text" name="name" class="form-control" placeholder="Örn: Lotus Connect" required>
-                    </div>
-                    <div>
-                        <label class="form-label">Kod</label>
-                        <input type="text" name="code" class="form-control" placeholder="Örn: lotus" required>
-                        <small class="text-muted">Sipariş yönlendirmelerinde kullanılacak benzersiz kısa ad.</small>
-                    </div>
-                    <div>
-                        <label class="form-label">API Adresi</label>
-                        <input type="url" name="base_url" class="form-control" placeholder="https://example.com" required>
-                    </div>
-                    <div>
-                        <label class="form-label">API Anahtarı</label>
-                        <input type="text" name="api_key" class="form-control" placeholder="Uzun anahtar" required>
-                    </div>
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Ürün Uç Noktası</label>
-                            <input type="text" name="products_endpoint" class="form-control" value="/api/products">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Sipariş Uç Noktası</label>
-                            <input type="text" name="orders_endpoint" class="form-control" value="/api/orders">
-                        </div>
-                    </div>
-                    <div>
-                        <label class="form-label">Durum</label>
-                        <select name="status" class="form-select">
-                            <option value="active">Aktif</option>
-                            <option value="inactive" selected>Pasif</option>
-                        </select>
-                    </div>
+
                     <button type="submit" class="btn btn-primary">Sağlayıcıyı Kaydet</button>
                 </form>
             </div>
@@ -419,6 +383,7 @@ include __DIR__ . '/../templates/header.php';
                                     <th>Kod</th>
                                     <th>Durum</th>
                                     <th>API Adresi</th>
+
                                     <th>Son Senkron</th>
                                     <th class="text-end">İşlemler</th>
                                 </tr>
@@ -426,6 +391,7 @@ include __DIR__ . '/../templates/header.php';
                             <tbody>
                                 <?php foreach ($providers as $providerItem): ?>
                                     <tr>
+
                                         <td>
                                             <strong><?= Helpers::sanitize(isset($providerItem['name']) ? $providerItem['name'] : 'Sağlayıcı') ?></strong>
                                         </td>
@@ -443,6 +409,7 @@ include __DIR__ . '/../templates/header.php';
                                             </a>
                                         </td>
                                         <td>
+
                                             <?php if (!empty($providerItem['last_synced_at'])): ?>
                                                 <span class="text-muted small"><?= Helpers::sanitize(date('d.m.Y H:i', strtotime($providerItem['last_synced_at']))) ?></span>
                                             <?php else: ?>
@@ -452,6 +419,7 @@ include __DIR__ . '/../templates/header.php';
                                         <td class="text-end">
                                             <a href="/admin/providers.php?provider_id=<?= (int) $providerItem['id'] ?>" class="btn btn-sm btn-outline-secondary">Ürünler</a>
                                             <form method="post" class="d-inline">
+
                                                 <input type="hidden" name="action" value="sync_products">
                                                 <input type="hidden" name="csrf_token" value="<?= Helpers::sanitize(Helpers::csrfToken()) ?>">
                                                 <input type="hidden" name="provider_id" value="<?= (int) $providerItem['id'] ?>">
@@ -470,7 +438,7 @@ include __DIR__ . '/../templates/header.php';
                                     <div class="modal fade" id="editProvider<?= (int) $providerItem['id'] ?>" tabindex="-1" aria-hidden="true">
                                         <div class="modal-dialog modal-lg modal-dialog-centered">
                                             <div class="modal-content">
-                                                <form method="post">
+
                                                     <div class="modal-header">
                                                         <h5 class="modal-title">Sağlayıcıyı Düzenle</h5>
                                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
@@ -479,42 +447,7 @@ include __DIR__ . '/../templates/header.php';
                                                         <input type="hidden" name="action" value="update_provider">
                                                         <input type="hidden" name="csrf_token" value="<?= Helpers::sanitize(Helpers::csrfToken()) ?>">
                                                         <input type="hidden" name="id" value="<?= (int) $providerItem['id'] ?>">
-                                                        <div class="row g-3">
-                                                            <div class="col-md-6">
-                                                                <label class="form-label">Sağlayıcı Adı</label>
-                                                                <input type="text" name="name" class="form-control" value="<?= Helpers::sanitize(isset($providerItem['name']) ? $providerItem['name'] : '') ?>" required>
-                                                            </div>
-                                                            <div class="col-md-6">
-                                                                <label class="form-label">Kod</label>
-                                                                <input type="text" name="code" class="form-control" value="<?= Helpers::sanitize(isset($providerItem['code']) ? $providerItem['code'] : '') ?>" required>
-                                                            </div>
-                                                            <div class="col-md-6">
-                                                                <label class="form-label">API Adresi</label>
-                                                                <input type="url" name="base_url" class="form-control" value="<?= Helpers::sanitize(isset($providerItem['base_url']) ? $providerItem['base_url'] : '') ?>" required>
-                                                            </div>
-                                                            <div class="col-md-6">
-                                                                <label class="form-label">API Anahtarı</label>
-                                                                <input type="text" name="api_key" class="form-control" value="<?= Helpers::sanitize(isset($providerItem['api_key']) ? $providerItem['api_key'] : '') ?>" required>
-                                                            </div>
-                                                            <?php
-                                                            $providerSettings = isset($providerItem['settings']) && is_array($providerItem['settings']) ? $providerItem['settings'] : array();
-                                                            $editProductsEndpoint = isset($providerSettings['products_endpoint']) ? (string) $providerSettings['products_endpoint'] : '/api/products';
-                                                            $editOrdersEndpoint = isset($providerSettings['orders_endpoint']) ? (string) $providerSettings['orders_endpoint'] : '/api/orders';
-                                                            ?>
-                                                            <div class="col-md-6">
-                                                                <label class="form-label">Ürün Uç Noktası</label>
-                                                                <input type="text" name="products_endpoint" class="form-control" value="<?= Helpers::sanitize($editProductsEndpoint) ?>">
-                                                            </div>
-                                                            <div class="col-md-6">
-                                                                <label class="form-label">Sipariş Uç Noktası</label>
-                                                                <input type="text" name="orders_endpoint" class="form-control" value="<?= Helpers::sanitize($editOrdersEndpoint) ?>">
-                                                            </div>
-                                                            <div class="col-md-6">
-                                                                <label class="form-label">Durum</label>
-                                                                <select name="status" class="form-select">
-                                                                    <option value="active" <?= isset($providerItem['status']) && $providerItem['status'] === 'active' ? 'selected' : '' ?>>Aktif</option>
-                                                                    <option value="inactive" <?= !isset($providerItem['status']) || $providerItem['status'] !== 'active' ? 'selected' : '' ?>>Pasif</option>
-                                                                </select>
+
                                                             </div>
                                                         </div>
                                                     </div>
@@ -651,6 +584,7 @@ $GLOBALS['pageInlineScripts'][] = <<<JS
                 });
             });
         }
+
     });
 JS;
 include __DIR__ . '/../templates/footer.php';

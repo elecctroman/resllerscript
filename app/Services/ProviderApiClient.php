@@ -32,6 +32,7 @@ final class ProviderApiClient
     }
 
     /**
+
      * @param array<string,mixed> $provider
      * @param array<string,mixed> $payload
      * @return array<string,mixed>
