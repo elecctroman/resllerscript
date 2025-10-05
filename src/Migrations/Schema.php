@@ -28,6 +28,7 @@ final class Schema
         self::ensureUserLocaleColumns($pdo);
         self::ensureBlogCategoriesTable($pdo);
         self::ensureBlogPostsTable($pdo);
+        self::ensureInstructionsTable($pdo);
 
     }
 
@@ -42,6 +43,7 @@ final class Schema
             cost_price_try DECIMAL(12,2) NULL,
             price DECIMAL(12,2) NOT NULL DEFAULT 0,
             status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+            automatic_delivery TINYINT(1) NOT NULL DEFAULT 1,
             provider_code VARCHAR(100) NULL,
             provider_product_id VARCHAR(100) NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -51,6 +53,7 @@ final class Schema
 
         self::ensureColumn($pdo, 'products', 'provider_code', "VARCHAR(100) NULL");
         self::ensureColumn($pdo, 'products', 'provider_product_id', "VARCHAR(100) NULL");
+        self::ensureColumn($pdo, 'products', 'automatic_delivery', "TINYINT(1) NOT NULL DEFAULT 1");
     }
 
     private static function ensureProductStockTable(PDO $pdo): void
@@ -215,6 +218,22 @@ final class Schema
         self::ensureColumn($pdo, 'blog_posts', 'meta_description', 'VARCHAR(255) NULL');
         self::ensureColumn($pdo, 'blog_posts', 'author_name', 'VARCHAR(150) NULL');
         self::ensureColumn($pdo, 'blog_posts', 'image_url', 'VARCHAR(255) NULL');
+    }
+
+    private static function ensureInstructionsTable(PDO $pdo): void
+    {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS instructions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(191) NOT NULL,
+            summary VARCHAR(255) NULL,
+            content MEDIUMTEXT NOT NULL,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        self::ensureColumn($pdo, 'instructions', 'summary', 'VARCHAR(255) NULL');
+        self::ensureColumn($pdo, 'instructions', 'is_active', 'TINYINT(1) NOT NULL DEFAULT 1');
     }
 
 

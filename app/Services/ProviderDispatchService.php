@@ -24,7 +24,7 @@ class ProviderDispatchService
         }
 
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('SELECT po.*, p.name AS product_name, p.provider_code, p.provider_product_id, u.name AS user_name, u.email AS user_email, u.notify_order_completed, u.telegram_bot_token, u.telegram_chat_id FROM product_orders po INNER JOIN products p ON po.product_id = p.id INNER JOIN users u ON po.user_id = u.id WHERE po.id = :id LIMIT 1');
+        $stmt = $pdo->prepare('SELECT po.*, p.name AS product_name, p.provider_code, p.provider_product_id, p.automatic_delivery, u.name AS user_name, u.email AS user_email, u.notify_order_completed, u.telegram_bot_token, u.telegram_chat_id FROM product_orders po INNER JOIN products p ON po.product_id = p.id INNER JOIN users u ON po.user_id = u.id WHERE po.id = :id LIMIT 1');
         $stmt->execute(array('id' => $orderId));
         $order = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -34,6 +34,21 @@ class ProviderDispatchService
 
         $providerCode = isset($order['provider_code']) ? strtolower((string) $order['provider_code']) : '';
         $providerProductId = isset($order['provider_product_id']) ? trim((string) $order['provider_product_id']) : '';
+
+        $automaticDelivery = isset($order['automatic_delivery']) ? (int)$order['automatic_delivery'] === 1 : false;
+
+        if ($automaticDelivery && ($providerCode === '' || $providerCode === 'panel' || $providerCode === 'stock')) {
+            $complete = $pdo->prepare('UPDATE product_orders SET status = :status, admin_note = :note, updated_at = NOW() WHERE id = :id');
+            $complete->execute(array(
+                'status' => 'completed',
+                'note' => 'Sipariş otomatik teslim edildi.',
+                'id' => $orderId,
+            ));
+
+            self::notifyIfCompleted($orderId);
+
+            return array('success' => true, 'status' => 'completed', 'message' => 'Sipariş otomatik teslim edildi.');
+        }
 
         if ($providerCode === '' || $providerCode === 'panel' || $providerCode === 'stock') {
             return ProductStockService::deliverOrderFromStock($orderId);

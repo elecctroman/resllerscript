@@ -6,6 +6,7 @@ use App\AuditLog;
 use App\Currency;
 use App\Database;
 use App\Helpers;
+use App\Services\ProductStockService;
 use App\Settings;
 
 Auth::requireRoles(array('super_admin', 'admin', 'content'));
@@ -31,6 +32,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $status = isset($_POST['status']) ? 'active' : 'inactive';
             $providerCode = isset($_POST['provider_code']) ? strtolower(trim($_POST['provider_code'])) : '';
             $providerProductId = isset($_POST['provider_product_id']) ? trim($_POST['provider_product_id']) : '';
+            $automaticDeliveryInput = isset($_POST['automatic_delivery']) ? (int)$_POST['automatic_delivery'] : 1;
+            $automaticDelivery = $automaticDeliveryInput === 1 ? 1 : 0;
 
             $costSanitized = preg_replace('/[^0-9.,-]/', '', $costInput);
             $costSanitized = str_replace(',', '.', (string)$costSanitized);
@@ -55,10 +58,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errors[] = 'Sağlayıcı ürün kimliği zorunludur.';
             }
 
+            if ($providerCode !== '') {
+                $automaticDelivery = 1;
+            } elseif ($automaticDelivery === 0) {
+                $automaticDelivery = 1; // stok girişi yapılmadığında otomatik teslimat aktif kalır
+            }
+
             if (!$errors) {
                 $salePrice = Helpers::priceFromCostTry($costPriceTry);
 
-                $stmt = $pdo->prepare('INSERT INTO products (name, category_id, cost_price_try, price, description, sku, status, provider_code, provider_product_id, created_at) VALUES (:name, :category_id, :cost_price_try, :price, :description, :sku, :status, :provider_code, :provider_product_id, NOW())');
+                $stmt = $pdo->prepare('INSERT INTO products (name, category_id, cost_price_try, price, description, sku, status, automatic_delivery, provider_code, provider_product_id, created_at) VALUES (:name, :category_id, :cost_price_try, :price, :description, :sku, :status, :automatic_delivery, :provider_code, :provider_product_id, NOW())');
                 $stmt->execute(array(
                     'name' => $name,
                     'category_id' => $categoryId,
@@ -67,6 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'description' => $description !== '' ? $description : null,
                     'sku' => $sku !== '' ? $sku : null,
                     'status' => $status,
+                    'automatic_delivery' => $automaticDelivery,
                     'provider_code' => $providerCode !== '' ? $providerCode : null,
                     'provider_product_id' => $providerProductId !== '' ? $providerProductId : null,
                 ));
@@ -91,6 +101,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $status = isset($_POST['status']) ? 'active' : 'inactive';
             $providerCode = isset($_POST['provider_code']) ? strtolower(trim($_POST['provider_code'])) : '';
             $providerProductId = isset($_POST['provider_product_id']) ? trim($_POST['provider_product_id']) : '';
+            $automaticDeliveryInput = isset($_POST['automatic_delivery']) ? (int)$_POST['automatic_delivery'] : 0;
+            $automaticDelivery = $automaticDeliveryInput === 1 ? 1 : 0;
 
             $costSanitized = preg_replace('/[^0-9.,-]/', '', $costInput);
             $costSanitized = str_replace(',', '.', (string)$costSanitized);
@@ -116,9 +128,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             if (!$errors) {
+                if ($providerCode !== '') {
+                    $automaticDelivery = 1;
+                } elseif ($automaticDelivery === 0) {
+                    $availableStock = 0;
+                    try {
+                        $availableStock = ProductStockService::availableStockCount($productId);
+                    } catch (\Throwable $exception) {
+                        $availableStock = 0;
+                    }
+
+                    if ($availableStock === 0) {
+                        $automaticDelivery = 1;
+                    }
+                }
+
                 $salePrice = Helpers::priceFromCostTry($costPriceTry);
 
-                $stmt = $pdo->prepare('UPDATE products SET name = :name, category_id = :category_id, cost_price_try = :cost_price_try, price = :price, description = :description, sku = :sku, status = :status, provider_code = :provider_code, provider_product_id = :provider_product_id, updated_at = NOW() WHERE id = :id');
+                $stmt = $pdo->prepare('UPDATE products SET name = :name, category_id = :category_id, cost_price_try = :cost_price_try, price = :price, description = :description, sku = :sku, status = :status, automatic_delivery = :automatic_delivery, provider_code = :provider_code, provider_product_id = :provider_product_id, updated_at = NOW() WHERE id = :id');
                 $stmt->execute(array(
                     'id' => $productId,
                     'name' => $name,
@@ -128,6 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'description' => $description !== '' ? $description : null,
                     'sku' => $sku !== '' ? $sku : null,
                     'status' => $status,
+                    'automatic_delivery' => $automaticDelivery,
                     'provider_code' => $providerCode !== '' ? $providerCode : null,
                     'provider_product_id' => $providerProductId !== '' ? $providerProductId : null,
                 ));
@@ -288,15 +316,22 @@ include __DIR__ . '/../templates/header.php';
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label">Sağlayıcı</label>
-                            <select name="provider_code" class="form-select">
+                            <select name="provider_code" class="form-select" data-provider-select="#createProviderProduct">
                                 <option value="">Panel (Stok Teslimatı)</option>
+                                <option value="lotus">Lotus Connect</option>
                             </select>
-                            <small class="text-muted">"Stok" seçeneği fiziksel stoğu kullanır. Harici sağlayıcılar şu anda devre dışıdır.</small>
+                            <small class="text-muted">Harici sağlayıcı seçtiğinizde siparişler otomatik olarak sağlayıcıya yönlendirilir.</small>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-6 d-none" id="createProviderProduct">
                             <label class="form-label">Sağlayıcı Ürün ID</label>
-                            <input type="text" name="provider_product_id" class="form-control" placeholder="Örn: 57">
+                            <input type="text" name="provider_product_id" class="form-control" placeholder="Örn: 57" disabled>
                         </div>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input type="hidden" name="automatic_delivery" value="0">
+                        <input class="form-check-input" type="checkbox" id="createAutomaticDelivery" name="automatic_delivery" value="1" checked>
+                        <label class="form-check-label" for="createAutomaticDelivery">Otomatik teslimat</label>
+                        <small class="text-muted d-block">Stok tanımlanana veya sağlayıcı bağlantısı kurulana kadar siparişler otomatik tamamlanır.</small>
                     </div>
                     <div>
                         <label class="form-label">Açıklama</label>
@@ -336,6 +371,7 @@ include __DIR__ . '/../templates/header.php';
                                 <th>Kategori</th>
                                 <th>Alış Fiyatı (₺)</th>
                                 <th>Satış Fiyatı ($)</th>
+                                <th>Teslimat</th>
                                 <th>Stok</th>
                                 <th>Durum</th>
                                 <th class="text-end">İşlemler</th>
@@ -358,8 +394,20 @@ include __DIR__ . '/../templates/header.php';
                                     <td>
                                         <?php
                                         $provider = isset($product['provider_code']) ? strtolower((string)$product['provider_code']) : '';
+                                        $automaticDelivery = isset($product['automatic_delivery']) ? (int)$product['automatic_delivery'] === 1 : false;
                                         if ($provider === 'lotus') {
                                             echo '<span class="badge bg-info">Sağlayıcı</span>';
+                                        } elseif ($automaticDelivery) {
+                                            echo '<span class="badge bg-primary">Otomatik</span>';
+                                        } else {
+                                            echo '<span class="badge bg-dark">Stoktan</span>';
+                                        }
+                                        ?>
+                                    </td>
+                                    <td>
+                                        <?php
+                                        if ($provider === 'lotus' || $automaticDelivery) {
+                                            echo '<span class="text-muted">Otomatik</span>';
                                         } else {
                                             $availableStock = isset($product['available_stock']) ? (int)$product['available_stock'] : 0;
                                             if ($availableStock > 0) {
@@ -425,19 +473,29 @@ include __DIR__ . '/../templates/header.php';
                                                         </div>
                                                         <div class="col-md-4">
                                                             <label class="form-label">Sağlayıcı</label>
-                                                            <select name="provider_code" class="form-select">
+                                                            <select name="provider_code" class="form-select" data-provider-select="#providerProduct<?= (int)$product['id'] ?>">
                                                                 <option value="">Panel (Stok Teslimatı)</option>
-                                                                <option value="stock" <?= isset($product['provider_code']) && $product['provider_code'] === 'stock' ? 'selected' : '' ?>>Stoktan Teslim</option>
+                                                                <option value="lotus" <?= isset($product['provider_code']) && $product['provider_code'] === 'lotus' ? 'selected' : '' ?>>Lotus Connect</option>
                                                             </select>
                                                         </div>
-                                                        <div class="col-md-4">
+                                                        <?php
+                                                        $providerActive = isset($product['provider_code']) && $product['provider_code'];
+                                                        ?>
+                                                        <div class="col-md-4<?= $providerActive ? '' : ' d-none' ?>" id="providerProduct<?= (int)$product['id'] ?>">
                                                             <label class="form-label">Sağlayıcı Ürün ID</label>
-                                                            <input type="text" name="provider_product_id" class="form-control" value="<?= Helpers::sanitize(isset($product['provider_product_id']) ? $product['provider_product_id'] : '') ?>" placeholder="Örn: 57">
+                                                            <input type="text" name="provider_product_id" class="form-control" value="<?= Helpers::sanitize(isset($product['provider_product_id']) ? $product['provider_product_id'] : '') ?>" placeholder="Örn: 57" <?= $providerActive ? '' : 'disabled' ?>>
                                                         </div>
                                                         <div class="col-md-4">
                                                             <div class="form-check form-switch pt-4">
                                                                 <input class="form-check-input" type="checkbox" id="productStatus<?= (int)$product['id'] ?>" name="status" <?= $product['status'] === 'active' ? 'checked' : '' ?>>
                                                                 <label class="form-check-label" for="productStatus<?= (int)$product['id'] ?>">Aktif</label>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <div class="form-check form-switch pt-4">
+                                                                <input type="hidden" name="automatic_delivery" value="0">
+                                                                <input class="form-check-input" type="checkbox" id="productAuto<?= (int)$product['id'] ?>" name="automatic_delivery" value="1" <?= isset($product['automatic_delivery']) && (int)$product['automatic_delivery'] === 1 ? 'checked' : '' ?>>
+                                                                <label class="form-check-label" for="productAuto<?= (int)$product['id'] ?>">Otomatik teslimat</label>
                                                             </div>
                                                         </div>
                                                         <div class="col-12">
@@ -463,4 +521,37 @@ include __DIR__ . '/../templates/header.php';
         </div>
     </div>
 </div>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('[data-provider-select]').forEach(function (select) {
+            var targetSelector = select.getAttribute('data-provider-select');
+            if (!targetSelector) {
+                return;
+            }
+
+            var target = document.querySelector(targetSelector);
+            if (!target) {
+                return;
+            }
+
+            var toggleVisibility = function () {
+                var hasProvider = (select.value || '').trim() !== '';
+                if (hasProvider) {
+                    target.classList.remove('d-none');
+                    target.querySelectorAll('input').forEach(function (input) {
+                        input.disabled = false;
+                    });
+                } else {
+                    target.classList.add('d-none');
+                    target.querySelectorAll('input').forEach(function (input) {
+                        input.disabled = true;
+                    });
+                }
+            };
+
+            toggleVisibility();
+            select.addEventListener('change', toggleVisibility);
+        });
+    });
+</script>
 <?php include __DIR__ . '/../templates/footer.php';

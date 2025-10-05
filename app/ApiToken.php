@@ -38,8 +38,11 @@ class ApiToken
 
         if ($row) {
             $pdo->prepare('UPDATE api_tokens SET last_used_at = NOW() WHERE id = :id')->execute(array('id' => $row['token_id']));
+            $tokenId = (int)$row['token_id'];
+
             return array(
-                'id' => (int)$row['token_id'],
+                'id' => $tokenId,
+                'token_id' => $tokenId,
                 'user_id' => (int)$row['user_id'],
                 'token' => $row['token'],
                 'label' => isset($row['label']) ? $row['label'] : null,
