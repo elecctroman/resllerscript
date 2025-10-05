@@ -20,61 +20,7 @@ if ($errorFlash) {
 }
 $success = is_string($success) ? $success : '';
 
-$providerDrivers = array(
-    'generic' => array(
-        'label' => 'Özel Sağlayıcı',
-        'placeholder' => 'https://api.example.com/',
-        'default_name' => 'Özel Sağlayıcı',
-        'default_code' => 'ozel-saglayici',
-    ),
-    'netgsm' => array(
-        'label' => 'NetGSM',
-        'placeholder' => 'https://api.netgsm.com.tr/',
-        'default_name' => 'NetGSM Entegrasyonu',
-        'default_code' => 'netgsm',
-    ),
-    'turkpin' => array(
-        'label' => 'TürkPin',
-        'placeholder' => 'https://panel.turkpin.net/',
-        'default_name' => 'TürkPin Entegrasyonu',
-        'default_code' => 'turkpin',
-    ),
-    'pinabi' => array(
-        'label' => 'Pinabi',
-        'placeholder' => 'https://api.pinabi.com/',
-        'default_name' => 'Pinabi Entegrasyonu',
-        'default_code' => 'pinabi',
-    ),
-);
 
-$deriveIdentity = static function (string $baseUrl): array {
-    $baseUrl = trim($baseUrl);
-    $host = '';
-
-    if ($baseUrl !== '') {
-        $parsed = parse_url($baseUrl);
-        if (is_array($parsed) && isset($parsed['host']) && $parsed['host'] !== '') {
-            $host = $parsed['host'];
-        } else {
-            $stripped = preg_replace('#^https?://#i', '', $baseUrl);
-            $host = $stripped ? strtok($stripped, '/') : '';
-        }
-    }
-
-    $host = trim((string) $host, '/');
-    $readable = $host !== '' ? preg_replace('/[._-]+/', ' ', $host) : 'Sağlayıcı';
-    $name = ucwords(trim((string) $readable));
-    if ($name === '') {
-        $name = 'Sağlayıcı';
-    }
-
-    $code = Helpers::slugify($host !== '' ? $host : $name);
-    if ($code === '') {
-        $code = 'provider';
-    }
-
-    return array('name' => $name, 'code' => $code);
-};
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = isset($_POST['action']) ? $_POST['action'] : '';
@@ -91,12 +37,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $status = isset($_POST['status']) && $_POST['status'] === 'active' ? 'active' : 'inactive';
             $productsEndpoint = isset($_POST['products_endpoint']) ? trim((string) $_POST['products_endpoint']) : '/api/products';
             $ordersEndpoint = isset($_POST['orders_endpoint']) ? trim((string) $_POST['orders_endpoint']) : '/api/orders';
-            $statusEndpoint = isset($_POST['status_endpoint']) ? trim((string) $_POST['status_endpoint']) : '/api/user';
-            $driverInput = isset($_POST['driver']) ? strtolower(trim((string) $_POST['driver'])) : 'generic';
-            $driver = isset($providerDrivers[$driverInput]) ? $driverInput : 'generic';
+
 
             $code = strtolower(str_replace(' ', '-', $codeInput));
             $code = preg_replace('/[^a-z0-9_-]/', '', $code);
+
 
             if ($code === '') {
                 $errors[] = 'Sağlayıcı kodu yalnızca harf, rakam, tire ve alt çizgi içerebilir.';
@@ -112,25 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errors[] = 'API anahtarı zorunludur.';
             }
 
-            if ($name === '' || $codeInput === '' || $code === '') {
-                $identity = $deriveIdentity($baseUrl);
-                if ($name === '') {
-                    $name = $identity['name'];
-                }
-                if ($codeInput === '' || $code === '') {
-                    $codeInput = $identity['code'];
-                    $code = $identity['code'];
-                }
-            }
 
-            if ($name === '') {
-                $name = $providerDrivers[$driver]['default_name'];
-            }
-
-            if ($code === '') {
-                $code = $providerDrivers[$driver]['default_code'];
-                $codeInput = $code;
-            }
 
             if (!$errors) {
                 $check = $pdo->prepare('SELECT id FROM providers WHERE code = :code LIMIT 1');
@@ -142,17 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if (!$errors) {
                 $settings = array(
-                    'driver' => $driver,
-                    'products_endpoint' => $productsEndpoint !== '' ? $productsEndpoint : '/api/products',
-                    'orders_endpoint' => $ordersEndpoint !== '' ? $ordersEndpoint : '/api/orders',
-                    'status_endpoint' => $statusEndpoint !== '' ? $statusEndpoint : '/api/user',
-                );
 
-                $stmt = $pdo->prepare('INSERT INTO providers (name, code, driver, base_url, api_key, status, settings, created_at) VALUES (:name, :code, :driver, :base_url, :api_key, :status, :settings, NOW())');
-                $stmt->execute(array(
-                    'name' => $name,
-                    'code' => $code,
-                    'driver' => $driver,
                     'base_url' => rtrim($baseUrl),
                     'api_key' => $apiKey,
                     'status' => $status,
@@ -181,8 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $status = isset($_POST['status']) && $_POST['status'] === 'active' ? 'active' : 'inactive';
             $productsEndpoint = isset($_POST['products_endpoint']) ? trim((string) $_POST['products_endpoint']) : '/api/products';
             $ordersEndpoint = isset($_POST['orders_endpoint']) ? trim((string) $_POST['orders_endpoint']) : '/api/orders';
-            $statusEndpoint = isset($_POST['status_endpoint']) ? trim((string) $_POST['status_endpoint']) : '/api/user';
-            $driverInput = isset($_POST['driver']) ? strtolower(trim((string) $_POST['driver'])) : '';
+
 
             $code = strtolower(str_replace(' ', '-', $codeInput));
             $code = preg_replace('/[^a-z0-9_-]/', '', $code);
@@ -195,6 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$provider) {
                 $errors[] = 'Sağlayıcı kaydı bulunamadı.';
             }
+
 
             if ($code === '') {
                 $errors[] = 'Sağlayıcı kodu yalnızca harf, rakam, tire ve alt çizgi içerebilir.';
@@ -210,31 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errors[] = 'API anahtarı zorunludur.';
             }
 
-            $providerDriver = $provider && isset($provider['driver']) ? (string) $provider['driver'] : 'generic';
-            $driver = isset($providerDrivers[$driverInput]) ? $driverInput : $providerDriver;
-            if (!isset($providerDrivers[$driver])) {
-                $driver = 'generic';
-            }
 
-            if ($name === '' || $codeInput === '' || $code === '') {
-                $identity = $deriveIdentity($baseUrl !== '' ? $baseUrl : (isset($provider['base_url']) ? (string) $provider['base_url'] : ''));
-                if ($name === '') {
-                    $name = $identity['name'];
-                }
-                if ($codeInput === '' || $code === '') {
-                    $codeInput = $identity['code'];
-                    $code = $identity['code'];
-                }
-            }
-
-            if ($name === '') {
-                $name = $providerDrivers[$driver]['default_name'];
-            }
-
-            if ($code === '') {
-                $code = $providerDrivers[$driver]['default_code'];
-                $codeInput = $code;
-            }
 
             if (!$errors) {
                 $check = $pdo->prepare('SELECT id FROM providers WHERE code = :code AND id <> :id LIMIT 1');
@@ -246,22 +139,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if (!$errors) {
                 $settings = array(
-                    'driver' => $driver,
-                    'products_endpoint' => $productsEndpoint !== '' ? $productsEndpoint : '/api/products',
-                    'orders_endpoint' => $ordersEndpoint !== '' ? $ordersEndpoint : '/api/orders',
-                    'status_endpoint' => $statusEndpoint !== '' ? $statusEndpoint : '/api/user',
-                );
 
-                if ($provider && isset($provider['settings']) && is_array($provider['settings']) && isset($provider['settings']['connection_test'])) {
-                    $settings['connection_test'] = $provider['settings']['connection_test'];
-                }
-
-                $stmt = $pdo->prepare('UPDATE providers SET name = :name, code = :code, driver = :driver, base_url = :base_url, api_key = :api_key, status = :status, settings = :settings, updated_at = NOW() WHERE id = :id');
                 $stmt->execute(array(
                     'id' => $providerId,
                     'name' => $name,
                     'code' => $code,
-                    'driver' => $driver,
+
                     'base_url' => rtrim($baseUrl),
                     'api_key' => $apiKey,
                     'status' => $status,
@@ -385,24 +268,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $errors[] = isset($result['error']) ? (string) $result['error'] : 'Ürünler içe aktarılırken hata oluştu.';
                 }
             }
-        } elseif ($action === 'test_connection') {
-            $providerId = isset($_POST['provider_id']) ? (int) $_POST['provider_id'] : 0;
-            $provider = $providerId > 0 ? ProviderManager::find($providerId) : null;
 
-            if (!$provider) {
-                $errors[] = 'Bağlantısı test edilecek sağlayıcı bulunamadı.';
-            } else {
-                $result = ProviderManager::testConnection($provider);
-                if (!empty($result['success'])) {
-                    $message = isset($result['message']) && is_string($result['message']) ? $result['message'] : 'Bağlantı testi başarılı.';
-                    Helpers::redirectWithFlash('/admin/providers.php?provider_id=' . $providerId, array('providers.success' => $message));
-                    exit;
-                }
-
-                $errorMessage = isset($result['error']) ? (string) $result['error'] : 'Bağlantı testi başarısız oldu.';
-                Helpers::redirectWithFlash('/admin/providers.php?provider_id=' . $providerId, array('providers.error' => $errorMessage));
-                exit;
-            }
         }
     }
 }
@@ -486,70 +352,7 @@ include __DIR__ . '/../templates/header.php';
                     <div class="alert alert-success mb-3"><?= Helpers::sanitize($success) ?></div>
                 <?php endif; ?>
 
-                <form method="post" class="vstack gap-3" id="createProviderForm" data-provider-form>
-                    <input type="hidden" name="action" value="create_provider">
-                    <input type="hidden" name="csrf_token" value="<?= Helpers::sanitize(Helpers::csrfToken()) ?>">
-                    <div class="row g-3 align-items-end">
-                        <div class="col-sm-6">
-                            <label class="form-label">Sağlayıcı Türü</label>
-                            <select name="driver" class="form-select" data-provider-driver-select>
-                                <?php foreach ($providerDrivers as $driverKey => $driverMeta): ?>
-                                    <option value="<?= Helpers::sanitize($driverKey) ?>"
-                                        data-placeholder="<?= Helpers::sanitize($driverMeta['placeholder']) ?>"
-                                        data-default-name="<?= Helpers::sanitize($driverMeta['default_name']) ?>"
-                                        data-default-code="<?= Helpers::sanitize($driverMeta['default_code']) ?>"
-                                        <?= $driverKey === 'netgsm' ? 'selected' : '' ?>><?= Helpers::sanitize($driverMeta['label']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-sm-6">
-                            <label class="form-label">API Adresi</label>
-                            <input type="url" name="base_url" class="form-control" placeholder="<?= Helpers::sanitize($providerDrivers['netgsm']['placeholder']) ?>" data-provider-base-input required>
-                            <small class="text-muted">Sadece API URL'sini girmeniz yeterlidir.</small>
-                        </div>
-                    </div>
-                    <div>
-                        <label class="form-label">API Anahtarı</label>
-                        <input type="text" name="api_key" class="form-control" placeholder="API key" required>
-                    </div>
-                    <button type="button" class="btn btn-link px-0 text-decoration-none" data-bs-toggle="collapse" data-bs-target="#providerAdvancedCreate" aria-expanded="false" aria-controls="providerAdvancedCreate">
-                        <span class="me-2">Gelişmiş ayarları göster</span><i class="ri-arrow-down-s-line"></i>
-                    </button>
-                    <div class="collapse" id="providerAdvancedCreate">
-                        <div class="card card-body border-0 bg-light vstack gap-3">
-                            <div>
-                                <label class="form-label">Sağlayıcı Adı</label>
-                                <input type="text" name="name" class="form-control" placeholder="Otomatik doldurulur" data-provider-name-input>
-                                <small class="text-muted">Varsayılan olarak API adresinden üretilir.</small>
-                            </div>
-                            <div>
-                                <label class="form-label">Kod</label>
-                                <input type="text" name="code" class="form-control" placeholder="Otomatik doldurulur" data-provider-code-input>
-                                <small class="text-muted">Ürün yönlendirmeleri için benzersiz kısa ad.</small>
-                            </div>
-                            <div class="row g-3">
-                                <div class="col-md-4">
-                                    <label class="form-label">Ürün Uç Noktası</label>
-                                    <input type="text" name="products_endpoint" class="form-control" value="/api/products">
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label">Sipariş Uç Noktası</label>
-                                    <input type="text" name="orders_endpoint" class="form-control" value="/api/orders">
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label">Kimlik Doğrulama Uç Noktası</label>
-                                    <input type="text" name="status_endpoint" class="form-control" value="/api/user">
-                                </div>
-                            </div>
-                            <div>
-                                <label class="form-label">Durum</label>
-                                <select name="status" class="form-select">
-                                    <option value="active" selected>Aktif</option>
-                                    <option value="inactive">Pasif</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
+
                     <button type="submit" class="btn btn-primary">Sağlayıcıyı Kaydet</button>
                 </form>
             </div>
@@ -571,10 +374,7 @@ include __DIR__ . '/../templates/header.php';
                                 <tr>
                                     <th>Adı</th>
                                     <th>Kod</th>
-                                    <th>Tür</th>
-                                    <th>Durum</th>
-                                    <th>API Adresi</th>
-                                    <th>Bağlantı</th>
+
                                     <th>Son Senkron</th>
                                     <th class="text-end">İşlemler</th>
                                 </tr>
@@ -582,31 +382,13 @@ include __DIR__ . '/../templates/header.php';
                             <tbody>
                                 <?php foreach ($providers as $providerItem): ?>
                                     <tr>
-                                        <?php
-                                        $connectionMeta = array();
-                                        if (isset($providerItem['settings']) && is_array($providerItem['settings']) && isset($providerItem['settings']['connection_test']) && is_array($providerItem['settings']['connection_test'])) {
-                                            $connectionMeta = $providerItem['settings']['connection_test'];
-                                        }
-                                        $connectionStatus = isset($connectionMeta['status']) ? (string) $connectionMeta['status'] : '';
-                                        $connectionMessage = isset($connectionMeta['message']) ? (string) $connectionMeta['message'] : '';
-                                        $connectionChecked = isset($connectionMeta['checked_at']) ? (string) $connectionMeta['checked_at'] : '';
-                                        $connectionCheckedAt = $connectionChecked !== '' ? strtotime($connectionChecked) : false;
-                                        ?>
+
                                         <td>
                                             <strong><?= Helpers::sanitize(isset($providerItem['name']) ? $providerItem['name'] : 'Sağlayıcı') ?></strong>
                                         </td>
                                         <td><code><?= Helpers::sanitize(isset($providerItem['code']) ? $providerItem['code'] : '') ?></code></td>
                                         <td>
-                                            <?php
-                                            $driverKey = isset($providerItem['driver']) ? (string) $providerItem['driver'] : 'generic';
-                                            if (!isset($providerDrivers[$driverKey]) && isset($providerItem['settings']['driver']) && isset($providerDrivers[$providerItem['settings']['driver']])) {
-                                                $driverKey = (string) $providerItem['settings']['driver'];
-                                            }
-                                            $driverLabel = isset($providerDrivers[$driverKey]) ? $providerDrivers[$driverKey]['label'] : 'Özel Sağlayıcı';
-                                            ?>
-                                            <span class="badge bg-light text-dark border"><?= Helpers::sanitize($driverLabel) ?></span>
-                                        </td>
-                                        <td>
+
                                             <?php if (isset($providerItem['status']) && $providerItem['status'] === 'active'): ?>
                                                 <span class="badge bg-success">Aktif</span>
                                             <?php else: ?>
@@ -619,21 +401,7 @@ include __DIR__ . '/../templates/header.php';
                                             </a>
                                         </td>
                                         <td>
-                                            <?php if ($connectionStatus === 'success'): ?>
-                                                <span class="badge bg-success">Başarılı</span>
-                                            <?php elseif ($connectionStatus === 'error'): ?>
-                                                <span class="badge bg-danger">Hatalı</span>
-                                            <?php else: ?>
-                                                <span class="text-muted small">Test edilmedi</span>
-                                            <?php endif; ?>
-                                            <?php if ($connectionMessage !== '' && $connectionStatus !== ''): ?>
-                                                <div class="text-muted small mt-1"><?= Helpers::sanitize($connectionMessage) ?></div>
-                                            <?php endif; ?>
-                                            <?php if ($connectionCheckedAt): ?>
-                                                <div class="text-muted small"><?= Helpers::sanitize(date('d.m.Y H:i', $connectionCheckedAt)) ?></div>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td>
+
                                             <?php if (!empty($providerItem['last_synced_at'])): ?>
                                                 <span class="text-muted small"><?= Helpers::sanitize(date('d.m.Y H:i', strtotime($providerItem['last_synced_at']))) ?></span>
                                             <?php else: ?>
@@ -643,12 +411,7 @@ include __DIR__ . '/../templates/header.php';
                                         <td class="text-end">
                                             <a href="/admin/providers.php?provider_id=<?= (int) $providerItem['id'] ?>" class="btn btn-sm btn-outline-secondary">Ürünler</a>
                                             <form method="post" class="d-inline">
-                                                <input type="hidden" name="action" value="test_connection">
-                                                <input type="hidden" name="csrf_token" value="<?= Helpers::sanitize(Helpers::csrfToken()) ?>">
-                                                <input type="hidden" name="provider_id" value="<?= (int) $providerItem['id'] ?>">
-                                                <button type="submit" class="btn btn-sm btn-outline-success">Bağlantıyı Test Et</button>
-                                            </form>
-                                            <form method="post" class="d-inline">
+
                                                 <input type="hidden" name="action" value="sync_products">
                                                 <input type="hidden" name="csrf_token" value="<?= Helpers::sanitize(Helpers::csrfToken()) ?>">
                                                 <input type="hidden" name="provider_id" value="<?= (int) $providerItem['id'] ?>">
@@ -667,7 +430,7 @@ include __DIR__ . '/../templates/header.php';
                                     <div class="modal fade" id="editProvider<?= (int) $providerItem['id'] ?>" tabindex="-1" aria-hidden="true">
                                         <div class="modal-dialog modal-lg modal-dialog-centered">
                                             <div class="modal-content">
-                                                <form method="post" data-provider-form>
+
                                                     <div class="modal-header">
                                                         <h5 class="modal-title">Sağlayıcıyı Düzenle</h5>
                                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
@@ -676,80 +439,7 @@ include __DIR__ . '/../templates/header.php';
                                                         <input type="hidden" name="action" value="update_provider">
                                                         <input type="hidden" name="csrf_token" value="<?= Helpers::sanitize(Helpers::csrfToken()) ?>">
                                                         <input type="hidden" name="id" value="<?= (int) $providerItem['id'] ?>">
-                                                        <?php
-                                                        $providerSettings = isset($providerItem['settings']) && is_array($providerItem['settings']) ? $providerItem['settings'] : array();
-                                                        $currentDriver = isset($providerItem['driver']) ? (string) $providerItem['driver'] : 'generic';
-                                                        if (!isset($providerDrivers[$currentDriver])) {
-                                                            $currentDriver = isset($providerSettings['driver']) && isset($providerDrivers[$providerSettings['driver']]) ? (string) $providerSettings['driver'] : 'generic';
-                                                        }
-                                                        if (!isset($providerDrivers[$currentDriver])) {
-                                                            $currentDriver = 'generic';
-                                                        }
-                                                        $editProductsEndpoint = isset($providerSettings['products_endpoint']) ? (string) $providerSettings['products_endpoint'] : '/api/products';
-                                                        $editOrdersEndpoint = isset($providerSettings['orders_endpoint']) ? (string) $providerSettings['orders_endpoint'] : '/api/orders';
-                                                        $editStatusEndpoint = isset($providerSettings['status_endpoint']) ? (string) $providerSettings['status_endpoint'] : '/api/user';
-                                                        $advancedId = 'providerAdvancedEdit' . (int) $providerItem['id'];
-                                                        ?>
-                                                        <div class="vstack gap-3">
-                                                            <div class="row g-3 align-items-end">
-                                                                <div class="col-sm-6">
-                                                                    <label class="form-label">Sağlayıcı Türü</label>
-                                                                    <select name="driver" class="form-select" data-provider-driver-select>
-                                                                        <?php foreach ($providerDrivers as $driverKey => $driverMeta): ?>
-                                                                            <option value="<?= Helpers::sanitize($driverKey) ?>"
-                                                                                data-placeholder="<?= Helpers::sanitize($driverMeta['placeholder']) ?>"
-                                                                                data-default-name="<?= Helpers::sanitize($driverMeta['default_name']) ?>"
-                                                                                data-default-code="<?= Helpers::sanitize($driverMeta['default_code']) ?>"
-                                                                                <?= $driverKey === $currentDriver ? 'selected' : '' ?>><?= Helpers::sanitize($driverMeta['label']) ?></option>
-                                                                        <?php endforeach; ?>
-                                                                    </select>
-                                                                </div>
-                                                                <div class="col-sm-6">
-                                                                    <label class="form-label">API Adresi</label>
-                                                                    <input type="url" name="base_url" class="form-control" value="<?= Helpers::sanitize(isset($providerItem['base_url']) ? $providerItem['base_url'] : '') ?>" placeholder="<?= Helpers::sanitize($providerDrivers[$currentDriver]['placeholder']) ?>" data-provider-base-input required>
-                                                                </div>
-                                                            </div>
-                                                            <div>
-                                                                <label class="form-label">API Anahtarı</label>
-                                                                <input type="text" name="api_key" class="form-control" value="<?= Helpers::sanitize(isset($providerItem['api_key']) ? $providerItem['api_key'] : '') ?>" required>
-                                                            </div>
-                                                            <button type="button" class="btn btn-link px-0 text-decoration-none" data-bs-toggle="collapse" data-bs-target="#<?= Helpers::sanitize($advancedId) ?>" aria-expanded="false" aria-controls="<?= Helpers::sanitize($advancedId) ?>">
-                                                                <span class="me-2">Gelişmiş ayarları göster</span><i class="ri-arrow-down-s-line"></i>
-                                                            </button>
-                                                            <div class="collapse" id="<?= Helpers::sanitize($advancedId) ?>">
-                                                                <div class="card card-body border-0 bg-light vstack gap-3">
-                                                                    <div class="row g-3">
-                                                                        <div class="col-md-6">
-                                                                            <label class="form-label">Sağlayıcı Adı</label>
-                                                                            <input type="text" name="name" class="form-control" value="<?= Helpers::sanitize(isset($providerItem['name']) ? $providerItem['name'] : '') ?>" data-provider-name-input>
-                                                                        </div>
-                                                                        <div class="col-md-6">
-                                                                            <label class="form-label">Kod</label>
-                                                                            <input type="text" name="code" class="form-control" value="<?= Helpers::sanitize(isset($providerItem['code']) ? $providerItem['code'] : '') ?>" data-provider-code-input>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div class="row g-3">
-                                                                        <div class="col-md-4">
-                                                                            <label class="form-label">Ürün Uç Noktası</label>
-                                                                            <input type="text" name="products_endpoint" class="form-control" value="<?= Helpers::sanitize($editProductsEndpoint) ?>">
-                                                                        </div>
-                                                                        <div class="col-md-4">
-                                                                            <label class="form-label">Sipariş Uç Noktası</label>
-                                                                            <input type="text" name="orders_endpoint" class="form-control" value="<?= Helpers::sanitize($editOrdersEndpoint) ?>">
-                                                                        </div>
-                                                                        <div class="col-md-4">
-                                                                            <label class="form-label">Kimlik Doğrulama Uç Noktası</label>
-                                                                            <input type="text" name="status_endpoint" class="form-control" value="<?= Helpers::sanitize($editStatusEndpoint) ?>">
-                                                                        </div>
-                                                                    </div>
-                                                                    <div>
-                                                                        <label class="form-label">Durum</label>
-                                                                        <select name="status" class="form-select">
-                                                                            <option value="active" <?= isset($providerItem['status']) && $providerItem['status'] === 'active' ? 'selected' : '' ?>>Aktif</option>
-                                                                            <option value="inactive" <?= !isset($providerItem['status']) || $providerItem['status'] !== 'active' ? 'selected' : '' ?>>Pasif</option>
-                                                                        </select>
-                                                                    </div>
-                                                                </div>
+
                                                             </div>
                                                         </div>
                                                     </div>
@@ -887,128 +577,7 @@ $GLOBALS['pageInlineScripts'][] = <<<JS
             });
         }
 
-        var providerForms = document.querySelectorAll('[data-provider-form]');
-        var slugify = function (value) {
-            return value.toString().toLowerCase()
-                .replace(/[^a-z0-9]+/g, '-')
-                .replace(/^-+|-+$/g, '');
-        };
 
-        var titleCase = function (value) {
-            return value.split(' ').filter(function (part) {
-                return part.trim() !== '';
-            }).map(function (part) {
-                return part.charAt(0).toUpperCase() + part.slice(1);
-            }).join(' ');
-        };
-
-        providerForms.forEach(function (form) {
-            var baseInput = form.querySelector('[data-provider-base-input]');
-            if (!baseInput) {
-                return;
-            }
-
-            var driverSelect = form.querySelector('[data-provider-driver-select]');
-            var nameInput = form.querySelector('[data-provider-name-input]');
-            var codeInput = form.querySelector('[data-provider-code-input]');
-
-            if (nameInput) {
-                nameInput.addEventListener('input', function () {
-                    nameInput.dataset.manual = 'true';
-                });
-            }
-
-            if (codeInput) {
-                codeInput.addEventListener('input', function () {
-                    codeInput.dataset.manual = 'true';
-                });
-            }
-
-            var deriveIdentity = function (raw) {
-                var value = (raw || '').trim();
-                if (!value) {
-                    return { name: '', code: '' };
-                }
-
-                var host = '';
-                try {
-                    var parsed = new URL(value);
-                    host = parsed.hostname || '';
-                } catch (error) {
-                    host = value.replace(/^https?:\/\//i, '').split('/')[0];
-                }
-
-                host = host.replace(/\/$/, '');
-                if (!host) {
-                    return { name: '', code: '' };
-                }
-
-                var readable = host.replace(/[._-]+/g, ' ').trim();
-                var name = readable ? titleCase(readable) : 'Sağlayıcı';
-                var code = slugify(host);
-                if (!code) {
-                    code = slugify(name) || 'provider';
-                }
-
-                return { name: name, code: code };
-            };
-
-            var applyIdentity = function () {
-                var identity = deriveIdentity(baseInput.value);
-                if (nameInput && (!nameInput.value.trim() || nameInput.dataset.manual !== 'true')) {
-                    nameInput.value = identity.name;
-                }
-                if (codeInput && (!codeInput.value.trim() || codeInput.dataset.manual !== 'true')) {
-                    codeInput.value = identity.code;
-                }
-            };
-
-            var applyDriverDefaults = function () {
-                if (!driverSelect) {
-                    return;
-                }
-
-                var option = driverSelect.options[driverSelect.selectedIndex];
-                if (!option) {
-                    return;
-                }
-
-                var placeholder = option.getAttribute('data-placeholder') || '';
-                var defaultName = option.getAttribute('data-default-name') || '';
-                var defaultCode = option.getAttribute('data-default-code') || '';
-
-                if (baseInput && placeholder) {
-                    baseInput.setAttribute('placeholder', placeholder);
-                }
-
-                if (nameInput && (!nameInput.value.trim() || nameInput.dataset.manual !== 'true')) {
-                    if (defaultName) {
-                        nameInput.value = defaultName;
-                    }
-                }
-
-                if (codeInput && (!codeInput.value.trim() || codeInput.dataset.manual !== 'true')) {
-                    if (defaultCode) {
-                        codeInput.value = defaultCode;
-                    }
-                }
-            };
-
-            baseInput.addEventListener('input', applyIdentity);
-            baseInput.addEventListener('change', applyIdentity);
-            baseInput.addEventListener('blur', applyIdentity);
-
-            if (driverSelect) {
-                driverSelect.addEventListener('change', function () {
-                    applyDriverDefaults();
-                    applyIdentity();
-                });
-
-                applyDriverDefaults();
-            }
-
-            applyIdentity();
-        });
     });
 JS;
 include __DIR__ . '/../templates/footer.php';

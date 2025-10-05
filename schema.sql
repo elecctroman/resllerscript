@@ -128,40 +128,7 @@ CREATE TABLE IF NOT EXISTS products (
     FOREIGN KEY (category_id) REFERENCES categories(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS providers (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(191) NOT NULL,
-    code VARCHAR(100) NOT NULL,
-    driver VARCHAR(50) NOT NULL DEFAULT 'generic',
-    base_url VARCHAR(255) NOT NULL,
-    api_key VARCHAR(191) NOT NULL,
-    status ENUM('active','inactive') NOT NULL DEFAULT 'inactive',
-    settings TEXT NULL,
-    last_synced_at DATETIME NULL,
-    last_sync_status VARCHAR(50) NULL,
-    last_sync_error TEXT NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uniq_provider_code (code)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS provider_products (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    provider_id INT NOT NULL,
-    external_id VARCHAR(191) NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    description MEDIUMTEXT NULL,
-    price DECIMAL(16,4) NULL,
-    currency VARCHAR(10) NULL,
-    stock INT NULL,
-    is_available TINYINT(1) NOT NULL DEFAULT 0,
-    payload MEDIUMTEXT NULL,
-    last_synced_at DATETIME NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uniq_provider_product (provider_id, external_id),
-    FOREIGN KEY (provider_id) REFERENCES providers(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS instructions (
     id INT AUTO_INCREMENT PRIMARY KEY,
