@@ -35,14 +35,6 @@ if (!file_exists($configPath)) {
 
 require $configPath;
 
-if (class_exists(App\Migrations\Schema::class)) {
-    try {
-        App\Migrations\Schema::ensure();
-    } catch (\Throwable $exception) {
-        error_log('[API] Schema ensure failed: ' . $exception->getMessage());
-    }
-}
-
 try {
     App\Database::initialize(array(
         'host' => DB_HOST,
@@ -59,7 +51,19 @@ try {
     exit;
 }
 
-App\Notifications\PreferenceManager::ensureUserColumns();
+if (class_exists(App\Migrations\Schema::class)) {
+    try {
+        App\Migrations\Schema::ensure();
+    } catch (\Throwable $exception) {
+        error_log('[API] Schema ensure failed: ' . $exception->getMessage());
+    }
+}
+
+try {
+    App\Notifications\PreferenceManager::ensureUserColumns();
+} catch (\Throwable $exception) {
+    error_log('[API] Notification preference check failed: ' . $exception->getMessage());
+}
 
 function api_client_ip(): string
 {
