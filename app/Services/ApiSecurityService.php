@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Database;
 use App\Settings;
+use PDOException;
 use RuntimeException;
 
 class ApiSecurityService
@@ -230,11 +231,16 @@ class ApiSecurityService
             }
 
             $pdo->commit();
-        } catch (\Throwable $exception) {
+        } catch (RuntimeException $runtimeException) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-            throw $exception;
+            throw $runtimeException;
+        } catch (PDOException $exception) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            error_log('[API] Rate limit kaydı güncellenemedi: ' . $exception->getMessage());
         }
     }
 
@@ -248,16 +254,26 @@ class ApiSecurityService
      */
     public static function logRequest(?array $tokenRow, string $ip, string $method, string $endpoint, int $status): void
     {
-        $pdo = Database::connection();
-        $stmt = $pdo->prepare('INSERT INTO api_request_logs (token_id, ip_address, method, endpoint, status_code, user_agent) VALUES (:token_id, :ip, :method, :endpoint, :status, :agent)');
-        $stmt->execute(array(
-            ':token_id' => $tokenRow && isset($tokenRow['token_id']) ? (int)$tokenRow['token_id'] : null,
-            ':ip' => $ip,
-            ':method' => strtoupper($method),
-            ':endpoint' => $endpoint,
-            ':status' => $status,
-            ':agent' => isset($_SERVER['HTTP_USER_AGENT']) ? substr((string)$_SERVER['HTTP_USER_AGENT'], 0, 250) : null,
-        ));
+        try {
+            $pdo = Database::connection();
+        } catch (PDOException $exception) {
+            error_log('[API] Request log bağlantısı kurulamadı: ' . $exception->getMessage());
+            return;
+        }
+
+        try {
+            $stmt = $pdo->prepare('INSERT INTO api_request_logs (token_id, ip_address, method, endpoint, status_code, user_agent) VALUES (:token_id, :ip, :method, :endpoint, :status, :agent)');
+            $stmt->execute(array(
+                ':token_id' => $tokenRow && isset($tokenRow['token_id']) ? (int)$tokenRow['token_id'] : null,
+                ':ip' => $ip,
+                ':method' => strtoupper($method),
+                ':endpoint' => $endpoint,
+                ':status' => $status,
+                ':agent' => isset($_SERVER['HTTP_USER_AGENT']) ? substr((string)$_SERVER['HTTP_USER_AGENT'], 0, 250) : null,
+            ));
+        } catch (PDOException $exception) {
+            error_log('[API] Request log kaydedilemedi: ' . $exception->getMessage());
+        }
     }
 
     /**
