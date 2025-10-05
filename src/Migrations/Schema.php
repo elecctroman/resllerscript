@@ -19,6 +19,7 @@ final class Schema
 
         self::ensureProvidersTable($pdo);
         self::ensureProviderProductsTable($pdo);
+
         self::ensureProductsTable($pdo);
         self::ensureProductStockTable($pdo);
         self::ensureResellerFavoritesTable($pdo);
@@ -84,6 +85,7 @@ final class Schema
         self::ensureColumn($pdo, 'provider_products', 'payload', 'MEDIUMTEXT NULL');
         self::ensureColumn($pdo, 'provider_products', 'last_synced_at', 'DATETIME NULL');
     }
+
 
     private static function ensureProductsTable(PDO $pdo): void
     {
