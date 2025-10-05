@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $pdo->beginTransaction();
 
-            $orderStmt = $pdo->prepare('SELECT po.*, u.name AS user_name, u.email AS user_email, u.id AS owner_id, u.notify_order_completed, u.telegram_bot_token, u.telegram_chat_id, p.name AS product_name, p.sku, c.name AS category_name FROM product_orders po INNER JOIN users u ON po.user_id = u.id INNER JOIN products p ON po.product_id = p.id LEFT JOIN categories c ON p.category_id = c.id WHERE po.id = :id FOR UPDATE');
+            $orderStmt = $pdo->prepare('SELECT po.*, u.name AS user_name, u.email AS user_email, u.id AS owner_id, u.notify_order_completed, u.telegram_bot_token, u.telegram_chat_id, p.name AS product_name, p.sku, p.provider_code, c.name AS category_name FROM product_orders po INNER JOIN users u ON po.user_id = u.id INNER JOIN products p ON po.product_id = p.id LEFT JOIN categories c ON p.category_id = c.id WHERE po.id = :id FOR UPDATE');
             $orderStmt->execute(array('id' => $orderId));
             $order = $orderStmt->fetch();
 
@@ -129,11 +129,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                             if (!empty($order['api_token_id'])) {
                                 $metadata = null;
+                                $webhookOverrideTarget = null;
                                 $externalReference = isset($order['external_reference']) ? $order['external_reference'] : null;
                                 if ((!$externalReference || $externalReference === '') && isset($order['external_metadata']) && $order['external_metadata'] !== '') {
                                     $metadata = json_decode($order['external_metadata'], true);
                                     if (is_array($metadata) && isset($metadata['external_order']['id'])) {
                                         $externalReference = (string)$metadata['external_order']['id'];
+                                    }
+                                    if (is_array($metadata) && isset($metadata['webhook_override']) && is_string($metadata['webhook_override'])) {
+                                        $candidate = trim($metadata['webhook_override']);
+                                        if ($candidate !== '') {
+                                            $webhookOverrideTarget = $candidate;
+                                        }
                                     }
                                 }
 
@@ -161,7 +168,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     $payload['external_order'] = $metadata['external_order'];
                                 }
 
-                                $webhookResult = ApiToken::notifyWebhook((int)$order['api_token_id'], $payload);
+                                $payload['meta'] = array(
+                                    'provider' => isset($order['provider_code']) && $order['provider_code'] !== '' ? strtolower((string)$order['provider_code']) : null,
+                                    'webhook_attempt' => 1,
+                                    'sent_at' => gmdate('c'),
+                                );
+
+                                if ($webhookOverrideTarget !== null) {
+                                    $payload['meta']['webhook_override'] = $webhookOverrideTarget;
+                                }
+
+                                $webhookResult = ApiToken::notifyWebhook((int)$order['api_token_id'], $payload, $webhookOverrideTarget);
                                 if (!$webhookResult['success']) {
                                     $formErrors[] = 'API webhook bildirimi gönderilemedi: ' . (isset($webhookResult['error']) ? $webhookResult['error'] : 'Bilinmeyen hata');
                                 }
@@ -315,7 +332,7 @@ include __DIR__ . '/../templates/header.php';
                                 <?php endif; ?>
                             </td>
                             <td><?= isset($order['quantity']) ? (int)$order['quantity'] : 1 ?></td>
-                            <td><?= Helpers::sanitize(Helpers::formatCurrency((float)$order['price'])) ?></td>
+                            <td><?= Helpers::formatCurrencyHtml((float)$order['price']) ?></td>
                             <td>
                                 <?php
                                 $source = isset($order['source']) ? $order['source'] : 'panel';
@@ -353,7 +370,7 @@ include __DIR__ . '/../templates/header.php';
                                                 <small class="text-muted">Kategori: <?= Helpers::sanitize(isset($order['category_name']) ? $order['category_name'] : '-') ?> | SKU: <?= Helpers::sanitize(isset($order['sku']) ? $order['sku'] : '-') ?></small>
                                             </dd>
                                             <dt class="col-sm-4">Fiyat</dt>
-                                            <dd class="col-sm-8"><?= Helpers::sanitize(Helpers::formatCurrency((float)$order['price'])) ?></dd>
+                                            <dd class="col-sm-8"><?= Helpers::formatCurrencyHtml((float)$order['price']) ?></dd>
                                             <dt class="col-sm-4">Adet</dt>
                                             <dd class="col-sm-8"><?= isset($order['quantity']) ? (int)$order['quantity'] : 1 ?></dd>
                                             <dt class="col-sm-4">Kaynak</dt>

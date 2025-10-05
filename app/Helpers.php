@@ -2,6 +2,8 @@
 
 namespace App;
 
+use App\Services\CurrencyService;
+
 if (!function_exists(__NAMESPACE__ . '\\mail')) {
     /**
      * Safe wrapper for PHP's global mail() so namespaced calls do not fatal out
@@ -380,9 +382,23 @@ class Helpers
      */
     public static function sanitize($value)
     {
+        if ($value === null) {
+            $value = '';
+        }
+
         if (is_string($value)) {
             Lang::boot();
             $value = Lang::line($value);
+        } elseif (is_bool($value) || is_numeric($value)) {
+            $value = (string) $value;
+        } elseif (is_object($value) && method_exists($value, '__toString')) {
+            $value = (string) $value;
+        } elseif (!is_string($value)) {
+            $value = '';
+        }
+
+        if (!is_string($value)) {
+            $value = (string) $value;
         }
 
         return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
@@ -404,24 +420,35 @@ class Helpers
      */
     public static function activeCurrency()
     {
-        $currency = null;
+        $selected = null;
 
-        if (isset($_SESSION['user']) && isset($_SESSION['user']['currency']) && $_SESSION['user']['currency']) {
-            $currency = strtoupper((string)$_SESSION['user']['currency']);
+        if (isset($_SESSION['app_currency']) && $_SESSION['app_currency']) {
+            $selected = strtoupper((string) $_SESSION['app_currency']);
         }
 
-        if (!$currency) {
-            $stored = Settings::get('platform_default_currency');
-            if ($stored) {
-                $currency = strtoupper((string)$stored);
+        if (!$selected && isset($_SESSION['user']) && isset($_SESSION['user']['currency']) && $_SESSION['user']['currency']) {
+            $selected = strtoupper((string) $_SESSION['user']['currency']);
+        }
+
+        $currencies = CurrencyService::isReady() ? CurrencyService::currenciesByCode() : array();
+
+        if ($selected && isset($currencies[$selected]) && (int) $currencies[$selected]['is_active'] === 1) {
+            return $selected;
+        }
+
+        if (CurrencyService::isReady()) {
+            return CurrencyService::defaultCurrency();
+        }
+
+        $stored = Settings::get('platform_default_currency');
+        if ($stored) {
+            $stored = strtoupper((string) $stored);
+            if (in_array($stored, array('TRY', 'USD', 'EUR'), true)) {
+                return $stored;
             }
         }
 
-        if (!$currency) {
-            $currency = 'TRY';
-        }
-
-        return in_array($currency, array('TRY', 'USD', 'EUR'), true) ? $currency : 'TRY';
+        return 'TRY';
     }
 
     /**
@@ -432,13 +459,50 @@ class Helpers
     public static function formatCurrency($amount, $baseCurrency = 'USD')
     {
         Lang::boot();
-        $activeCurrency = self::activeCurrency();
 
-        if (strtoupper($baseCurrency) !== $activeCurrency) {
-            $amount = Currency::convert((float)$amount, $baseCurrency, $activeCurrency);
+        $base = strtoupper((string) $baseCurrency);
+        if ($base === '') {
+            $base = CurrencyService::isReady() ? CurrencyService::defaultCurrency() : 'USD';
         }
 
-        return Currency::format((float)$amount, $activeCurrency);
+        $active = self::activeCurrency();
+        $converted = $base === $active ? (float) $amount : Currency::convert((float) $amount, $base, $active);
+
+        return Currency::format($converted, $active);
+    }
+
+    /**
+     * @param float $amount
+     * @param string $baseCurrency
+     * @return string
+     */
+    public static function formatCurrencyHtml($amount, $baseCurrency = 'USD')
+    {
+        Lang::boot();
+
+        $base = strtoupper((string) $baseCurrency);
+        if ($base === '') {
+            $base = CurrencyService::isReady() ? CurrencyService::defaultCurrency() : 'USD';
+        }
+
+        $active = self::activeCurrency();
+        $converted = $base === $active ? (float) $amount : Currency::convert((float) $amount, $base, $active);
+        $formatted = Currency::format($converted, $active);
+
+        $attributes = array(
+            'class' => 'app-money',
+            'data-money-base' => $base,
+            'data-money-target' => $active,
+            'data-money-base-amount' => number_format((float) $amount, 6, '.', ''),
+            'data-money-current-amount' => number_format($converted, 6, '.', ''),
+        );
+
+        $attrString = '';
+        foreach ($attributes as $key => $value) {
+            $attrString .= ' ' . $key . '="' . htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8') . '"';
+        }
+
+        return '<span' . $attrString . '>' . htmlspecialchars($formatted, ENT_QUOTES, 'UTF-8') . '</span>';
     }
 
     /**
