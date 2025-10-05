@@ -519,7 +519,7 @@ Helpers::includeTemplate('auth-header.php');
                                             <p class="package-description mb-0"><?= Helpers::sanitize($package['description']) ?></p>
                                         <?php endif; ?>
                                     </div>
-                                    <span class="package-price"><?= Helpers::sanitize(Helpers::formatCurrency((float)$package['price'])) ?></span>
+                                    <span class="package-price"><?= Helpers::formatCurrencyHtml((float)$package['price']) ?></span>
                                 </div>
                                 <?php if ($features): ?>
                                     <ul class="package-feature-list">
@@ -529,7 +529,7 @@ Helpers::includeTemplate('auth-header.php');
                                     </ul>
                                 <?php endif; ?>
                                 <div class="package-footer d-flex justify-content-between align-items-center">
-                                    <span class="badge bg-light text-dark">Başlangıç Bakiyesi: <?= Helpers::sanitize(Helpers::formatCurrency((float)$package['initial_balance'])) ?></span>
+                                    <span class="badge bg-light text-dark">Başlangıç Bakiyesi: <?= Helpers::formatCurrencyHtml((float)$package['initial_balance']) ?></span>
                                     <span class="package-tag">ID #<?= $packageId ?></span>
                                 </div>
                             </label>
