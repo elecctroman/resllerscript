@@ -19,7 +19,7 @@ final class Schema
 
         self::ensureProvidersTable($pdo);
         self::ensureProviderProductsTable($pdo);
-        self::ensureCategoriesTable($pdo);
+
         self::ensureProductsTable($pdo);
         self::ensureProductStockTable($pdo);
         self::ensureResellerFavoritesTable($pdo);
@@ -86,20 +86,6 @@ final class Schema
         self::ensureColumn($pdo, 'provider_products', 'last_synced_at', 'DATETIME NULL');
     }
 
-    private static function ensureCategoriesTable(PDO $pdo): void
-    {
-        $pdo->exec("CREATE TABLE IF NOT EXISTS categories (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            parent_id INT NULL,
-            name VARCHAR(150) NOT NULL,
-            description TEXT NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-            FOREIGN KEY (parent_id) REFERENCES categories(id) ON DELETE SET NULL
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-        self::ensureColumn($pdo, 'categories', 'parent_id', 'INT NULL');
-    }
 
     private static function ensureProductsTable(PDO $pdo): void
     {
