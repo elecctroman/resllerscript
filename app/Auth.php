@@ -198,7 +198,9 @@ class Auth
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
 
-        return (int)$pdo->lastInsertId();
+        $userId = (int)$pdo->lastInsertId();
+
+        return $userId;
     }
 
     /**

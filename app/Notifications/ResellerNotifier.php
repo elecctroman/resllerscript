@@ -24,7 +24,7 @@ class ResellerNotifier
         $loginUrl = Helpers::url('index.php', true);
         $name = self::escape(isset($user['name']) ? $user['name'] : 'Bayi');
         $packageName = isset($order['package_name']) ? self::escape($order['package_name']) : '';
-        $price = isset($order['price']) ? Helpers::formatCurrency((float)$order['price'], 'USD') : null;
+        $price = isset($order['price']) ? Helpers::formatCurrency((float)$order['price'], 'TRY') : null;
 
         $lines = array(
             '👋 <b>Hoş geldiniz ' . $name . '!</b>',
@@ -82,7 +82,7 @@ class ResellerNotifier
             $lines[] = '🔢 Adet: <b>' . self::escape($order['quantity']) . '</b>';
         }
         if (isset($order['price'])) {
-            $lines[] = '💰 Tutar: <b>' . self::escape(Helpers::formatCurrency((float)$order['price'], 'USD')) . '</b>';
+            $lines[] = '💰 Tutar: <b>' . self::escape(Helpers::formatCurrency((float)$order['price'], 'TRY')) . '</b>';
         }
 
         if (!empty($order['admin_note'])) {
@@ -110,7 +110,7 @@ class ResellerNotifier
 
         $lines = array(
             '💳 <b>Bakiye talebiniz onaylandı!</b>',
-            '✅ Tutar: <b>' . self::escape(Helpers::formatCurrency((float)$request['amount'], 'USD')) . '</b>',
+            '✅ Tutar: <b>' . self::escape(Helpers::formatCurrency((float)$request['amount'], 'TRY')) . '</b>',
         );
 
         if (!empty($request['payment_method'])) {
@@ -156,6 +156,38 @@ class ResellerNotifier
         );
 
         return self::send($user, implode("\n", $lines), 'support_replied');
+    }
+
+    /**
+     * @param array $user
+     * @param array $product
+     * @param int   $added
+     * @param int   $available
+     * @return bool
+     */
+    public static function sendStockRestocked(array $user, array $product, int $added, int $available)
+    {
+        $productName = isset($product['name']) ? $product['name'] : ('Ürün #' . (isset($product['id']) ? $product['id'] : ''));
+        $lines = array(
+            '🔔 <b>Stok yenilendi!</b>',
+            '📦 Ürün: <b>' . self::escape($productName) . '</b>',
+        );
+
+        if ($added > 0) {
+            $lines[] = '➕ Yeni eklenen stok: <b>' . self::escape((string) $added) . '</b>';
+        }
+
+        $lines[] = '📊 Anlık stok: <b>' . self::escape((string) $available) . '</b>';
+
+        if (isset($product['price'])) {
+            $lines[] = '💰 Panel fiyatı: <b>' . self::escape(Helpers::formatCurrency((float) $product['price'])) . '</b>';
+        }
+
+        $query = urlencode($productName);
+        $lines[] = '';
+        $lines[] = '🛒 <a href="' . self::escape(Helpers::url('products.php?q=' . $query, true)) . '">Hemen sipariş verin</a>';
+
+        return self::send($user, implode("\n", $lines), 'stock_restock', true);
     }
 
     /**
