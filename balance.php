@@ -153,7 +153,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 Telegram::notify(sprintf(
                     "💳 Test modunda bakiye yüklendi!\nBayi: %s\nTutar: %s\nTalep No: %s",
                     $user['name'],
-                    Helpers::formatCurrency($amount, 'USD'),
+                    Helpers::formatCurrency($amount, 'TRY'),
                     $displayReference
                 ));
                 $_SESSION['flash_success'] = 'Test modu aktif olduğu için bakiye yüklemesi otomatik onaylandı. Bildirimler Telegram botunuza gönderildi.';
@@ -236,7 +236,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 Telegram::notify(sprintf(
                     "💳 Yeni bakiye talebi alındı!\nBayi: %s\nTutar: %s\nYöntem: %s\nTalep No: %s",
                     $user['name'],
-                    Helpers::formatCurrency($amount, 'USD'),
+                    Helpers::formatCurrency($amount, 'TRY'),
                     $methodLabel,
                     $displayReference
                 ));
@@ -272,7 +272,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $invoice = $gateway->createInvoice(
                 $amount,
-                'USD',
+                'TRY',
                 $displayReference,
                 $description,
                 $user['email'],
@@ -296,7 +296,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             Telegram::notify(sprintf(
                 "💳 Yeni bakiye talebi alındı!\nBayi: %s\nTutar: %s\nYöntem: %s\nTalep No: %s",
                 $user['name'],
-                Helpers::formatCurrency($amount, 'USD'),
+                Helpers::formatCurrency($amount, 'TRY'),
                 $methodLabel,
                 $displayReference
             ));
@@ -396,7 +396,10 @@ include __DIR__ . '/templates/header.php';
 
                 <form method="post" class="vstack gap-3">
                     <div>
-                        <label class="form-label"><?= Helpers::sanitize('Yüklenecek Tutar') ?> (<?= Helpers::sanitize(Helpers::currencySymbol()) ?>)</label>
+                        <label class="form-label">
+                            <?= Helpers::sanitize('Yüklenecek Tutar') ?>
+                            (<span class="app-currency-symbol" data-currency-symbol><?= Helpers::sanitize(Helpers::currencySymbol()) ?></span>)
+                        </label>
                         <input type="number" step="0.01" min="1" name="amount" class="form-control" required>
                     </div>
                     <?php if ($paymentTestMode): ?>
@@ -518,7 +521,7 @@ include __DIR__ . '/templates/header.php';
                             <?php foreach ($requests as $request): ?>
                                 <tr>
                                     <td><?= date('d.m.Y H:i', strtotime($request['created_at'])) ?></td>
-                                    <td><?= Helpers::sanitize(Helpers::formatCurrency((float)$request['amount'])) ?></td>
+                                    <td><?= Helpers::formatCurrencyHtml((float)$request['amount']) ?></td>
                                     <td><?= Helpers::sanitize($request['payment_method']) ?></td>
                                     <?php
                                     $displayReference = '-';
@@ -560,7 +563,10 @@ include __DIR__ . '/templates/header.php';
                             <?php foreach ($transactions as $transaction): ?>
                                 <tr>
                                     <td><?= date('d.m.Y H:i', strtotime($transaction['created_at'])) ?></td>
-                                    <td><?= Helpers::sanitize($transaction['type'] === 'credit' ? '+' : '-') ?><?= Helpers::sanitize(Helpers::formatCurrency((float)$transaction['amount'])) ?></td>
+                                    <td>
+                                        <span class="me-1"><?= Helpers::sanitize($transaction['type'] === 'credit' ? '+' : '-') ?></span>
+                                        <?= Helpers::formatCurrencyHtml((float)$transaction['amount']) ?>
+                                    </td>
                                     <td><?= strtoupper(Helpers::sanitize($transaction['type'])) ?></td>
                                     <td><?= Helpers::sanitize(isset($transaction['description']) ? $transaction['description'] : '-') ?></td>
                                 </tr>
