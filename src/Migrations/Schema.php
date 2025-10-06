@@ -17,18 +17,150 @@ final class Schema
             return;
         }
 
+        self::ensureLanguagesTable($pdo);
+        self::ensureLanguageTranslationsTable($pdo);
+        self::ensureCurrenciesTable($pdo);
+        self::ensureCategoriesTable($pdo);
         self::ensureProductsTable($pdo);
         self::ensureProductStockTable($pdo);
         self::ensureResellerFavoritesTable($pdo);
         self::ensureStockWatchersTable($pdo);
-        self::ensureApiTokens($pdo);
-        self::ensureApiRateLimitTable($pdo);
-        self::ensureApiRequestLogTable($pdo);
         self::ensureAutoTopupTable($pdo);
         self::ensureUserLocaleColumns($pdo);
         self::ensureBlogCategoriesTable($pdo);
         self::ensureBlogPostsTable($pdo);
+        self::ensureInstructionsTable($pdo);
+        self::ensureAnnouncementsTable($pdo);
+        self::ensureUserApiKeyColumn($pdo);
 
+    }
+
+    private static function ensureUserApiKeyColumn(PDO $pdo): void
+    {
+        if (!self::tableExists($pdo, 'users')) {
+            return;
+        }
+
+        self::ensureColumn($pdo, 'users', 'api_key', 'VARCHAR(128) NULL');
+        self::addIndex($pdo, 'users', 'uniq_users_api_key', 'ADD UNIQUE INDEX uniq_users_api_key (api_key)');
+    }
+
+    private static function ensureLanguagesTable(PDO $pdo): void
+    {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS languages (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            code VARCHAR(10) NOT NULL,
+            name VARCHAR(100) NOT NULL,
+            native_name VARCHAR(100) NOT NULL,
+            is_default TINYINT(1) NOT NULL DEFAULT 0,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_languages_code (code)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        self::ensureColumn($pdo, 'languages', 'native_name', "VARCHAR(100) NOT NULL DEFAULT ''");
+        self::ensureColumn($pdo, 'languages', 'is_default', 'TINYINT(1) NOT NULL DEFAULT 0');
+        self::ensureColumn($pdo, 'languages', 'is_active', 'TINYINT(1) NOT NULL DEFAULT 1');
+
+        try {
+            $count = (int) $pdo->query('SELECT COUNT(*) FROM languages')->fetchColumn();
+        } catch (PDOException $exception) {
+            $count = 0;
+        }
+
+        if ($count === 0) {
+            $insert = $pdo->prepare('INSERT INTO languages (code, name, native_name, is_default, is_active, created_at) VALUES (:code, :name, :native_name, :is_default, 1, NOW())');
+            $insert->execute(array('code' => 'en', 'name' => 'English', 'native_name' => 'English', 'is_default' => 1));
+            $insert->execute(array('code' => 'tr', 'name' => 'Turkish', 'native_name' => 'Türkçe', 'is_default' => 0));
+        } else {
+            $pdo->exec("INSERT IGNORE INTO languages (code, name, native_name, is_default, is_active, created_at) VALUES
+                ('en', 'English', 'English', 0, 1, NOW()),
+                ('tr', 'Turkish', 'Türkçe', 0, 1, NOW())");
+
+            $defaultCount = (int) $pdo->query('SELECT COUNT(*) FROM languages WHERE is_default = 1')->fetchColumn();
+            if ($defaultCount === 0) {
+                $pdo->exec("UPDATE languages SET is_default = CASE WHEN code = 'en' THEN 1 ELSE 0 END");
+            }
+        }
+    }
+
+    private static function ensureLanguageTranslationsTable(PDO $pdo): void
+    {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS language_translations (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            language_code VARCHAR(10) NOT NULL,
+            translation_key VARCHAR(255) NOT NULL,
+            translation_value TEXT NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_language_key (language_code, translation_key),
+            INDEX idx_language_code (language_code),
+            CONSTRAINT fk_language_code FOREIGN KEY (language_code) REFERENCES languages(code) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        self::ensureColumn($pdo, 'language_translations', 'translation_value', 'TEXT NOT NULL');
+    }
+
+    private static function ensureCurrenciesTable(PDO $pdo): void
+    {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS currencies (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            code VARCHAR(3) NOT NULL,
+            name VARCHAR(100) NOT NULL,
+            symbol VARCHAR(10) NOT NULL,
+            rate DECIMAL(18,8) NOT NULL DEFAULT 1.00000000,
+            decimals TINYINT(1) NOT NULL DEFAULT 2,
+            is_default TINYINT(1) NOT NULL DEFAULT 0,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            auto_update TINYINT(1) NOT NULL DEFAULT 0,
+            last_rate_at DATETIME NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_currencies_code (code)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        self::ensureColumn($pdo, 'currencies', 'decimals', 'TINYINT(1) NOT NULL DEFAULT 2');
+        self::ensureColumn($pdo, 'currencies', 'auto_update', 'TINYINT(1) NOT NULL DEFAULT 0');
+        self::ensureColumn($pdo, 'currencies', 'last_rate_at', 'DATETIME NULL');
+
+        try {
+            $count = (int) $pdo->query('SELECT COUNT(*) FROM currencies')->fetchColumn();
+        } catch (PDOException $exception) {
+            $count = 0;
+        }
+
+        if ($count === 0) {
+            $stmt = $pdo->prepare('INSERT INTO currencies (code, name, symbol, rate, decimals, is_default, is_active, auto_update, created_at) VALUES (:code, :name, :symbol, :rate, :decimals, :is_default, 1, :auto_update, NOW())');
+            $stmt->execute(array('code' => 'USD', 'name' => 'US Dollar', 'symbol' => '$', 'rate' => 1.0, 'decimals' => 2, 'is_default' => 1, 'auto_update' => 0));
+            $stmt->execute(array('code' => 'EUR', 'name' => 'Euro', 'symbol' => '€', 'rate' => 0.90, 'decimals' => 2, 'is_default' => 0, 'auto_update' => 1));
+            $stmt->execute(array('code' => 'TRY', 'name' => 'Türk Lirası', 'symbol' => '₺', 'rate' => 27.00, 'decimals' => 2, 'is_default' => 0, 'auto_update' => 1));
+        } else {
+            $pdo->exec("INSERT IGNORE INTO currencies (code, name, symbol, rate, decimals, is_default, is_active, auto_update, created_at) VALUES
+                ('USD', 'US Dollar', '$', 1.0, 2, 0, 1, 0, NOW()),
+                ('EUR', 'Euro', '€', 0.90, 2, 0, 1, 1, NOW()),
+                ('TRY', 'Türk Lirası', '₺', 27.00, 2, 0, 1, 1, NOW())");
+
+            $defaultCount = (int) $pdo->query('SELECT COUNT(*) FROM currencies WHERE is_default = 1')->fetchColumn();
+            if ($defaultCount === 0) {
+                $pdo->exec("UPDATE currencies SET is_default = CASE WHEN code = 'USD' THEN 1 ELSE 0 END, rate = CASE WHEN code = 'USD' THEN 1.0 ELSE rate END");
+            }
+        }
+    }
+
+    private static function ensureCategoriesTable(PDO $pdo): void
+    {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS categories (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            parent_id INT NULL,
+            name VARCHAR(150) NOT NULL,
+            description TEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (parent_id) REFERENCES categories(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        self::ensureColumn($pdo, 'categories', 'parent_id', 'INT NULL');
     }
 
     private static function ensureProductsTable(PDO $pdo): void
@@ -42,15 +174,13 @@ final class Schema
             cost_price_try DECIMAL(12,2) NULL,
             price DECIMAL(12,2) NOT NULL DEFAULT 0,
             status ENUM('active','inactive') NOT NULL DEFAULT 'active',
-            provider_code VARCHAR(100) NULL,
-            provider_product_id VARCHAR(100) NULL,
+            automatic_delivery TINYINT(1) NOT NULL DEFAULT 1,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (category_id) REFERENCES categories(id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-        self::ensureColumn($pdo, 'products', 'provider_code', "VARCHAR(100) NULL");
-        self::ensureColumn($pdo, 'products', 'provider_product_id', "VARCHAR(100) NULL");
+        self::ensureColumn($pdo, 'products', 'automatic_delivery', "TINYINT(1) NOT NULL DEFAULT 1");
     }
 
     private static function ensureProductStockTable(PDO $pdo): void
@@ -105,47 +235,6 @@ final class Schema
             UNIQUE KEY uniq_stock_watch (user_id, product_id),
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
             FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-    }
-
-    private static function ensureApiTokens(PDO $pdo): void
-    {
-        self::ensureColumn($pdo, 'api_tokens', 'status', "ENUM('active','disabled') NOT NULL DEFAULT 'active'");
-        self::ensureColumn($pdo, 'api_tokens', 'scopes', 'TEXT NULL');
-        self::ensureColumn($pdo, 'api_tokens', 'ip_whitelist', 'TEXT NULL');
-        self::ensureColumn($pdo, 'api_tokens', 'otp_secret', 'VARCHAR(64) NULL');
-        self::ensureColumn($pdo, 'api_tokens', 'last_rotated_at', 'DATETIME NULL');
-    }
-
-    private static function ensureApiRateLimitTable(PDO $pdo): void
-    {
-        $pdo->exec("CREATE TABLE IF NOT EXISTS api_rate_limits (
-            id BIGINT AUTO_INCREMENT PRIMARY KEY,
-            token_id INT NULL,
-            ip_address VARCHAR(45) NOT NULL,
-            bucket VARCHAR(64) NOT NULL,
-            hits INT NOT NULL DEFAULT 0,
-            period_start DATETIME NOT NULL,
-            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            UNIQUE KEY uniq_rate_bucket (token_id, ip_address, bucket),
-            INDEX idx_rate_period (period_start),
-            FOREIGN KEY (token_id) REFERENCES api_tokens(id) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-    }
-
-    private static function ensureApiRequestLogTable(PDO $pdo): void
-    {
-        $pdo->exec("CREATE TABLE IF NOT EXISTS api_request_logs (
-            id BIGINT AUTO_INCREMENT PRIMARY KEY,
-            token_id INT NULL,
-            ip_address VARCHAR(45) NOT NULL,
-            method VARCHAR(10) NOT NULL,
-            endpoint VARCHAR(191) NOT NULL,
-            status_code INT NOT NULL,
-            user_agent VARCHAR(255) NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (token_id) REFERENCES api_tokens(id) ON DELETE SET NULL,
-            INDEX idx_api_logs_created (created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
 
@@ -217,6 +306,48 @@ final class Schema
         self::ensureColumn($pdo, 'blog_posts', 'image_url', 'VARCHAR(255) NULL');
     }
 
+    private static function ensureInstructionsTable(PDO $pdo): void
+    {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS instructions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(191) NOT NULL,
+            summary VARCHAR(255) NULL,
+            content MEDIUMTEXT NOT NULL,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        self::ensureColumn($pdo, 'instructions', 'summary', 'VARCHAR(255) NULL');
+        self::ensureColumn($pdo, 'instructions', 'is_active', 'TINYINT(1) NOT NULL DEFAULT 1');
+    }
+
+    private static function ensureAnnouncementsTable(PDO $pdo): void
+    {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS announcements (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(191) NOT NULL,
+            body MEDIUMTEXT NOT NULL,
+            audience ENUM('reseller','admin','all') NOT NULL DEFAULT 'reseller',
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            pinned TINYINT(1) NOT NULL DEFAULT 0,
+            starts_at DATETIME NULL,
+            ends_at DATETIME NULL,
+            created_by INT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+            KEY idx_announcements_active (is_active, audience, starts_at, ends_at),
+            KEY idx_announcements_pinned (pinned),
+            CONSTRAINT fk_announcements_creator FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        self::ensureColumn($pdo, 'announcements', 'audience', "ENUM('reseller','admin','all') NOT NULL DEFAULT 'reseller'");
+        self::ensureColumn($pdo, 'announcements', 'pinned', 'TINYINT(1) NOT NULL DEFAULT 0');
+        self::ensureColumn($pdo, 'announcements', 'starts_at', 'DATETIME NULL');
+        self::ensureColumn($pdo, 'announcements', 'ends_at', 'DATETIME NULL');
+        self::ensureColumn($pdo, 'announcements', 'created_by', 'INT NULL');
+    }
+
 
     private static function ensureColumn(PDO $pdo, string $table, string $column, string $definition): void
     {
@@ -242,6 +373,14 @@ final class Schema
     {
         $stmt = $pdo->prepare('SHOW COLUMNS FROM ' . $table . ' LIKE :column');
         $stmt->execute(array(':column' => $column));
+        return (bool) $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    private static function tableExists(PDO $pdo, string $table): bool
+    {
+        $stmt = $pdo->prepare('SHOW TABLES LIKE :table_name');
+        $stmt->execute(array(':table_name' => $table));
+
         return (bool) $stmt->fetch(PDO::FETCH_ASSOC);
     }
 }

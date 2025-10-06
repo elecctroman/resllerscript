@@ -25,9 +25,6 @@ $current = Settings::getMany(array(
     'reseller_auto_suspend_days',
     'platform_default_locale',
     'platform_default_currency',
-    'api_base_url',
-    'api_rate_limit_per_minute',
-    'api_captcha_secret',
 ));
 
 $featureLabels = array(
@@ -36,7 +33,6 @@ $featureLabels = array(
     'balance' => 'Bakiye yönetimi',
     'support' => 'Destek talepleri',
     'packages' => 'Bayilik paketleri başvurusu',
-    'api' => 'API erişimi',
     'premium_modules' => 'Premium modül pazarı',
 );
 
@@ -79,17 +75,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $defaultCurrency = 'TRY';
             }
 
-            $apiBaseUrl = isset($_POST['api_base_url']) ? trim($_POST['api_base_url']) : '';
-            if ($apiBaseUrl !== '') {
-                $apiBaseUrl = rtrim($apiBaseUrl, '/');
-                if (!filter_var($apiBaseUrl, FILTER_VALIDATE_URL)) {
-                    $errors[] = 'Geçerli bir API temel adresi giriniz (https://ornek.com/api/v1 gibi).';
-                }
-            }
-
-            $rateLimitPerMinute = isset($_POST['api_rate_limit_per_minute']) ? max(10, (int)$_POST['api_rate_limit_per_minute']) : 120;
-            $captchaSecret = isset($_POST['api_captcha_secret']) ? trim($_POST['api_captcha_secret']) : '';
-
             $autoSuspendEnabled = isset($_POST['reseller_auto_suspend_enabled']) ? '1' : '0';
             $autoThresholdInput = isset($_POST['reseller_auto_suspend_threshold']) ? str_replace(',', '.', trim($_POST['reseller_auto_suspend_threshold'])) : '0';
             $autoThreshold = (float)$autoThresholdInput;
@@ -117,9 +102,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 Settings::set('platform_default_locale', $defaultLocale);
                 Settings::set('platform_default_currency', $defaultCurrency);
-                Settings::set('api_base_url', $apiBaseUrl !== '' ? $apiBaseUrl : null);
-                Settings::set('api_rate_limit_per_minute', (string)$rateLimitPerMinute);
-                Settings::set('api_captcha_secret', $captchaSecret !== '' ? $captchaSecret : null);
 
                 foreach ($featureLabels as $key => $label) {
                     $enabled = isset($_POST['features'][$key]);
@@ -156,9 +138,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'reseller_auto_suspend_days',
                     'platform_default_locale',
                     'platform_default_currency',
-                    'api_base_url',
-                    'api_rate_limit_per_minute',
-                    'api_captcha_secret',
                 ));
             }
         }
@@ -258,24 +237,6 @@ include __DIR__ . '/../templates/header.php';
                                 <?php endforeach; ?>
                             </select>
                             <small class="text-muted">Grafikler ve fiyatlar bu para birimine göre gösterilir.</small>
-                        </div>
-                    </div>
-
-                    <div class="row g-3 mt-3" id="api-security">
-                        <div class="col-md-6 col-xl-4">
-                            <label class="form-label">API Temel URL</label>
-                            <input type="url" name="api_base_url" class="form-control" value="<?= Helpers::sanitize(isset($current['api_base_url']) ? $current['api_base_url'] : '') ?>" placeholder="https://ornek.com/api/v1">
-                            <small class="text-muted">Boş bırakırsanız panel alan adınız otomatik kullanılır.</small>
-                        </div>
-                        <div class="col-md-6 col-xl-4">
-                            <label class="form-label">API Rate Limit (dakika)</label>
-                            <input type="number" name="api_rate_limit_per_minute" min="10" step="10" class="form-control" value="<?= Helpers::sanitize(isset($current['api_rate_limit_per_minute']) ? $current['api_rate_limit_per_minute'] : '120') ?>">
-                            <small class="text-muted">Dakikada izin verilen maksimum API isteği.</small>
-                        </div>
-                        <div class="col-md-6 col-xl-4">
-                            <label class="form-label">API Captcha Gizli Anahtar</label>
-                            <input type="text" name="api_captcha_secret" class="form-control" value="<?= Helpers::sanitize(isset($current['api_captcha_secret']) ? $current['api_captcha_secret'] : '') ?>" placeholder="Opsiyonel güvenlik katmanı">
-                            <small class="text-muted">Belirlenirse API çağrıları X-Captcha-Token başlığıyla bu değeri iletmelidir.</small>
                         </div>
                     </div>
 
