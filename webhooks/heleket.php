@@ -163,7 +163,7 @@ if (strpos($orderReference, 'BAL-') === 0) {
     Telegram::notify(sprintf(
         "Heleket üzerinden yeni bakiye yüklemesi tamamlandı!\nBayi: %s\nTutar: %s",
         $request['name'],
-        Helpers::formatCurrency((float)$request['amount'], 'USD')
+        Helpers::formatCurrency((float)$request['amount'])
     ));
 
     echo json_encode(['status' => 'ok']);

@@ -124,7 +124,7 @@ class PackageOrderService
                 "Yeni teslimat tamamlandı!\nBayi: %s\nPaket: %s\nTutar: %s",
                 $order['name'],
                 $order['package_name'],
-                Helpers::formatCurrency((float)$order['price'], 'USD')
+                Helpers::formatCurrency((float)$order['price'], 'TRY')
             ));
 
             return [
