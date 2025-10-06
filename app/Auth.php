@@ -198,7 +198,24 @@ class Auth
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
 
-        return (int)$pdo->lastInsertId();
+        $userId = (int)$pdo->lastInsertId();
+
+        if ($role === 'reseller') {
+            try {
+                $resellerStmt = $pdo->prepare('INSERT INTO resellers (user_id, name, email, password_hash, status, created_at, updated_at) VALUES (:user_id, :name, :email, :password_hash, :status, NOW(), NOW()) ON DUPLICATE KEY UPDATE name = VALUES(name), email = VALUES(email), password_hash = VALUES(password_hash), status = VALUES(status), updated_at = NOW()');
+                $resellerStmt->execute(array(
+                    'user_id' => $userId,
+                    'name' => $name,
+                    'email' => $email,
+                    'password_hash' => $params['password_hash'],
+                    'status' => $status === 'active' ? 'active' : 'suspended',
+                ));
+            } catch (\Throwable $ignored) {
+                // Reseller tablosu isteğe bağlıdır; başarısızlık ana akışı engellememelidir.
+            }
+        }
+
+        return $userId;
     }
 
     /**

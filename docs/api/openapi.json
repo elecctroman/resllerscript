@@ -1,0 +1,100 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Reseller API",
+    "version": "1.0.0",
+    "description": "REST API for reseller automation"
+  },
+  "servers": [
+    { "url": "https://example.com/api" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-KEY"
+      }
+    }
+  },
+  "paths": {
+    "/v1/auth/login": {
+      "post": {
+        "summary": "Authenticate reseller",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string" },
+                  "password": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {"description": "Login response"}
+        }
+      }
+    },
+    "/v1/products": {
+      "get": {
+        "security": [{"ApiKey": []}],
+        "summary": "List products",
+        "responses": {
+          "200": {"description": "Product list"}
+        }
+      }
+    },
+    "/v1/order/create": {
+      "post": {
+        "security": [{"ApiKey": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["product_id"],
+                "properties": {
+                  "product_id": {"type": "integer"},
+                  "note": {"type": "string"},
+                  "external_reference": {"type": "string"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {"description": "Order created"}
+        }
+      }
+    },
+    "/v1/order/status": {
+      "get": {
+        "security": [{"ApiKey": []}],
+        "parameters": [
+          {"in": "query", "name": "order_id", "schema": {"type": "integer"}},
+          {"in": "query", "name": "external_reference", "schema": {"type": "string"}}
+        ],
+        "responses": {"200": {"description": "Order status"}}
+      }
+    },
+    "/v1/balance": {
+      "get": {
+        "security": [{"ApiKey": []}],
+        "responses": {"200": {"description": "Balance"}}
+      }
+    },
+    "/v1/user/info": {
+      "get": {
+        "security": [{"ApiKey": []}],
+        "responses": {"200": {"description": "User profile"}}
+      }
+    }
+  }
+}

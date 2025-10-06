@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Reseller API Documentation</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 40px; color: #1f2933; }
+h1 { color: #0b7285; }
+code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; }
+pre { background: #0b7285; color: #fff; padding: 16px; border-radius: 8px; overflow-x: auto; }
+section { margin-bottom: 32px; }
+</style>
+</head>
+<body>
+<h1>Reseller API v1</h1>
+<p>Tam kapsamlı REST API ile ürün listeleme, sipariş oluşturma ve bakiye kontrolü işlemlerini otomatikleştirebilirsiniz. Kimlik doğrulaması <code>Bearer token</code> veya <code>X-API-KEY</code> başlıklarıyla yapılır.</p>
+<section>
+<h2>Kimlik Doğrulama</h2>
+<pre>{
+  "email": "bayi@example.com",
+  "password": "secret123"
+}</pre>
+<p>Yanıt <code>token</code> alanı içerir. Bu token'ı <code>Authorization: Bearer TOKEN</code> şeklinde kullanabilirsiniz. Alternatif olarak API key ve secret ile erişim mümkündür.</p>
+</section>
+<section>
+<h2>Ürünleri Listeleme</h2>
+<pre>curl -X GET "https://example.com/api/v1/products" \
+  -H "X-API-KEY: YOUR_KEY" \
+  -H "X-API-SECRET: YOUR_SECRET" \
+  -H "X-CLIENT-DOMAIN: yoursite.com"</pre>
+</section>
+<section>
+<h2>Sipariş Oluşturma</h2>
+<pre>curl -X POST "https://example.com/api/v1/order/create" \
+  -H "Content-Type: application/json" \
+  -H "X-API-KEY: YOUR_KEY" \
+  -H "X-API-SECRET: YOUR_SECRET" \
+  -d '{
+    "product_id": 24,
+    "note": "Müşteri için",
+    "external_reference": "ORDER-1001"
+}'</pre>
+</section>
+<section>
+<h2>Postman &amp; SDK'lar</h2>
+<p><code>docs/api/postman_collection.json</code> dosyasını Postman'e aktarabilirsiniz. PHP, Node.js ve Python istemci örnekleri <code>integrations/sdk</code> klasöründedir.</p>
+</section>
+</body>
+</html>

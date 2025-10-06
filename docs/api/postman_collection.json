@@ -1,0 +1,42 @@
+{
+  "info": {
+    "name": "Reseller API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"}
+        ],
+        "url": {
+          "raw": "{{api_url}}/v1/auth/login",
+          "host": ["{{api_url}}"],
+          "path": ["v1", "auth", "login"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"demo@example.com\",\n  \"password\": \"secret\"\n}"
+        }
+      }
+    },
+    {
+      "name": "List Products",
+      "request": {
+        "method": "GET",
+        "header": [
+          {"key": "X-API-KEY", "value": "{{api_key}}"},
+          {"key": "X-API-SECRET", "value": "{{api_secret}}"},
+          {"key": "X-CLIENT-DOMAIN", "value": "example.com"}
+        ],
+        "url": {
+          "raw": "{{api_url}}/v1/products",
+          "host": ["{{api_url}}"],
+          "path": ["v1", "products"]
+        }
+      }
+    }
+  ]
+}
