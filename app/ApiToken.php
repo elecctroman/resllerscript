@@ -18,7 +18,7 @@ class ApiToken
         }
 
         $pdo = Database::connection();
-        $query = 'SELECT t.id AS token_id, t.user_id, t.token, t.label, t.webhook_url, t.status AS token_status, t.scopes, t.ip_whitelist, t.otp_secret, t.created_at AS token_created_at, t.last_used_at, u.id AS user_id, u.name, u.email, u.balance, u.role, u.status, u.created_at, u.updated_at FROM api_tokens t INNER JOIN users u ON t.user_id = u.id WHERE t.token = :token AND u.status = :status AND t.status = :token_status';
+        $query = 'SELECT t.id AS token_id, t.user_id, t.token, t.label, t.webhook_url, t.status AS token_status, t.scopes, t.ip_whitelist, t.otp_secret, t.hmac_secret, t.rate_limit_per_minute, t.created_at AS token_created_at, t.last_used_at, u.id AS user_id, u.name, u.email, u.balance, u.role, u.status, u.created_at, u.updated_at FROM api_tokens t INNER JOIN users u ON t.user_id = u.id WHERE t.token = :token AND u.status = :status AND t.status = :token_status';
         $params = array(
             'token' => $token,
             'status' => 'active',
@@ -51,6 +51,8 @@ class ApiToken
                 'scopes' => isset($row['scopes']) ? (string)$row['scopes'] : '',
                 'ip_whitelist' => isset($row['ip_whitelist']) ? (string)$row['ip_whitelist'] : '',
                 'otp_secret' => isset($row['otp_secret']) ? (string)$row['otp_secret'] : '',
+                'hmac_secret' => isset($row['hmac_secret']) ? (string)$row['hmac_secret'] : '',
+                'rate_limit_per_minute' => isset($row['rate_limit_per_minute']) ? (int)$row['rate_limit_per_minute'] : null,
                 'created_at' => isset($row['token_created_at']) ? $row['token_created_at'] : null,
                 'last_used_at' => isset($row['last_used_at']) ? $row['last_used_at'] : null,
                 'name' => isset($row['name']) ? $row['name'] : null,
@@ -77,13 +79,16 @@ class ApiToken
     {
         $plain = bin2hex(random_bytes(16));
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('INSERT INTO api_tokens (user_id, token, label, scopes, status, created_at) VALUES (:user_id, :token, :label, :scopes, :status, NOW())');
+        $hmacSecret = bin2hex(random_bytes(32));
+
+        $stmt = $pdo->prepare('INSERT INTO api_tokens (user_id, token, label, scopes, status, hmac_secret, created_at) VALUES (:user_id, :token, :label, :scopes, :status, :hmac_secret, NOW())');
         $stmt->execute(array(
             'user_id' => $userId,
             'token' => $plain,
             'label' => $label,
             'scopes' => is_array($scopes) ? implode(',', $scopes) : (string)$scopes,
             'status' => 'active',
+            'hmac_secret' => $hmacSecret,
         ));
 
         return array(
@@ -93,6 +98,7 @@ class ApiToken
             'label' => $label,
             'webhook_url' => null,
             'scopes' => is_array($scopes) ? implode(',', $scopes) : (string)$scopes,
+            'hmac_secret' => $hmacSecret,
             'created_at' => date('Y-m-d H:i:s'),
             'last_used_at' => null,
         );
@@ -347,6 +353,7 @@ class ApiToken
                 'token' => $existing['token'],
                 'label' => isset($existing['label']) ? $existing['label'] : null,
                 'webhook_url' => isset($existing['webhook_url']) ? $existing['webhook_url'] : null,
+                'hmac_secret' => isset($existing['hmac_secret']) ? $existing['hmac_secret'] : null,
                 'created_at' => isset($existing['created_at']) ? $existing['created_at'] : null,
                 'last_used_at' => isset($existing['last_used_at']) ? $existing['last_used_at'] : null,
             );

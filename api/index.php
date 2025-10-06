@@ -2,5 +2,9 @@
 require __DIR__ . '/bootstrap.php';
 
 json_response(array(
-    'message' => 'Reseller API. Use /api/v1/products and /api/v1/orders for REST access.'
+    'message' => 'Reseller API hazır. Güncel REST uç noktaları için /api/v2 yolunu kullanın.',
+    'links' => array(
+        'openapi' => '/api/openapi.yaml',
+        'documentation' => '/api/docs/index.html',
+    ),
 ));

@@ -184,7 +184,8 @@ class ApiSecurityService
      */
     private static function checkRateLimit(array $tokenRow, string $ip, string $method, string $endpoint): void
     {
-        $limitPerMinute = (int)Settings::get('api_rate_limit_per_minute');
+        $limitOverride = isset($tokenRow['rate_limit_per_minute']) ? (int) $tokenRow['rate_limit_per_minute'] : 0;
+        $limitPerMinute = $limitOverride > 0 ? $limitOverride : (int) Settings::get('api_rate_limit_per_minute');
         if ($limitPerMinute <= 0) {
             $limitPerMinute = 120;
         }

@@ -1,6 +1,8 @@
 <?php
 header('Content-Type: application/json');
 
+$__apiRawBody = null;
+
 $autoloader = __DIR__ . '/../vendor/autoload.php';
 if (file_exists($autoloader)) {
     require_once $autoloader;
@@ -144,8 +146,8 @@ function json_response($data, $statusCode = 200)
 
 function read_json_body()
 {
-    $raw = file_get_contents('php://input');
-    if ($raw === false || $raw === '') {
+    $raw = api_raw_body();
+    if ($raw === '') {
         return array();
     }
 
@@ -155,6 +157,24 @@ function read_json_body()
     }
 
     return $decoded;
+}
+
+function api_raw_body(): string
+{
+    global $__apiRawBody;
+
+    if ($__apiRawBody !== null) {
+        return (string) $__apiRawBody;
+    }
+
+    $raw = file_get_contents('php://input');
+    if ($raw === false) {
+        $raw = '';
+    }
+
+    $__apiRawBody = $raw;
+
+    return $raw;
 }
 
 function authenticate_token()
@@ -253,9 +273,21 @@ function authenticate_token()
 
     try {
         App\Services\ApiSecurityService::guard($tokenRow, $__apiSecurityContext['ip'], $__apiSecurityContext['method'], $__apiSecurityContext['endpoint']);
+        App\Services\ApiSignatureService::assertValid($tokenRow, api_raw_body(), $__apiSecurityContext['method'], $__apiSecurityContext['endpoint']);
     } catch (\RuntimeException $securityException) {
-        App\Services\ApiSecurityService::logRequest($tokenRow, $__apiSecurityContext['ip'], $__apiSecurityContext['method'], $__apiSecurityContext['endpoint'], 429);
-        json_response(array('success' => false, 'error' => $securityException->getMessage()), 429);
+        $message = $securityException->getMessage();
+        $lowerMessage = strtolower($message);
+        $status = 403;
+
+        if (str_contains($lowerMessage, 'rate limit')) {
+            $status = 429;
+            $__apiSecurityContext['retry_after'] = 60;
+        } elseif (str_contains($lowerMessage, 'imza') || str_contains($lowerMessage, 'otp')) {
+            $status = 401;
+        }
+
+        App\Services\ApiSecurityService::logRequest($tokenRow, $__apiSecurityContext['ip'], $__apiSecurityContext['method'], $__apiSecurityContext['endpoint'], $status);
+        json_response(array('success' => false, 'error' => $message), $status);
     }
 
     return $tokenRow;

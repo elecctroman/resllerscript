@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8">
+    <title>Reseller REST API Dokümantasyonu</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.11.0/swagger-ui.css">
+    <style>
+        body { margin: 0; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0f172a; }
+        header { background: #111827; color: #f8fafc; padding: 32px 48px; }
+        header h1 { margin: 0; font-size: 28px; }
+        header p { margin: 8px 0 0; color: #cbd5f5; max-width: 760px; }
+        main { display: flex; flex-direction: column; min-height: 100vh; }
+        section.guide { background: #020617; color: #e2e8f0; padding: 32px 48px; border-bottom: 1px solid rgba(148, 163, 184, 0.2); }
+        section.guide h2 { margin-top: 0; font-size: 20px; }
+        section.guide pre { background: #0f172a; color: #e2e8f0; padding: 16px; border-radius: 8px; overflow-x: auto; }
+        #swagger-ui { flex: 1; background: #fff; }
+        a { color: #38bdf8; }
+        .columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+        .card { background: rgba(148, 163, 184, 0.08); padding: 20px; border-radius: 12px; }
+        .card h3 { margin-top: 0; font-size: 18px; }
+    </style>
+</head>
+<body>
+<main>
+    <header>
+        <h1>Reseller REST API</h1>
+        <p>Bayileriniz için ürün listeleme, sipariş oluşturma ve bakiye yönetimi işlemlerini otomatikleştiren REST servisi.
+            Bu sayfa <code>api/openapi.yaml</code> dosyasından üretilen Swagger dokümantasyonunu içermektedir.</p>
+    </header>
+    <section class="guide">
+        <h2>Başlangıç</h2>
+        <div class="columns">
+            <div class="card">
+                <h3>Kimlik Doğrulama</h3>
+                <p>İsteklerinize <code>X-API-Key</code> başlığı veya <code>Authorization: Bearer &lt;token&gt;</code> formatında
+                    kimlik bilgisi ekleyin. HMAC imzası aktifleştirilen anahtarlar için aşağıdaki formülü kullanın:</p>
+                <pre>signature = HMAC_SHA256(secret, timestamp + "\n" + METHOD + "\n" + PATH + "\n" + body)
+X-Request-Timestamp: &lt;unix epoch&gt;
+X-Signature: sha256=&lt;signature&gt;</pre>
+            </div>
+            <div class="card">
+                <h3>Hız Limiti</h3>
+                <p>Varsayılan limit dakika başına 120 istektir. API anahtarı bazında farklı sınırlar tanımlanabilir.</p>
+            </div>
+            <div class="card">
+                <h3>Doküman Dosyaları</h3>
+                <ul>
+                    <li><a href="../openapi.yaml">openapi.yaml</a></li>
+                    <li><a href="../../docs/postman/reseller-api.postman_collection.json">Postman koleksiyonu</a></li>
+                </ul>
+            </div>
+        </div>
+    </section>
+    <div id="swagger-ui"></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.11.0/swagger-ui-bundle.js"></script>
+<script>
+window.addEventListener('load', () => {
+  SwaggerUIBundle({
+    url: '../openapi.yaml',
+    dom_id: '#swagger-ui',
+    presets: [SwaggerUIBundle.presets.apis],
+    layout: 'BaseLayout'
+  });
+});
+</script>
+</body>
+</html>

@@ -22,6 +22,13 @@ CREATE TABLE IF NOT EXISTS api_tokens (
     token VARCHAR(191) NOT NULL UNIQUE,
     label VARCHAR(150) NULL,
     webhook_url TEXT NULL,
+    status ENUM('active','disabled') NOT NULL DEFAULT 'active',
+    scopes TEXT NULL,
+    ip_whitelist TEXT NULL,
+    otp_secret VARCHAR(64) NULL,
+    hmac_secret VARCHAR(191) NULL,
+    rate_limit_per_minute INT NULL,
+    last_rotated_at DATETIME NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_used_at DATETIME NULL,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE

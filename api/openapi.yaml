@@ -1,0 +1,291 @@
+openapi: 3.0.3
+info:
+  title: Reseller REST API
+  version: 2.0.0
+  description: |
+    Reseller Script için REST tabanlı bayi API'si.
+servers:
+  - url: https://example.com/api/v2
+    description: Production
+  - url: https://sandbox.example.com/api/v2
+    description: Sandbox
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Token
+  schemas:
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        sku:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        price:
+          type: number
+          format: float
+        status:
+          type: string
+        automatic_delivery:
+          type: boolean
+        provider_code:
+          type: string
+          nullable: true
+        provider_product_id:
+          type: string
+          nullable: true
+        category:
+          type: object
+          properties:
+            id:
+              type: integer
+              nullable: true
+            name:
+              type: string
+              nullable: true
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+    OrderCreateRequest:
+      type: object
+      required:
+        - product_id
+      properties:
+        product_id:
+          type: integer
+        sku:
+          type: string
+          description: Product SKU yerine ID göndermek için kullanılabilir.
+        quantity:
+          type: integer
+          minimum: 1
+          default: 1
+        note:
+          type: string
+        external_reference:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+      example:
+        product_id: 15
+        quantity: 1
+        note: "Otomatik teslimat"
+        external_reference: "EXT-12345"
+        metadata:
+          customer:
+            email: customer@example.com
+    OrderResponse:
+      type: object
+      properties:
+        order_id:
+          type: integer
+        status:
+          type: string
+        message:
+          type: string
+        product:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            sku:
+              type: string
+              nullable: true
+        quantity:
+          type: integer
+        total_amount:
+          type: number
+        remaining_balance:
+          type: number
+        provider_note:
+          type: string
+          nullable: true
+        delivery:
+          type: string
+          nullable: true
+    Order:
+      allOf:
+        - $ref: '#/components/schemas/OrderResponse'
+        - type: object
+          properties:
+            admin_note:
+              type: string
+              nullable: true
+            external_reference:
+              type: string
+              nullable: true
+            metadata:
+              type: object
+              additionalProperties: true
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+paths:
+  /products:
+    get:
+      summary: Aktif ürünleri listeler.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Ürün listesi.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      products:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Product'
+                      count:
+                        type: integer
+  /order/create:
+    post:
+      summary: Yeni ürün siparişi oluşturur.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderCreateRequest'
+      responses:
+        '201':
+          description: Sipariş oluşturuldu.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrderResponse'
+        '422':
+          description: Doğrulama hatası.
+  /order/status:
+    get:
+      summary: Sipariş durumunu döndürür.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: order_id
+          schema:
+            type: integer
+        - in: query
+          name: external_reference
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Sipariş bulundu.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      order:
+                        $ref: '#/components/schemas/Order'
+        '404':
+          description: Sipariş bulunamadı.
+  /balance:
+    get:
+      summary: Kullanıcı bakiyesini döndürür.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Bakiye bilgisi.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      balance:
+                        type: number
+                      currency:
+                        type: string
+                      updated_at:
+                        type: string
+                        format: date-time
+  /user/info:
+    get:
+      summary: Bayi ve token bilgilerini döndürür.
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Kullanıcı bilgisi.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                          name:
+                            type: string
+                          email:
+                            type: string
+                          balance:
+                            type: number
+                          role:
+                            type: string
+                      token:
+                        type: object
+                        properties:
+                          token_id:
+                            type: integer
+                            nullable: true
+                          label:
+                            type: string
+                            nullable: true
+                          scopes:
+                            type: string
+                            nullable: true
+                          ip_whitelist:
+                            type: string
+                            nullable: true
+                          rate_limit_per_minute:
+                            type: integer
+                            nullable: true

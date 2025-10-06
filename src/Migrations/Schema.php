@@ -126,6 +126,8 @@ final class Schema
         self::ensureColumn($pdo, 'api_tokens', 'scopes', 'TEXT NULL');
         self::ensureColumn($pdo, 'api_tokens', 'ip_whitelist', 'TEXT NULL');
         self::ensureColumn($pdo, 'api_tokens', 'otp_secret', 'VARCHAR(64) NULL');
+        self::ensureColumn($pdo, 'api_tokens', 'hmac_secret', 'VARCHAR(191) NULL');
+        self::ensureColumn($pdo, 'api_tokens', 'rate_limit_per_minute', 'INT NULL');
         self::ensureColumn($pdo, 'api_tokens', 'last_rotated_at', 'DATETIME NULL');
     }
 

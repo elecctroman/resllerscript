@@ -1,0 +1,93 @@
+{
+  "info": {
+    "name": "Reseller REST API",
+    "description": "Reseller Script için REST API uç noktaları",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "2.0.0"
+  },
+  "item": [
+    {
+      "name": "List Products",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "X-API-Key", "value": "{{api_key}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/products",
+          "host": [ "{{base_url}}" ],
+          "path": [ "products" ]
+        }
+      }
+    },
+    {
+      "name": "Create Order",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-API-Key", "value": "{{api_key}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"product_id\": 15,\n  \"quantity\": 1,\n  \"external_reference\": \"EXT-123\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/order/create",
+          "host": [ "{{base_url}}" ],
+          "path": [ "order", "create" ]
+        }
+      }
+    },
+    {
+      "name": "Order Status",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "X-API-Key", "value": "{{api_key}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/order/status?order_id=123",
+          "host": [ "{{base_url}}" ],
+          "path": [ "order", "status" ],
+          "query": [
+            { "key": "order_id", "value": "123" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Balance",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/balance",
+          "host": [ "{{base_url}}" ],
+          "path": [ "balance" ]
+        }
+      }
+    },
+    {
+      "name": "User Info",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/user/info",
+          "host": [ "{{base_url}}" ],
+          "path": [ "user", "info" ]
+        }
+      }
+    }
+  ],
+  "variable": [
+    { "key": "base_url", "value": "https://example.com/api/v2" },
+    { "key": "api_key", "value": "" },
+    { "key": "token", "value": "" }
+  ]
+}
