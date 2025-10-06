@@ -119,13 +119,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         "Yeni bayilik başvurusu onaylandı!\nBayi: %s\nPaket: %s\nTutar: %s",
                         $displayName !== '' ? $displayName : 'Bilinmiyor',
                         isset($request['package_name']) ? $request['package_name'] : '-',
-                        Helpers::formatCurrency((float)$request['amount'], 'USD')
+                        Helpers::formatCurrency((float)$request['amount'])
                     ));
                 } else {
                     Telegram::notify(sprintf(
                         "Yeni bakiye yüklemesi tamamlandı!\nBayi: %s\nTutar: %s",
                         $displayName !== '' ? $displayName : 'Bilinmiyor',
-                        Helpers::formatCurrency((float)$request['amount'], 'USD')
+                        Helpers::formatCurrency((float)$request['amount'])
                     ));
                 }
             }
@@ -212,7 +212,7 @@ include __DIR__ . '/../templates/header.php';
                                         <strong><?= Helpers::sanitize($displayName) ?></strong><br>
                                         <small class="text-muted"><?= Helpers::sanitize($displayEmail) ?></small>
                                     </td>
-                                    <td><?= Helpers::sanitize(Helpers::formatCurrency((float)$request['amount'])) ?></td>
+                                    <td><?= Helpers::formatCurrencyHtml((float)$request['amount']) ?></td>
                                     <td><?= Helpers::sanitize($request['payment_method']) ?></td>
                                     <td><span class="badge <?= $typeClass ?> text-uppercase" style="font-size: 0.7rem; letter-spacing: .08em;"><?= Helpers::sanitize($typeLabel) ?></span></td>
                                     <?php
@@ -252,7 +252,7 @@ include __DIR__ . '/../templates/header.php';
                                                                     <div><span class="fw-semibold">Paket:</span> <?= Helpers::sanitize($request['package_name']) ?></div>
                                                                 <?php endif; ?>
                                                             </div>
-                                                            <div><span class="fw-semibold">Tutar:</span> <?= Helpers::sanitize(Helpers::formatCurrency((float)$request['amount'])) ?></div>
+                                                            <div><span class="fw-semibold">Tutar:</span> <?= Helpers::formatCurrencyHtml((float)$request['amount']) ?></div>
                                                             <div><span class="fw-semibold">Ödeme Yöntemi:</span> <?= Helpers::sanitize($request['payment_method']) ?></div>
                                                             <?php if (!empty($request['notes'])): ?>
                                                                 <div class="mt-2">
@@ -321,7 +321,7 @@ include __DIR__ . '/../templates/header.php';
                                         : (isset($item['applicant_name']) ? $item['applicant_name'] : '-');
                                     ?>
                                     <td><?= Helpers::sanitize($historyName) ?></td>
-                                    <td><?= Helpers::sanitize(Helpers::formatCurrency((float)$item['amount'])) ?></td>
+                                    <td><?= Helpers::formatCurrencyHtml((float)$item['amount']) ?></td>
                                     <td><span class="badge-status <?= Helpers::sanitize($item['status']) ?>"><?= strtoupper(Helpers::sanitize($item['status'])) ?></span></td>
                                     <td><?= Helpers::sanitize(isset($item['admin_note']) ? $item['admin_note'] : '-') ?></td>
                                 </tr>

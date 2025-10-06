@@ -36,8 +36,8 @@ include __DIR__ . '/templates/header.php';
                 <h5 class="mb-0">Bakiye Erime Projeksiyonu</h5>
             </div>
             <div class="card-body">
-                <p class="text-muted mb-1">Ortalama günlük harcama: <strong><?= Helpers::formatCurrency($analytics['balance_projection']['average_daily_spend']) ?></strong></p>
-                <p class="text-muted mb-3">Mevcut bakiye: <strong><?= Helpers::formatCurrency($analytics['balance_projection']['balance']) ?></strong></p>
+                <p class="text-muted mb-1">Ortalama günlük harcama: <strong><?= Helpers::formatCurrencyHtml($analytics['balance_projection']['average_daily_spend']) ?></strong></p>
+                <p class="text-muted mb-3">Mevcut bakiye: <strong><?= Helpers::formatCurrencyHtml($analytics['balance_projection']['balance']) ?></strong></p>
                 <?php if (!empty($analytics['balance_projection']['days_remaining'])): ?>
                     <div class="alert alert-warning mb-3">
                         <span class="fw-semibold">Tahmini kalan süre:</span>
@@ -72,7 +72,7 @@ include __DIR__ . '/templates/header.php';
                                     <tr>
                                         <td><?= Helpers::sanitize($item['name']) ?></td>
                                         <td class="text-end"><?= Helpers::sanitize((string)$item['orders']) ?></td>
-                                        <td class="text-end"><?= Helpers::formatCurrency($item['revenue']) ?></td>
+                                        <td class="text-end"><?= Helpers::formatCurrencyHtml($item['revenue']) ?></td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -95,7 +95,7 @@ include __DIR__ . '/templates/header.php';
                         <?php foreach ($analytics['package_orders'] as $row): ?>
                             <li class="list-group-item d-flex justify-content-between align-items-center">
                                 <span><?= Helpers::sanitize($row['order_day']) ?></span>
-                                <span class="fw-semibold text-primary"><?= Helpers::formatCurrency((float)$row['revenue']) ?></span>
+                                <span class="fw-semibold text-primary"><?= Helpers::formatCurrencyHtml((float)$row['revenue']) ?></span>
                             </li>
                         <?php endforeach; ?>
                     </ul>
