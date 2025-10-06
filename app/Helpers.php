@@ -2,6 +2,8 @@
 
 namespace App;
 
+use App\Services\CurrencyService;
+
 if (!function_exists(__NAMESPACE__ . '\\mail')) {
     /**
      * Safe wrapper for PHP's global mail() so namespaced calls do not fatal out
@@ -208,34 +210,14 @@ class Helpers
     }
 
     /**
-     * Determine the base URL for API consumers.
-     *
+     * @param bool $absolute
      * @return string
      */
-    public static function apiBaseUrl()
+    public static function apiBaseUrl(bool $absolute = true)
     {
-        $base = Settings::get('api_base_url');
-        $base = $base !== null ? trim($base) : '';
+        $base = self::url('api/v1', $absolute);
 
-        if ($base !== '') {
-            return rtrim($base, '/');
-        }
-
-        $scheme = 'http';
-        if (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off') {
-            $scheme = 'https';
-        } elseif (!empty($_SERVER['HTTP_X_FORWARDED_PROTO'])) {
-            $proto = strtolower((string)$_SERVER['HTTP_X_FORWARDED_PROTO']);
-            if ($proto === 'https') {
-                $scheme = 'https';
-            }
-        } elseif (!empty($_SERVER['REQUEST_SCHEME'])) {
-            $scheme = strtolower((string)$_SERVER['REQUEST_SCHEME']) === 'https' ? 'https' : 'http';
-        }
-
-        $host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : (isset($_SERVER['SERVER_NAME']) ? $_SERVER['SERVER_NAME'] : 'localhost');
-
-        return $scheme . '://' . $host . '/api/v1';
+        return rtrim($base, '/');
     }
 
     /**
@@ -380,9 +362,23 @@ class Helpers
      */
     public static function sanitize($value)
     {
+        if ($value === null) {
+            $value = '';
+        }
+
         if (is_string($value)) {
             Lang::boot();
             $value = Lang::line($value);
+        } elseif (is_bool($value) || is_numeric($value)) {
+            $value = (string) $value;
+        } elseif (is_object($value) && method_exists($value, '__toString')) {
+            $value = (string) $value;
+        } elseif (!is_string($value)) {
+            $value = '';
+        }
+
+        if (!is_string($value)) {
+            $value = (string) $value;
         }
 
         return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
@@ -404,24 +400,35 @@ class Helpers
      */
     public static function activeCurrency()
     {
-        $currency = null;
+        $selected = null;
 
-        if (isset($_SESSION['user']) && isset($_SESSION['user']['currency']) && $_SESSION['user']['currency']) {
-            $currency = strtoupper((string)$_SESSION['user']['currency']);
+        if (isset($_SESSION['app_currency']) && $_SESSION['app_currency']) {
+            $selected = strtoupper((string) $_SESSION['app_currency']);
         }
 
-        if (!$currency) {
-            $stored = Settings::get('platform_default_currency');
-            if ($stored) {
-                $currency = strtoupper((string)$stored);
+        if (!$selected && isset($_SESSION['user']) && isset($_SESSION['user']['currency']) && $_SESSION['user']['currency']) {
+            $selected = strtoupper((string) $_SESSION['user']['currency']);
+        }
+
+        $currencies = CurrencyService::isReady() ? CurrencyService::currenciesByCode() : array();
+
+        if ($selected && isset($currencies[$selected]) && (int) $currencies[$selected]['is_active'] === 1) {
+            return $selected;
+        }
+
+        if (CurrencyService::isReady()) {
+            return CurrencyService::defaultCurrency();
+        }
+
+        $stored = Settings::get('platform_default_currency');
+        if ($stored) {
+            $stored = strtoupper((string) $stored);
+            if (in_array($stored, array('TRY', 'USD', 'EUR'), true)) {
+                return $stored;
             }
         }
 
-        if (!$currency) {
-            $currency = 'TRY';
-        }
-
-        return in_array($currency, array('TRY', 'USD', 'EUR'), true) ? $currency : 'TRY';
+        return 'TRY';
     }
 
     /**
@@ -432,13 +439,50 @@ class Helpers
     public static function formatCurrency($amount, $baseCurrency = 'USD')
     {
         Lang::boot();
-        $activeCurrency = self::activeCurrency();
 
-        if (strtoupper($baseCurrency) !== $activeCurrency) {
-            $amount = Currency::convert((float)$amount, $baseCurrency, $activeCurrency);
+        $base = strtoupper((string) $baseCurrency);
+        if ($base === '') {
+            $base = CurrencyService::isReady() ? CurrencyService::defaultCurrency() : 'USD';
         }
 
-        return Currency::format((float)$amount, $activeCurrency);
+        $active = self::activeCurrency();
+        $converted = $base === $active ? (float) $amount : Currency::convert((float) $amount, $base, $active);
+
+        return Currency::format($converted, $active);
+    }
+
+    /**
+     * @param float $amount
+     * @param string $baseCurrency
+     * @return string
+     */
+    public static function formatCurrencyHtml($amount, $baseCurrency = 'USD')
+    {
+        Lang::boot();
+
+        $base = strtoupper((string) $baseCurrency);
+        if ($base === '') {
+            $base = CurrencyService::isReady() ? CurrencyService::defaultCurrency() : 'USD';
+        }
+
+        $active = self::activeCurrency();
+        $converted = $base === $active ? (float) $amount : Currency::convert((float) $amount, $base, $active);
+        $formatted = Currency::format($converted, $active);
+
+        $attributes = array(
+            'class' => 'app-money',
+            'data-money-base' => $base,
+            'data-money-target' => $active,
+            'data-money-base-amount' => number_format((float) $amount, 6, '.', ''),
+            'data-money-current-amount' => number_format($converted, 6, '.', ''),
+        );
+
+        $attrString = '';
+        foreach ($attributes as $key => $value) {
+            $attrString .= ' ' . $key . '="' . htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8') . '"';
+        }
+
+        return '<span' . $attrString . '>' . htmlspecialchars($formatted, ENT_QUOTES, 'UTF-8') . '</span>';
     }
 
     /**
@@ -546,6 +590,38 @@ class Helpers
         $path = parse_url($uri, PHP_URL_PATH);
 
         return $path ?: '/';
+    }
+
+    /**
+     * Build the current URL with merged query parameters.
+     *
+     * @param array<string,mixed> $params
+     * @param string|null $path
+     * @return string
+     */
+    public static function urlWithQuery(array $params, $path = null)
+    {
+        $basePath = $path !== null ? (string)$path : self::currentPath();
+        $currentQuery = array();
+
+        if (!empty($_GET) && is_array($_GET)) {
+            foreach ($_GET as $key => $value) {
+                $currentQuery[$key] = $value;
+            }
+        }
+
+        foreach ($params as $key => $value) {
+            if ($value === null) {
+                unset($currentQuery[$key]);
+                continue;
+            }
+
+            $currentQuery[$key] = $value;
+        }
+
+        $query = http_build_query($currentQuery);
+
+        return $basePath . ($query !== '' ? '?' . $query : '');
     }
 
     /**
