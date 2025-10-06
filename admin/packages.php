@@ -187,8 +187,8 @@ include __DIR__ . '/../templates/header.php';
                                     <strong><?= Helpers::sanitize($package['name']) ?></strong><br>
                                     <small class="text-muted"><?= Helpers::sanitize(isset($package['description']) ? $package['description'] : '') ?></small>
                                 </td>
-                                <td><?= Helpers::sanitize(Helpers::formatCurrency((float)$package['price'])) ?></td>
-                                <td><?= Helpers::sanitize(Helpers::formatCurrency((float)$package['initial_balance'])) ?></td>
+                                <td><?= Helpers::formatCurrencyHtml((float)$package['price']) ?></td>
+                                <td><?= Helpers::formatCurrencyHtml((float)$package['initial_balance']) ?></td>
                                 <td>
                                     <?php if ($package['is_active']): ?>
                                         <span class="badge bg-success">Aktif</span>
