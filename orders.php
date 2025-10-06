@@ -124,7 +124,7 @@ include __DIR__ . '/templates/header.php';
                                     </td>
                                     <td><?= Helpers::sanitize($order['category_name']) ?></td>
                                     <td><?= isset($order['quantity']) ? (int)$order['quantity'] : 1 ?></td>
-                                    <td><?= Helpers::sanitize(Helpers::formatCurrency((float)$order['price'])) ?></td>
+                                    <td><?= Helpers::formatCurrencyHtml((float)$order['price']) ?></td>
                                     <td>
                                         <?php
                                         $source = isset($order['source']) ? $order['source'] : 'panel';
@@ -146,7 +146,9 @@ include __DIR__ . '/templates/header.php';
                                                 data-order-title="<?= Helpers::sanitize($order['product_name']) ?>"
                                                 data-order-category="<?= Helpers::sanitize($order['category_name']) ?>"
                                                 data-order-quantity="<?= isset($order['quantity']) ? (int)$order['quantity'] : 1 ?>"
-                                                data-order-price="<?= Helpers::sanitize(Helpers::formatCurrency((float)$order['price'])) ?>"
+                                                data-order-price-html="<?= htmlspecialchars(Helpers::formatCurrencyHtml((float)$order['price']), ENT_QUOTES, 'UTF-8') ?>"
+                                                data-order-price-base-amount="<?= Helpers::sanitize(number_format((float)$order['price'], 6, '.', '')) ?>"
+                                                data-order-price-base-currency="USD"
                                                 data-order-source="<?= Helpers::sanitize(strtoupper(isset($order['source']) ? $order['source'] : 'panel')) ?>"
                                                 data-order-reference="<?= Helpers::sanitize(isset($order['external_reference']) ? $order['external_reference'] : '') ?>"
                                                 data-order-status="<?= Helpers::sanitize(strtoupper($order['status'])) ?>"
@@ -212,7 +214,7 @@ include __DIR__ . '/templates/header.php';
                                             <div class="text-muted small">Yönetici Notu: <?= Helpers::sanitize($order['admin_note']) ?></div>
                                         <?php endif; ?>
                                     </td>
-                                    <td><?= Helpers::sanitize(Helpers::formatCurrency((float)$order['total_amount'])) ?></td>
+                                    <td><?= Helpers::formatCurrencyHtml((float)$order['total_amount']) ?></td>
                                     <td><span class="badge-status <?= Helpers::sanitize($order['status']) ?>"><?= strtoupper(Helpers::sanitize($order['status'])) ?></span></td>
                                     <td><?= date('d.m.Y H:i', strtotime($order['created_at'])) ?></td>
                                     <td class="text-end">
@@ -223,7 +225,9 @@ include __DIR__ . '/templates/header.php';
                                                 data-order-type="package"
                                                 data-order-id="#<?= (int)$order['id'] ?>"
                                                 data-order-title="<?= Helpers::sanitize($order['package_name']) ?>"
-                                                data-order-price="<?= Helpers::sanitize(Helpers::formatCurrency((float)$order['total_amount'])) ?>"
+                                                data-order-price-html="<?= htmlspecialchars(Helpers::formatCurrencyHtml((float)$order['total_amount']), ENT_QUOTES, 'UTF-8') ?>"
+                                                data-order-price-base-amount="<?= Helpers::sanitize(number_format((float)$order['total_amount'], 6, '.', '')) ?>"
+                                                data-order-price-base-currency="USD"
                                                 data-order-status="<?= Helpers::sanitize(strtoupper($order['status'])) ?>"
                                                 data-order-status-class="<?= Helpers::sanitize($order['status']) ?>"
                                                 data-order-created="<?= date('d.m.Y H:i', strtotime($order['created_at'])) ?>"
@@ -356,7 +360,7 @@ $GLOBALS['pageInlineScripts'][] = <<<'JS'
         var meta = trigger.getAttribute('data-order-meta') || '';
         var status = trigger.getAttribute('data-order-status') || '';
         var statusClass = trigger.getAttribute('data-order-status-class') || '';
-        var price = trigger.getAttribute('data-order-price') || '';
+        var priceHtml = trigger.getAttribute('data-order-price-html') || '';
         var quantity = trigger.getAttribute('data-order-quantity') || '';
         var category = trigger.getAttribute('data-order-category') || '';
         var source = trigger.getAttribute('data-order-source') || '';
@@ -371,7 +375,12 @@ $GLOBALS['pageInlineScripts'][] = <<<'JS'
         fields.created.textContent = created;
         fields.title.textContent = title;
         fields.meta.textContent = meta;
-        fields.price.textContent = price !== '' ? price : '-';
+        if (fields.price) {
+            fields.price.innerHTML = priceHtml !== '' ? priceHtml : '-';
+            if (window.App && typeof window.App.refreshMoney === 'function') {
+                window.App.refreshMoney();
+            }
+        }
 
         fields.status.textContent = status !== '' ? status : '-';
         fields.status.className = 'badge badge-status' + (statusClass ? ' ' + statusClass : '');

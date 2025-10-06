@@ -40,7 +40,7 @@ include __DIR__ . '/templates/header.php';
                     <p class="text-muted mb-0"><?= Helpers::sanitize('Siparişlerinizi, ürünleri ve destek taleplerinizi tek panelden yönetin.') ?></p>
                 </div>
                 <div class="text-md-end">
-                    <span class="badge bg-success rounded-pill fs-6"><?= Helpers::sanitize('Bakiye') ?>: <?= Helpers::sanitize(Helpers::formatCurrency((float)$user['balance'])) ?></span>
+                    <span class="badge bg-success rounded-pill fs-6"><?= Helpers::sanitize('Bakiye') ?>: <?= Helpers::formatCurrencyHtml((float)$user['balance']) ?></span>
                 </div>
             </div>
         </div>
@@ -80,7 +80,7 @@ include __DIR__ . '/templates/header.php';
                             <?php foreach ($orderRows as $order): ?>
                                 <tr>
                                     <td><?= Helpers::sanitize($order['package_name']) ?></td>
-                                    <td><?= Helpers::sanitize(Helpers::formatCurrency((float)$order['total_amount'])) ?></td>
+                                    <td><?= Helpers::formatCurrencyHtml((float)$order['total_amount']) ?></td>
                                     <td><span class="badge-status <?= Helpers::sanitize($order['status']) ?>"><?= strtoupper(Helpers::sanitize($order['status'])) ?></span></td>
                                     <td><?= date('d.m.Y H:i', strtotime($order['created_at'])) ?></td>
                                 </tr>
