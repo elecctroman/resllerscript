@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Database;
 use App\Helpers;
 use App\Telegram;
-use App\Services\ProviderDispatchService;
 use PDO;
 use RuntimeException;
 
@@ -21,6 +20,20 @@ final class ProductOrderService
      */
     public static function placePanelOrder(array $user, int $productId, ?string $note = null): array
     {
+        return self::placeOrder($user, $productId, $note, 'panel');
+    }
+
+    /**
+     * API ve panel gibi farklı kaynaklardan sipariş oluşturmayı destekler.
+     *
+     * @param array<string,mixed> $user
+     * @param int $productId
+     * @param string|null $note
+     * @param string $source
+     * @return array<string,mixed>
+     */
+    public static function placeOrder(array $user, int $productId, ?string $note = null, string $source = 'panel'): array
+    {
         $productId = max(0, $productId);
         if ($productId === 0) {
             throw new RuntimeException('Geçersiz ürün numarası.');
@@ -31,6 +44,8 @@ final class ProductOrderService
         if ($note === '') {
             $note = null;
         }
+
+        $source = trim($source) !== '' ? substr($source, 0, 50) : 'panel';
 
         try {
             $pdo->beginTransaction();
@@ -61,10 +76,9 @@ final class ProductOrderService
                 return ['success' => false, 'message' => 'Bakiyeniz bu ürünü sipariş etmek için yetersiz görünüyor.'];
             }
 
-            $providerCode = isset($product['provider_code']) ? strtolower((string)$product['provider_code']) : '';
-            $useLocalStock = ($providerCode === '' || $providerCode === 'stock' || $providerCode === 'panel');
+            $automaticDelivery = isset($product['automatic_delivery']) ? (int)$product['automatic_delivery'] === 1 : false;
 
-            if ($useLocalStock) {
+            if (!$automaticDelivery) {
                 $stockCheck = $pdo->prepare('SELECT COUNT(*) FROM product_stock_items WHERE product_id = :product_id AND status = "available" FOR UPDATE');
                 $stockCheck->execute(['product_id' => $productId]);
                 $availableStock = (int)$stockCheck->fetchColumn();
@@ -82,7 +96,7 @@ final class ProductOrderService
                 'price' => $price,
                 'total_amount' => $price,
                 'status' => 'pending',
-                'source' => 'panel',
+                'source' => $source,
             ]);
 
             $orderId = (int)$pdo->lastInsertId();
@@ -109,22 +123,13 @@ final class ProductOrderService
                 $orderId
             ));
 
-            $dispatchResult = ProviderDispatchService::dispatchProductOrder($orderId);
-            $message = 'Sipariş talebiniz alındı ve bakiyenizden düşüldü. ';
-            if (is_array($dispatchResult)) {
-                if (!empty($dispatchResult['message'])) {
-                    $message .= (string)$dispatchResult['message'];
-                }
-                if (!empty($dispatchResult['success']) && !empty($dispatchResult['status']) && $dispatchResult['status'] === 'completed') {
-                    $message .= ' Teslimat tamamlandı, detayları siparişlerim bölümünde görüntüleyebilirsiniz.';
-                }
-            }
-
             return [
                 'success' => true,
                 'order_id' => $orderId,
-                'status' => isset($dispatchResult['status']) ? $dispatchResult['status'] : 'pending',
-                'message' => trim($message),
+                'status' => $automaticDelivery ? 'processing' : 'pending',
+                'message' => $automaticDelivery
+                    ? 'Siparişiniz otomatik teslimat için kuyruğa alındı. Sipariş durumunu kısa süre içinde siparişlerim ekranından takip edebilirsiniz.'
+                    : 'Sipariş talebiniz alındı ve bakiyenizden düşüldü. Ürün stoktan teslim edilecektir.',
             ];
         } catch (\Throwable $exception) {
             if ($pdo->inTransaction()) {
