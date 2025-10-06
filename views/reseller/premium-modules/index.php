@@ -35,7 +35,7 @@ $csrf = Helpers::csrfToken();
                     <div class="card-body d-flex flex-column">
                         <div class="d-flex align-items-center justify-content-between mb-3">
                             <h5 class="card-title mb-0"><?= Helpers::sanitize($module['name']) ?></h5>
-                            <span class="badge bg-primary fs-6"><?= Helpers::formatCurrency((float) $module['price']) ?></span>
+                            <span class="badge bg-primary fs-6"><?= Helpers::formatCurrencyHtml((float) $module['price']) ?></span>
                         </div>
                         <p class="card-text text-muted flex-grow-1"><?= nl2br(Helpers::sanitize($module['description'])) ?></p>
 

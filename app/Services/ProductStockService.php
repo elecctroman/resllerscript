@@ -56,6 +56,15 @@ class ProductStockService
 
         if ($added > 0) {
             self::logger()->info(sprintf('Ürün #%d için %d stok satırı eklendi.', $productId, $added));
+            try {
+                self::notifyRestock($productId, $added);
+            } catch (\Throwable $notificationException) {
+                self::logger()->warning(sprintf(
+                    'Stok bildirimi gönderilemedi (ürün #%d): %s',
+                    $productId,
+                    $notificationException->getMessage()
+                ));
+            }
         }
 
         return array('added' => $added, 'skipped' => $skipped);
@@ -169,7 +178,7 @@ class ProductStockService
         try {
             $pdo->beginTransaction();
 
-            $orderStmt = $pdo->prepare('SELECT po.*, p.name AS product_name, p.provider_code, u.name AS user_name, u.email AS user_email, u.notify_order_completed, u.telegram_bot_token, u.telegram_chat_id FROM product_orders po INNER JOIN products p ON po.product_id = p.id INNER JOIN users u ON po.user_id = u.id WHERE po.id = :id FOR UPDATE');
+            $orderStmt = $pdo->prepare('SELECT po.*, p.name AS product_name, u.name AS user_name, u.email AS user_email, u.notify_order_completed, u.telegram_bot_token, u.telegram_chat_id FROM product_orders po INNER JOIN products p ON po.product_id = p.id INNER JOIN users u ON po.user_id = u.id WHERE po.id = :id FOR UPDATE');
             $orderStmt->execute(array('id' => $orderId));
             $order = $orderStmt->fetch(PDO::FETCH_ASSOC);
 
@@ -180,12 +189,6 @@ class ProductStockService
 
             $productId = (int) $order['product_id'];
             $quantity = isset($order['quantity']) ? max(1, (int) $order['quantity']) : 1;
-
-            $providerCode = isset($order['provider_code']) ? strtolower((string) $order['provider_code']) : '';
-            if ($providerCode !== '' && $providerCode !== 'stock' && $providerCode !== 'panel') {
-                $pdo->rollBack();
-                return array('success' => false, 'reason' => 'Sipariş stok ile eşlenmemiş.');
-            }
 
             if ($order['status'] === 'completed') {
                 $pdo->commit();
@@ -298,5 +301,74 @@ class ProductStockService
     private static function logger(): Logger
     {
         return new Logger(dirname(__DIR__, 2) . '/storage/stock.log');
+    }
+
+    /**
+     * @param int $productId
+     * @param int $added
+     * @return void
+     */
+    private static function notifyRestock(int $productId, int $added): void
+    {
+        $pdo = Database::connection();
+
+        $productStmt = $pdo->prepare('SELECT id, name, amount, currency FROM products WHERE id = :id LIMIT 1');
+        $productStmt->execute(array('id' => $productId));
+        $product = $productStmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$product) {
+            return;
+        }
+
+        $watchStmt = $pdo->prepare('SELECT w.id, w.user_id, u.name, u.email, u.telegram_bot_token, u.telegram_chat_id
+            FROM reseller_stock_watchers w
+            INNER JOIN users u ON u.id = w.user_id
+            WHERE w.product_id = :product_id');
+        $watchStmt->execute(array('product_id' => $productId));
+        $watchers = $watchStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (!$watchers) {
+            return;
+        }
+
+        $available = self::availableStockCount($productId);
+        $notifiedIds = array();
+
+        foreach ($watchers as $watcher) {
+            $userPayload = array(
+                'id' => isset($watcher['user_id']) ? (int) $watcher['user_id'] : null,
+                'name' => isset($watcher['name']) ? $watcher['name'] : null,
+                'email' => isset($watcher['email']) ? $watcher['email'] : null,
+                'telegram_bot_token' => isset($watcher['telegram_bot_token']) ? $watcher['telegram_bot_token'] : null,
+                'telegram_chat_id' => isset($watcher['telegram_chat_id']) ? $watcher['telegram_chat_id'] : null,
+            );
+
+            $productPayload = array(
+                'id' => (int) $product['id'],
+                'name' => isset($product['name']) ? $product['name'] : ('Ürün #' . $productId),
+                'price' => isset($product['amount']) ? (float) $product['amount'] : null,
+                'currency' => isset($product['currency']) ? $product['currency'] : null,
+            );
+
+            try {
+                $sent = ResellerNotifier::sendStockRestocked($userPayload, $productPayload, $added, $available);
+                if ($sent) {
+                    $notifiedIds[] = (int) $watcher['id'];
+                }
+            } catch (\Throwable $exception) {
+                self::logger()->warning(sprintf(
+                    'Stok bildirimi gönderilemedi (ürün #%d, kullanıcı #%d): %s',
+                    $productId,
+                    isset($watcher['user_id']) ? (int) $watcher['user_id'] : 0,
+                    $exception->getMessage()
+                ));
+            }
+        }
+
+        if ($notifiedIds) {
+            $placeholders = implode(',', array_fill(0, count($notifiedIds), '?'));
+            $deleteStmt = $pdo->prepare('DELETE FROM reseller_stock_watchers WHERE id IN (' . $placeholders . ')');
+            $deleteStmt->execute($notifiedIds);
+        }
     }
 }

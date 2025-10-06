@@ -160,6 +160,39 @@ class ResellerNotifier
 
     /**
      * @param array $user
+     * @param array $product
+     * @param int   $added
+     * @param int   $available
+     * @return bool
+     */
+    public static function sendStockRestocked(array $user, array $product, int $added, int $available)
+    {
+        $productName = isset($product['name']) ? $product['name'] : ('Ürün #' . (isset($product['id']) ? $product['id'] : ''));
+        $lines = array(
+            '🔔 <b>Stok yenilendi!</b>',
+            '📦 Ürün: <b>' . self::escape($productName) . '</b>',
+        );
+
+        if ($added > 0) {
+            $lines[] = '➕ Yeni eklenen stok: <b>' . self::escape((string) $added) . '</b>';
+        }
+
+        $lines[] = '📊 Anlık stok: <b>' . self::escape((string) $available) . '</b>';
+
+        if (isset($product['price'])) {
+            $currency = isset($product['currency']) ? (string) $product['currency'] : 'USD';
+            $lines[] = '💰 Panel fiyatı: <b>' . self::escape(Helpers::formatCurrency((float) $product['price'], $currency)) . '</b>';
+        }
+
+        $query = urlencode($productName);
+        $lines[] = '';
+        $lines[] = '🛒 <a href="' . self::escape(Helpers::url('products.php?q=' . $query, true)) . '">Hemen sipariş verin</a>';
+
+        return self::send($user, implode("\n", $lines), 'stock_restock', true);
+    }
+
+    /**
+     * @param array $user
      * @param float $threshold
      * @param string $deadline
      * @param float $deficit
