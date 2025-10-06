@@ -12,7 +12,6 @@ $siteName = Helpers::siteName();
 $pageTitle = isset($pageTitle) && $pageTitle ? $pageTitle : 'Blog';
 $metaDescription = isset($metaDescription) && $metaDescription ? $metaDescription : Helpers::seoDescription();
 $metaKeywords = isset($metaKeywords) && $metaKeywords ? $metaKeywords : Helpers::seoKeywords();
-main
 ?>
 <!DOCTYPE html>
 <html lang="<?= Lang::htmlLocale() ?>">

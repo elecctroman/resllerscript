@@ -302,7 +302,7 @@ include __DIR__ . '/../templates/header.php';
                                 <td><?= Helpers::sanitize($user['name']) ?></td>
                                 <td><?= Helpers::sanitize($user['email']) ?></td>
                                 <td><?= Helpers::sanitize(Auth::roleLabel($user['role'])) ?></td>
-                                <td><?= Helpers::sanitize(Helpers::formatCurrency((float)$user['balance'])) ?></td>
+                                <td><?= Helpers::formatCurrencyHtml((float)$user['balance']) ?></td>
                                 <td>
                                     <?php if ($user['status'] === 'active'): ?>
                                         <span class="badge bg-success">Aktif</span>

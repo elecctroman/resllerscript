@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS users (
     name VARCHAR(150) NOT NULL,
     email VARCHAR(150) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
+    api_key VARCHAR(128) NULL,
     role ENUM('super_admin','admin','finance','support','content','reseller') NOT NULL DEFAULT 'reseller',
     balance DECIMAL(12,2) NOT NULL DEFAULT 0,
     status ENUM('active','inactive') NOT NULL DEFAULT 'active',
@@ -13,18 +14,48 @@ CREATE TABLE IF NOT EXISTS users (
     notify_support_replied TINYINT(1) NOT NULL DEFAULT 1,
     low_balance_since DATETIME NULL DEFAULT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
+    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_users_api_key (api_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS api_tokens (
+CREATE TABLE IF NOT EXISTS languages (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    token VARCHAR(191) NOT NULL UNIQUE,
-    label VARCHAR(150) NULL,
-    webhook_url TEXT NULL,
+    code VARCHAR(10) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    native_name VARCHAR(100) NOT NULL,
+    is_default TINYINT(1) NOT NULL DEFAULT 0,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    last_used_at DATETIME NULL,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_languages_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS language_translations (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    language_code VARCHAR(10) NOT NULL,
+    translation_key VARCHAR(255) NOT NULL,
+    translation_value TEXT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_language_key (language_code, translation_key),
+    KEY idx_language_code (language_code),
+    CONSTRAINT fk_language_code FOREIGN KEY (language_code) REFERENCES languages(code) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS currencies (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(3) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    symbol VARCHAR(10) NOT NULL,
+    rate DECIMAL(18,8) NOT NULL DEFAULT 1.00000000,
+    decimals TINYINT(1) NOT NULL DEFAULT 2,
+    is_default TINYINT(1) NOT NULL DEFAULT 0,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    auto_update TINYINT(1) NOT NULL DEFAULT 0,
+    last_rate_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_currencies_code (code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS packages (
@@ -80,18 +111,64 @@ CREATE TABLE IF NOT EXISTS products (
     cost_price_try DECIMAL(12,2) NULL,
     price DECIMAL(12,2) NOT NULL DEFAULT 0,
     status ENUM('active','inactive') NOT NULL DEFAULT 'active',
-    provider_code VARCHAR(100) NULL,
-    provider_product_id VARCHAR(100) NULL,
+    automatic_delivery TINYINT(1) NOT NULL DEFAULT 1,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (category_id) REFERENCES categories(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS reseller_favorites (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    product_id INT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_reseller_favorite (user_id, product_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS reseller_stock_watchers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    product_id INT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    notified_at DATETIME NULL,
+    UNIQUE KEY uniq_stock_watch (user_id, product_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS instructions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(191) NOT NULL,
+    summary VARCHAR(255) NULL,
+    content MEDIUMTEXT NOT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS announcements (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(191) NOT NULL,
+    body MEDIUMTEXT NOT NULL,
+    audience ENUM('reseller','admin','all') NOT NULL DEFAULT 'reseller',
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    pinned TINYINT(1) NOT NULL DEFAULT 0,
+    starts_at DATETIME NULL,
+    ends_at DATETIME NULL,
+    created_by INT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_announcements_active (is_active, audience, starts_at, ends_at),
+    KEY idx_announcements_pinned (pinned),
+    CONSTRAINT fk_announcements_creator FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS product_orders (
     id INT AUTO_INCREMENT PRIMARY KEY,
     product_id INT NOT NULL,
     user_id INT NOT NULL,
-    api_token_id INT NULL,
     quantity INT NOT NULL DEFAULT 1,
     note TEXT NULL,
     admin_note TEXT NULL,
@@ -103,8 +180,7 @@ CREATE TABLE IF NOT EXISTS product_orders (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES products(id),
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (api_token_id) REFERENCES api_tokens(id) ON DELETE SET NULL
+    FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS support_tickets (
@@ -246,7 +322,6 @@ CREATE TABLE IF NOT EXISTS blog_posts (
     INDEX idx_blog_status (status),
     INDEX idx_blog_category (category_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
 
 INSERT INTO users (id, name, email, password_hash, role, balance, status, created_at)
 VALUES (
