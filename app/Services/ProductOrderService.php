@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Database;
 use App\Helpers;
 use App\Telegram;
-use App\Services\ProviderDispatchService;
 use PDO;
 use RuntimeException;
 
@@ -61,10 +60,9 @@ final class ProductOrderService
                 return ['success' => false, 'message' => 'Bakiyeniz bu ürünü sipariş etmek için yetersiz görünüyor.'];
             }
 
-            $providerCode = isset($product['provider_code']) ? strtolower((string)$product['provider_code']) : '';
-            $useLocalStock = ($providerCode === '' || $providerCode === 'stock' || $providerCode === 'panel');
+            $automaticDelivery = isset($product['automatic_delivery']) ? (int)$product['automatic_delivery'] === 1 : false;
 
-            if ($useLocalStock) {
+            if (!$automaticDelivery) {
                 $stockCheck = $pdo->prepare('SELECT COUNT(*) FROM product_stock_items WHERE product_id = :product_id AND status = "available" FOR UPDATE');
                 $stockCheck->execute(['product_id' => $productId]);
                 $availableStock = (int)$stockCheck->fetchColumn();
@@ -109,22 +107,13 @@ final class ProductOrderService
                 $orderId
             ));
 
-            $dispatchResult = ProviderDispatchService::dispatchProductOrder($orderId);
-            $message = 'Sipariş talebiniz alındı ve bakiyenizden düşüldü. ';
-            if (is_array($dispatchResult)) {
-                if (!empty($dispatchResult['message'])) {
-                    $message .= (string)$dispatchResult['message'];
-                }
-                if (!empty($dispatchResult['success']) && !empty($dispatchResult['status']) && $dispatchResult['status'] === 'completed') {
-                    $message .= ' Teslimat tamamlandı, detayları siparişlerim bölümünde görüntüleyebilirsiniz.';
-                }
-            }
-
             return [
                 'success' => true,
                 'order_id' => $orderId,
-                'status' => isset($dispatchResult['status']) ? $dispatchResult['status'] : 'pending',
-                'message' => trim($message),
+                'status' => $automaticDelivery ? 'processing' : 'pending',
+                'message' => $automaticDelivery
+                    ? 'Siparişiniz otomatik teslimat için kuyruğa alındı. Sipariş durumunu kısa süre içinde siparişlerim ekranından takip edebilirsiniz.'
+                    : 'Sipariş talebiniz alındı ve bakiyenizden düşüldü. Ürün stoktan teslim edilecektir.',
             ];
         } catch (\Throwable $exception) {
             if ($pdo->inTransaction()) {

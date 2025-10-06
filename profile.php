@@ -2,7 +2,6 @@
 require __DIR__ . '/bootstrap.php';
 
 use App\Auth;
-use App\ApiToken;
 use App\Database;
 use App\Helpers;
 
@@ -15,14 +14,6 @@ $user = $_SESSION['user'];
 $pdo = Database::connection();
 $errors = array();
 $successMessages = array();
-$displayToken = '';
-
-try {
-    $activeToken = ApiToken::getOrCreateForUser($user['id']);
-} catch (\Throwable $exception) {
-    $activeToken = null;
-    $errors[] = 'API anahtarınıza erişilirken bir sorun oluştu: ' . $exception->getMessage();
-}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = isset($_POST['action']) ? $_POST['action'] : 'profile';
@@ -135,37 +126,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $errors[] = 'Profiliniz güncellenirken bir hata oluştu: ' . $exception->getMessage();
                 }
             }
-        } elseif ($action === 'webhook' && $activeToken) {
-            $webhookUrl = isset($_POST['webhook_url']) ? trim($_POST['webhook_url']) : '';
-
-            if ($webhookUrl !== '' && !filter_var($webhookUrl, FILTER_VALIDATE_URL)) {
-                $errors[] = 'Geçerli bir webhook adresi giriniz.';
-            }
-
-            if (!$errors) {
-                ApiToken::updateWebhook((int)$activeToken['id'], $webhookUrl !== '' ? $webhookUrl : null);
-                $successMessages[] = 'Webhook adresiniz güncellendi.';
-                if ($activeToken) {
-                    $activeToken['webhook_url'] = $webhookUrl !== '' ? $webhookUrl : null;
-                }
-            }
-        } elseif ($action === 'regenerate_token') {
-            try {
-                $newToken = ApiToken::regenerateForUser($user['id']);
-                $displayToken = $newToken['token'];
-                $successMessages[] = 'Yeni API anahtarınız oluşturuldu. Lütfen güvenli bir yerde saklayın.';
-                $activeToken = array(
-                    'id' => $newToken['id'],
-                    'user_id' => $user['id'],
-                    'token' => $newToken['token'],
-                    'label' => 'Panel API Anahtarı',
-                    'webhook_url' => null,
-                    'created_at' => date('Y-m-d H:i:s'),
-                    'last_used_at' => null,
-                );
-            } catch (\Throwable $exception) {
-                $errors[] = 'API anahtarınız yenilenirken bir sorun oluştu: ' . $exception->getMessage();
-            }
         } elseif ($action === 'notifications') {
             $prefOrder = isset($_POST['notify_order_completed']) ? '1' : '0';
             $prefBalance = isset($_POST['notify_balance_approved']) ? '1' : '0';
@@ -198,34 +158,34 @@ $pageTitle = 'Profilim';
 
 include __DIR__ . '/templates/header.php';
 ?>
+<?php if ($errors): ?>
+    <div class="alert alert-danger">
+        <ul class="mb-0">
+            <?php foreach ($errors as $error): ?>
+                <li><?= Helpers::sanitize($error) ?></li>
+            <?php endforeach; ?>
+        </ul>
+    </div>
+<?php endif; ?>
+
+<?php if ($successMessages): ?>
+    <div class="alert alert-success">
+        <ul class="mb-0">
+            <?php foreach ($successMessages as $message): ?>
+                <li><?= Helpers::sanitize($message) ?></li>
+            <?php endforeach; ?>
+        </ul>
+    </div>
+<?php endif; ?>
+
 <div class="row g-4">
-    <div class="col-12 col-lg-6">
+    <div class="col-12 col-xl-7">
         <div class="card border-0 shadow-sm h-100">
             <div class="card-header bg-white">
                 <h5 class="mb-0">Profil Bilgileri</h5>
                 <small class="text-muted">Bayi iletişim ve şifre ayarlarınızı güncelleyin.</small>
             </div>
             <div class="card-body">
-                <?php if ($errors): ?>
-                    <div class="alert alert-danger">
-                        <ul class="mb-0">
-                            <?php foreach ($errors as $error): ?>
-                                <li><?= Helpers::sanitize($error) ?></li>
-                            <?php endforeach; ?>
-                        </ul>
-                    </div>
-                <?php endif; ?>
-
-                <?php if ($successMessages): ?>
-                    <div class="alert alert-success">
-                        <ul class="mb-0">
-                            <?php foreach ($successMessages as $message): ?>
-                                <li><?= Helpers::sanitize($message) ?></li>
-                            <?php endforeach; ?>
-                        </ul>
-                    </div>
-                <?php endif; ?>
-
                 <form method="post" class="mb-4">
                     <input type="hidden" name="csrf_token" value="<?= Helpers::sanitize(Helpers::csrfToken()) ?>">
                     <input type="hidden" name="action" value="profile">
@@ -295,7 +255,9 @@ include __DIR__ . '/templates/header.php';
                 </dl>
             </div>
         </div>
-        <div class="card border-0 shadow-sm mt-4">
+    </div>
+    <div class="col-12 col-xl-5">
+        <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-white">
                 <h5 class="mb-0">Telegram Bildirimleri</h5>
                 <small class="text-muted">Telegram üzerinden hangi bildirimleri almak istediğinizi seçin.</small>
@@ -329,78 +291,7 @@ include __DIR__ . '/templates/header.php';
                 </form>
             </div>
         </div>
-    </div>
-    <div class="col-12 col-lg-6">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <div>
-                    <h5 class="mb-0">API Erişimi</h5>
-                    <small class="text-muted">Tüm platformlardan sipariş, bakiye ve bildirim entegrasyonları için REST API bilgileri.</small>
-                </div>
-                <form method="post">
-                    <input type="hidden" name="csrf_token" value="<?= Helpers::sanitize(Helpers::csrfToken()) ?>">
-                    <input type="hidden" name="action" value="regenerate_token">
-                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Yeni bir API anahtarı oluşturmak istediğinize emin misiniz? Mevcut anahtar kullanım dışı kalacaktır.');">Anahtarı Yenile</button>
-                </form>
-            </div>
-            <div class="card-body">
-                <?php if ($displayToken !== ''): ?>
-                    <div class="alert alert-warning">
-                        <strong>Yeni API Anahtarı:</strong>
-                        <div class="mt-2"><code><?= Helpers::sanitize($displayToken) ?></code></div>
-                        <p class="mb-0 small text-muted">Bu anahtar yalnızca bir kez gösterilir. Lütfen güvenli bir yerde saklayın.</p>
-                    </div>
-                <?php endif; ?>
 
-                <?php if ($activeToken): ?>
-                    <div class="mb-4">
-                        <label class="form-label">API Temel URL</label>
-                        <div class="input-group">
-                            <input type="text" class="form-control" value="<?= Helpers::sanitize(Helpers::apiBaseUrl()) ?>" readonly>
-                            <button type="button" class="btn btn-outline-secondary" onclick="navigator.clipboard.writeText('<?= Helpers::sanitize(Helpers::apiBaseUrl()) ?>'); this.textContent='Kopyalandı'; setTimeout(()=>{this.textContent='Kopyala';},2000);">Kopyala</button>
-                        </div>
-                        <small class="text-muted d-block mt-2">Tüm uç noktalar bu adres ile başlar (örneğin <code>/orders</code>, <code>/products</code>).</small>
-                    </div>
-
-                    <div class="mb-4">
-                        <label class="form-label">Aktif API Anahtarı</label>
-                        <div class="input-group">
-                            <input type="text" class="form-control" value="<?= Helpers::sanitize($activeToken['token']) ?>" readonly>
-                            <button type="button" class="btn btn-outline-secondary" onclick="navigator.clipboard.writeText('<?= Helpers::sanitize($activeToken['token']) ?>'); this.textContent='Kopyalandı'; setTimeout(()=>{this.textContent='Kopyala';},2000);">Kopyala</button>
-                        </div>
-                        <?php if (!empty($activeToken['last_used_at'])): ?>
-                            <small class="text-muted d-block mt-2">Son kullanım: <?= date('d.m.Y H:i', strtotime($activeToken['last_used_at'])) ?></small>
-                        <?php endif; ?>
-                    </div>
-
-                    <div class="mb-4">
-                        <label class="form-label">Webhook Adresi</label>
-                        <form method="post" class="d-flex gap-2 flex-column flex-lg-row">
-                            <input type="hidden" name="csrf_token" value="<?= Helpers::sanitize(Helpers::csrfToken()) ?>">
-                            <input type="hidden" name="action" value="webhook">
-                            <input type="url" name="webhook_url" class="form-control" placeholder="https://ornek.com/webhooks/reseller-status" value="<?= Helpers::sanitize(isset($activeToken['webhook_url']) ? $activeToken['webhook_url'] : '') ?>">
-                            <button type="submit" class="btn btn-outline-primary">Kaydet</button>
-                        </form>
-                        <small class="text-muted">Sipariş durumu, bakiye ve stok bildirimleri bu adrese JSON formatında iletilir.</small>
-                    </div>
-
-                    <div class="border rounded p-3 bg-light">
-                        <h6>Entegrasyon İpuçları</h6>
-                        <ul class="small mb-3">
-                            <li>Yetkilendirme: <code>Authorization: Bearer <?= Helpers::sanitize($activeToken['token']) ?></code> veya <code>X-API-Key</code> başlığını kullanın.</li>
-                            <li>API Dökümanı: <a href="/api/v1/" target="_blank" rel="noopener">JSON uç noktalarını görüntüleyin</a> veya Postman koleksiyonunu indirin.</li>
-                            <li>Sandbox: Gerçek bakiye harcamadan test etmek için <strong>"test"</strong> parametresini kullanabilirsiniz.</li>
-                        </ul>
-                        <pre class="bg-dark text-white p-3 rounded small mb-0"><code>curl -X POST "<?= Helpers::sanitize(Helpers::apiBaseUrl()) ?>/orders"
-  -H "Authorization: Bearer <?= Helpers::sanitize($activeToken['token']) ?>"
-  -H "Content-Type: application/json"
-  -d '{"order_id":"EX-1001","items":[{"sku":"SKU-001","quantity":1}]}'</code></pre>
-                    </div>
-                <?php else: ?>
-                    <p class="text-muted mb-0">API anahtarınız oluşturulamadı. Lütfen daha sonra tekrar deneyin veya destek ekibine ulaşın.</p>
-                <?php endif; ?>
-            </div>
-        </div>
     </div>
 </div>
 <?php include __DIR__ . '/templates/footer.php';
