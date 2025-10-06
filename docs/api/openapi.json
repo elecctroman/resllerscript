@@ -1,0 +1,150 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Reseller API",
+    "version": "1.1.0",
+    "description": "REST API for reseller automation"
+  },
+  "servers": [
+    { "url": "https://example.com/api" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-KEY"
+      },
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  },
+  "paths": {
+    "/v1/auth/login": {
+      "post": {
+        "summary": "Authenticate reseller",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string" },
+                  "password": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {"description": "Login response"}
+        }
+      }
+    },
+    "/v1/products": {
+      "get": {
+        "security": [{"ApiKey": []}, {"BearerAuth": []}],
+        "summary": "List products",
+        "responses": {
+          "200": {"description": "Product list"}
+        }
+      }
+    },
+    "/v1/order/create": {
+      "post": {
+        "security": [{"ApiKey": []}, {"BearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["product_id"],
+                "properties": {
+                  "product_id": {"type": "integer"},
+                  "note": {"type": "string"},
+                  "external_reference": {"type": "string"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {"description": "Order created"}
+        }
+      }
+    },
+    "/v1/order/status": {
+      "get": {
+        "security": [{"ApiKey": []}, {"BearerAuth": []}],
+        "parameters": [
+          {"in": "query", "name": "order_id", "schema": {"type": "integer"}},
+          {"in": "query", "name": "external_reference", "schema": {"type": "string"}}
+        ],
+        "responses": {"200": {"description": "Order status"}}
+      }
+    },
+    "/v1/balance": {
+      "get": {
+        "security": [{"ApiKey": []}, {"BearerAuth": []}],
+        "responses": {"200": {"description": "Balance"}}
+      }
+    },
+    "/v1/user/info": {
+      "get": {
+        "security": [{"ApiKey": []}, {"BearerAuth": []}],
+        "responses": {"200": {"description": "User profile"}}
+      }
+    },
+    "/v1/api-keys/create": {
+      "post": {
+        "security": [{"ApiKey": []}, {"BearerAuth": []}],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "allowed_ips": {"type": "array", "items": {"type": "string"}},
+                  "allowed_domains": {"type": "array", "items": {"type": "string"}}
+                }
+              }
+            }
+          }
+        },
+        "responses": {"201": {"description": "API key created"}}
+      }
+    },
+    "/v1/api-keys/list": {
+      "get": {
+        "security": [{"ApiKey": []}, {"BearerAuth": []}],
+        "responses": {"200": {"description": "List API keys"}}
+      }
+    },
+    "/v1/api-keys/revoke": {
+      "post": {
+        "security": [{"ApiKey": []}, {"BearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["key"],
+                "properties": {
+                  "key": {"type": "string"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {"200": {"description": "API key revoked"}}
+      }
+    }
+  }
+}

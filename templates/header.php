@@ -6,6 +6,9 @@ use App\Database;
 use App\Lang;
 use App\FeatureToggle;
 use App\ResellerPolicy;
+use App\Services\CurrencyService;
+use App\Services\LanguageService;
+use App\Services\AnnouncementService;
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
@@ -14,12 +17,169 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 $user = isset($_SESSION['user']) ? $_SESSION['user'] : null;
 $pageHeadline = isset($pageTitle) ? $pageTitle : 'Panel';
 
+if (!isset($_SESSION['dismissed_announcements']) || !is_array($_SESSION['dismissed_announcements'])) {
+    $_SESSION['dismissed_announcements'] = array();
+}
+
+$redirectAfterDismiss = false;
+if (isset($_GET['dismiss_announcement'])) {
+    $dismissId = (int) $_GET['dismiss_announcement'];
+    if ($dismissId > 0) {
+        $_SESSION['dismissed_announcements'][$dismissId] = time();
+        if (!headers_sent() && (!isset($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] === 'GET')) {
+            $redirectAfterDismiss = true;
+        }
+    }
+}
+
+if ($redirectAfterDismiss) {
+    Helpers::redirect(Helpers::urlWithQuery(array('dismiss_announcement' => null)));
+}
+
 Lang::boot();
 
 $siteName = Helpers::siteName();
 $siteTagline = Helpers::siteTagline();
 $metaDescription = Helpers::seoDescription();
 $metaKeywords = Helpers::seoKeywords();
+
+$activeLocale = Lang::locale();
+$defaultLocale = Lang::defaultLocale();
+$languageOptions = array();
+
+if (class_exists(LanguageService::class)) {
+    foreach (LanguageService::languages(false) as $language) {
+        if (!isset($language['code'])) {
+            continue;
+        }
+
+        $code = strtolower((string) $language['code']);
+        $languageOptions[$code] = array(
+            'code' => $code,
+            'label' => isset($language['native_name']) && $language['native_name'] !== ''
+                ? (string) $language['native_name']
+                : strtoupper($code),
+            'name' => isset($language['name']) && $language['name'] !== ''
+                ? (string) $language['name']
+                : strtoupper($code),
+            'is_active' => true,
+        );
+    }
+}
+
+if (!$languageOptions) {
+    foreach (Lang::availableLocales() as $localeOption) {
+        $code = strtolower((string) $localeOption);
+        $languageOptions[$code] = array(
+            'code' => $code,
+            'label' => strtoupper($code),
+            'name' => strtoupper($code),
+            'is_active' => true,
+        );
+    }
+}
+
+if (!isset($languageOptions[$activeLocale])) {
+    $languageOptions[$activeLocale] = array(
+        'code' => $activeLocale,
+        'label' => strtoupper($activeLocale),
+        'name' => strtoupper($activeLocale),
+        'is_active' => true,
+    );
+}
+
+$languageOptions = array_values($languageOptions);
+$languageOptionsForScript = array();
+foreach ($languageOptions as $option) {
+    $languageOptionsForScript[] = array(
+        'code' => $option['code'],
+        'label' => isset($option['label']) ? $option['label'] : strtoupper($option['code']),
+        'name' => isset($option['name']) ? $option['name'] : (isset($option['label']) ? $option['label'] : strtoupper($option['code'])),
+    );
+}
+
+$activeCurrency = Helpers::activeCurrency();
+$defaultCurrencyCode = CurrencyService::isReady() ? CurrencyService::defaultCurrency() : $activeCurrency;
+$currencyMap = CurrencyService::isReady() ? CurrencyService::currenciesByCode() : array();
+
+if (!$currencyMap) {
+    $currencyMap = array(
+        'USD' => array('code' => 'USD', 'symbol' => '$', 'rate' => 1.0, 'decimals' => 2, 'is_default' => $defaultCurrencyCode === 'USD' ? 1 : 0, 'is_active' => 1),
+        'EUR' => array('code' => 'EUR', 'symbol' => '€', 'rate' => 0.95, 'decimals' => 2, 'is_default' => $defaultCurrencyCode === 'EUR' ? 1 : 0, 'is_active' => 1),
+        'TRY' => array('code' => 'TRY', 'symbol' => '₺', 'rate' => 27.0, 'decimals' => 2, 'is_default' => $defaultCurrencyCode === 'TRY' ? 1 : 0, 'is_active' => 1),
+    );
+}
+
+if (!isset($currencyMap[$activeCurrency])) {
+    $currencyMap[$activeCurrency] = array(
+        'code' => $activeCurrency,
+        'symbol' => '',
+        'rate' => 1.0,
+        'decimals' => 2,
+        'is_default' => $activeCurrency === $defaultCurrencyCode ? 1 : 0,
+        'is_active' => 1,
+    );
+}
+
+if (!isset($currencyMap[$defaultCurrencyCode])) {
+    $currencyMap[$defaultCurrencyCode] = array(
+        'code' => $defaultCurrencyCode,
+        'symbol' => '',
+        'rate' => 1.0,
+        'decimals' => 2,
+        'is_default' => 1,
+        'is_active' => 1,
+    );
+}
+
+$currencyOptions = array();
+$currencyMapForScript = array();
+
+foreach ($currencyMap as $code => $info) {
+    $codeUpper = strtoupper((string) $code);
+    $isActiveCurrency = !isset($info['is_active']) || (int) $info['is_active'] === 1;
+
+    $currencyMapForScript[$codeUpper] = array(
+        'code' => $codeUpper,
+        'symbol' => isset($info['symbol']) ? (string) $info['symbol'] : '',
+        'rate' => isset($info['rate']) ? (float) $info['rate'] : 1.0,
+        'decimals' => isset($info['decimals']) ? (int) $info['decimals'] : 2,
+        'is_default' => isset($info['is_default']) ? (int) $info['is_default'] === 1 : ($codeUpper === $defaultCurrencyCode),
+        'is_active' => $isActiveCurrency,
+    );
+
+    if ($isActiveCurrency) {
+        $currencyOptions[] = array(
+            'code' => $codeUpper,
+            'label' => $codeUpper,
+            'symbol' => $currencyMapForScript[$codeUpper]['symbol'],
+        );
+    }
+}
+
+if (!$currencyOptions) {
+    $currencyOptions[] = array(
+        'code' => $activeCurrency,
+        'label' => strtoupper($activeCurrency),
+        'symbol' => isset($currencyMapForScript[strtoupper($activeCurrency)])
+            ? $currencyMapForScript[strtoupper($activeCurrency)]['symbol']
+            : '',
+    );
+}
+
+$showLanguageSwitch = count($languageOptions) > 1;
+$showCurrencySwitch = count($currencyOptions) > 0;
+
+$defaultCurrencySymbols = array(
+    'USD' => '$',
+    'EUR' => '€',
+    'TRY' => '₺',
+    'GBP' => '£',
+);
+
+$appCsrfToken = Helpers::csrfToken();
+$activeTranslations = class_exists(LanguageService::class) ? LanguageService::catalog($activeLocale) : array();
+$fallbackTranslations = class_exists(LanguageService::class) ? LanguageService::catalog($defaultLocale) : array();
 
 $lowBalanceNotice = null;
 if ($user) {
@@ -38,6 +198,12 @@ $menuBadges = array();
 $currentPath = Helpers::currentPath();
 $isAdminArea = false;
 $isAdminRole = $user ? Auth::isAdminRole($user['role']) : false;
+$dismissedAnnouncementIds = array_map('intval', array_keys($_SESSION['dismissed_announcements'] ?? array()));
+$activeAnnouncements = array();
+
+if ($user && !$isAdminRole) {
+    $activeAnnouncements = AnnouncementService::activeForUser($user, 4, $dismissedAnnouncementIds);
+}
 
 if ($isAdminRole) {
     $isAdminArea = strpos($currentPath, '/admin/') === 0;
@@ -91,14 +257,7 @@ if ($user) {
                 'items' => array(
                     array('label' => 'Blog Yazıları', 'href' => '/admin/blog-posts.php', 'pattern' => '/admin/blog-posts.php', 'icon' => 'bi-journal-text', 'roles' => array('super_admin', 'admin', 'content')),
                     array('label' => 'Blog Kategorileri', 'href' => '/admin/blog-categories.php', 'pattern' => '/admin/blog-categories.php', 'icon' => 'bi-tags', 'roles' => array('super_admin', 'admin', 'content')),
-                ),
-            ),
-            array(
-                'heading' => 'Entegrasyon & API',
-                'items' => array(
-                    array('label' => 'API Anahtarları', 'href' => '/admin/api-keys.php', 'pattern' => '/admin/api-keys.php', 'icon' => 'bi-key', 'roles' => array('super_admin', 'admin')),
-                    array('label' => 'API Güvenliği', 'href' => '/admin/settings-general.php#api-security', 'pattern' => '/admin/settings-general.php', 'icon' => 'bi-shield-lock', 'roles' => array('super_admin', 'admin')),
-                    array('label' => 'Telegram Entegrasyonu', 'href' => '/admin/settings-telegram.php', 'pattern' => '/admin/settings-telegram.php', 'icon' => 'bi-telegram', 'roles' => array('super_admin', 'admin')),
+                    array('label' => 'Talimatlar', 'href' => '/admin/instructions.php', 'pattern' => '/admin/instructions.php', 'icon' => 'bi-card-checklist', 'roles' => array('super_admin', 'admin', 'content')),
                 ),
             ),
             array(
@@ -120,6 +279,9 @@ if ($user) {
                 'items' => array(
                     array('label' => 'Genel Ayarlar', 'href' => '/admin/settings-general.php', 'pattern' => '/admin/settings-general.php', 'icon' => 'bi-gear', 'roles' => array('super_admin', 'admin')),
                     array('label' => 'Ödeme Methodları', 'href' => '/admin/settings-payments.php', 'pattern' => '/admin/settings-payments.php', 'icon' => 'bi-credit-card', 'roles' => array('super_admin', 'admin', 'finance')),
+                    array('label' => 'Dil Yönetimi', 'href' => '/admin/languages.php', 'pattern' => '/admin/languages.php', 'icon' => 'bi-translate', 'roles' => array('super_admin', 'admin')),
+                    array('label' => 'Para Birimi Yönetimi', 'href' => '/admin/currencies.php', 'pattern' => '/admin/currencies.php', 'icon' => 'bi-cash-coin', 'roles' => array('super_admin', 'admin', 'finance')),
+                    array('label' => 'Telegram Ayarları', 'href' => '/admin/settings-telegram.php', 'pattern' => '/admin/settings-telegram.php', 'icon' => 'bi-telegram', 'roles' => array('super_admin', 'admin')),
                 ),
             ),
             array(
@@ -167,6 +329,8 @@ if ($user) {
             $resellerItems[] = array('label' => 'Destek', 'href' => '/support.php', 'pattern' => '/support.php', 'icon' => 'bi-life-preserver');
         }
 
+        $resellerItems[] = array('label' => 'Talimatlar', 'href' => '/instructions.php', 'pattern' => '/instructions.php', 'icon' => 'bi-journal-check');
+
         if (Helpers::featureEnabled('premium_modules')) {
             $resellerItems[] = array('label' => 'Premium Modüller', 'href' => '/premium-modules.php', 'pattern' => '/premium-modules.php', 'icon' => 'bi-gem');
         }
@@ -196,6 +360,21 @@ if ($user) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <link href="/assets/css/style.css" rel="stylesheet">
+    <script>
+        window.App = window.App || {};
+        window.App.locale = <?= json_encode($activeLocale, JSON_UNESCAPED_UNICODE) ?>;
+        window.App.defaultLocale = <?= json_encode($defaultLocale, JSON_UNESCAPED_UNICODE) ?>;
+        window.App.csrfToken = <?= json_encode($appCsrfToken, JSON_UNESCAPED_UNICODE) ?>;
+        window.App.languages = <?= json_encode($languageOptionsForScript, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+        window.App.translations = <?= json_encode($activeTranslations, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+        window.App.translationFallback = <?= json_encode($fallbackTranslations, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+        window.App.currency = {
+            active: <?= json_encode(strtoupper($activeCurrency), JSON_UNESCAPED_UNICODE) ?>,
+            default: <?= json_encode(strtoupper($defaultCurrencyCode), JSON_UNESCAPED_UNICODE) ?>,
+            map: <?= json_encode($currencyMapForScript, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+            defaultSymbols: <?= json_encode($defaultCurrencySymbols, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
+        };
+    </script>
 </head>
 <body>
 <div class="app-shell">
@@ -213,7 +392,7 @@ if ($user) {
                 <?php if (Helpers::featureEnabled('balance')): ?>
                     <div class="sidebar-user-balance">
                         <?= Helpers::sanitize('Bakiye') ?>:
-                        <strong><?= Helpers::formatCurrency((float)$user['balance']) ?></strong>
+                        <strong><?= Helpers::formatCurrencyHtml((float)$user['balance']) ?></strong>
                     </div>
                 <?php endif; ?>
             </div>
@@ -258,13 +437,43 @@ if ($user) {
                         <p class="text-muted mb-0 small"><?= date('d F Y') ?></p>
                     </div>
                 </div>
-                <?php if ($isAdminRole && !$isAdminArea): ?>
-                    <div class="d-flex align-items-center gap-2">
-                        <a href="/admin/dashboard.php" class="btn btn-sm btn-primary">
-                            <i class="bi bi-speedometer2 me-1"></i> <?= Helpers::sanitize('Yönetim Paneli') ?>
-                        </a>
-                    </div>
-                <?php endif; ?>
+                <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+                    <?php if ($showLanguageSwitch || $showCurrencySwitch): ?>
+                        <div class="d-flex align-items-center gap-2 flex-wrap preference-switches">
+                            <?php if ($showLanguageSwitch): ?>
+                                <div class="preference-option">
+                                    <label class="form-label small mb-0 visually-hidden" for="appLanguageSelect"><?= Helpers::sanitize('Dil') ?></label>
+                                    <select class="form-select form-select-sm w-auto" id="appLanguageSelect" data-initial-locale="<?= Helpers::sanitize($activeLocale) ?>">
+                                        <?php foreach ($languageOptions as $option): ?>
+                                            <option value="<?= Helpers::sanitize($option['code']) ?>" <?= $option['code'] === $activeLocale ? 'selected' : '' ?>>
+                                                <?= Helpers::sanitize($option['label']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            <?php endif; ?>
+                            <?php if ($showCurrencySwitch): ?>
+                                <div class="preference-option">
+                                    <label class="form-label small mb-0 visually-hidden" for="appCurrencySelect"><?= Helpers::sanitize('Para Birimi') ?></label>
+                                    <select class="form-select form-select-sm w-auto" id="appCurrencySelect" data-initial-currency="<?= Helpers::sanitize(strtoupper($activeCurrency)) ?>">
+                                        <?php foreach ($currencyOptions as $option): ?>
+                                            <option value="<?= Helpers::sanitize(strtoupper($option['code'])) ?>" <?= strtoupper($option['code']) === strtoupper($activeCurrency) ? 'selected' : '' ?>>
+                                                <?= Helpers::sanitize($option['label']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
+                    <?php if ($isAdminRole && !$isAdminArea): ?>
+                        <div class="d-flex align-items-center gap-2">
+                            <a href="/admin/dashboard.php" class="btn btn-sm btn-primary">
+                                <i class="bi bi-speedometer2 me-1"></i> <?= Helpers::sanitize('Yönetim Paneli') ?>
+                            </a>
+                        </div>
+                    <?php endif; ?>
+                </div>
             </header>
         <?php endif; ?>
         <main class="app-content flex-grow-1 container-fluid">
@@ -288,7 +497,7 @@ if ($user) {
                                 Son tarih: <?= Helpers::sanitize($lowBalanceNotice['deadline']) ?>
                             </span>
                             <span class="badge bg-light text-dark px-3 py-2">
-                                Minimum bakiye: <?= Helpers::sanitize(Helpers::formatCurrency($lowBalanceNotice['threshold'])) ?>
+                                Minimum bakiye: <?= Helpers::formatCurrencyHtml($lowBalanceNotice['threshold']) ?>
                             </span>
                         </div>
                         <p class="mb-2">
@@ -297,7 +506,7 @@ if ($user) {
                         </p>
                         <?php if ($lowBalanceNotice['deficit'] > 0): ?>
                             <p class="mb-0">
-                                Eksik tutar: <strong><?= Helpers::sanitize(Helpers::formatCurrency($lowBalanceNotice['deficit'])) ?></strong>.
+                                Eksik tutar: <strong><?= Helpers::formatCurrencyHtml($lowBalanceNotice['deficit']) ?></strong>.
                                 Bayiliğinizi korumak için bakiyenizi en kısa sürede tamamlayın.
                             </p>
                         <?php else: ?>
@@ -311,5 +520,40 @@ if ($user) {
                             </a>
                         </div>
                     <?php endif; ?>
+                </div>
+            <?php endif; ?>
+            <?php if (!empty($activeAnnouncements)): ?>
+                <div class="announcement-stack mb-4">
+                    <?php foreach ($activeAnnouncements as $announcement): ?>
+                        <?php $announcementId = (int)$announcement['id']; ?>
+                        <div class="card border-0 shadow-sm announcement-card<?= !empty($announcement['pinned']) ? ' announcement-card--pinned' : '' ?> mb-3 p-0 overflow-hidden">
+                            <div class="announcement-card__accent"></div>
+                            <div class="card-body p-4">
+                                <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                                    <div>
+                                        <div class="d-flex align-items-center gap-2 mb-2">
+                                            <span class="badge bg-primary-subtle text-primary fw-semibold">Duyuru</span>
+                                            <?php if (!empty($announcement['pinned'])): ?>
+                                                <span class="badge bg-danger-subtle text-danger fw-semibold">Öne Çıkan</span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <h3 class="h5 mb-2 fw-semibold text-dark"><?= Helpers::sanitize($announcement['title']) ?></h3>
+                                        <div class="text-muted small mb-3">
+                                            <?php if (!empty($announcement['starts_at'])): ?>
+                                                <span class="me-3"><i class="bi bi-play-fill me-1"></i><?= date('d.m.Y H:i', strtotime($announcement['starts_at'])) ?></span>
+                                            <?php endif; ?>
+                                            <?php if (!empty($announcement['ends_at'])): ?>
+                                                <span><i class="bi bi-flag me-1"></i><?= date('d.m.Y H:i', strtotime($announcement['ends_at'])) ?></span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <p class="mb-0 announcement-card__body"><?= nl2br(Helpers::sanitize($announcement['body'])) ?></p>
+                                    </div>
+                                    <a class="btn btn-sm btn-outline-secondary" href="<?= Helpers::sanitize(Helpers::urlWithQuery(array('dismiss_announcement' => $announcementId))) ?>">
+                                        <i class="bi bi-x me-1"></i> Gizle
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
                 </div>
             <?php endif; ?>

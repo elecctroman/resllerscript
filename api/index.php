@@ -1,6 +1,11 @@
-<?php
-require __DIR__ . '/bootstrap.php';
+<?php declare(strict_types=1);
 
-json_response(array(
-    'message' => 'Reseller API. Use /api/v1/products and /api/v1/orders for REST access.'
-));
+require_once __DIR__ . '/../bootstrap.php';
+
+use App\ResellerApi\Http\ApiKernel;
+use App\ResellerApi\Http\Request;
+use App\ResellerApi\Services\ApiGateway;
+
+$kernel = new ApiKernel(new ApiGateway());
+$response = $kernel->handle(Request::fromGlobals());
+$response->send();
