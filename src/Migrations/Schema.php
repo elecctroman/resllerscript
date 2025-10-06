@@ -20,6 +20,7 @@ final class Schema
 
         self::ensureProductsTable($pdo);
         self::ensureProductStockTable($pdo);
+        self::ensureProductOrdersTotalAmount($pdo);
         self::ensureResellerFavoritesTable($pdo);
         self::ensureStockWatchersTable($pdo);
         self::ensureApiTokens($pdo);
@@ -91,6 +92,17 @@ final class Schema
 
         self::addIndex($pdo, 'product_stock_items', 'idx_stock_status', 'ADD INDEX idx_stock_status (product_id, status)');
         self::addIndex($pdo, 'product_stock_items', 'idx_stock_order', 'ADD INDEX idx_stock_order (order_id)');
+    }
+
+    private static function ensureProductOrdersTotalAmount(PDO $pdo): void
+    {
+        if (self::columnExists($pdo, 'product_orders', 'total_amount')) {
+            return;
+        }
+
+        $pdo->exec("ALTER TABLE product_orders ADD COLUMN total_amount DECIMAL(12,2) NULL AFTER price");
+        $pdo->exec("UPDATE product_orders SET total_amount = price WHERE total_amount IS NULL");
+        $pdo->exec("ALTER TABLE product_orders MODIFY COLUMN total_amount DECIMAL(12,2) NOT NULL AFTER price");
     }
 
     private static function ensureResellerFavoritesTable(PDO $pdo): void

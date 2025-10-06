@@ -43,9 +43,9 @@ final class AnalyticsService
 
         $stmt = $pdo->prepare(
             "SELECT DATE(po.created_at) AS order_day, " .
-            "SUM(po.price * COALESCE(po.quantity,1)) AS revenue, " .
+            "SUM(po.total_amount) AS revenue, " .
             "COUNT(*) AS total_orders, " .
-            "SUM((po.price - COALESCE(pr.cost_price_try,0)) * COALESCE(po.quantity,1)) AS profit " .
+            "SUM(po.total_amount - (COALESCE(pr.cost_price_try, 0) * COALESCE(po.quantity, 1))) AS profit " .
             "FROM product_orders po INNER JOIN products pr ON po.product_id = pr.id " .
             "WHERE po.user_id = :user_id AND po.created_at >= :start GROUP BY order_day"
         );
@@ -79,7 +79,7 @@ final class AnalyticsService
         }
 
         $productStmt = $pdo->prepare(
-            "SELECT pr.name, SUM(po.price * COALESCE(po.quantity,1)) AS revenue, COUNT(*) AS total_orders " .
+            "SELECT pr.name, SUM(po.total_amount) AS revenue, COUNT(*) AS total_orders " .
             "FROM product_orders po INNER JOIN products pr ON po.product_id = pr.id " .
             "WHERE po.user_id = :user_id GROUP BY po.product_id ORDER BY revenue DESC LIMIT 10"
         );

@@ -108,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'id' => $token['user_id'],
         ));
 
-        $orderInsert = $pdo->prepare('INSERT INTO product_orders (product_id, user_id, api_token_id, quantity, note, price, status, source, external_reference, external_metadata, created_at) VALUES (:product_id, :user_id, :api_token_id, :quantity, :note, :price, :status, :source, :external_reference, :external_metadata, NOW())');
+        $orderInsert = $pdo->prepare('INSERT INTO product_orders (product_id, user_id, api_token_id, quantity, note, price, total_amount, status, source, external_reference, external_metadata, created_at) VALUES (:product_id, :user_id, :api_token_id, :quantity, :note, :price, :total_amount, :status, :source, :external_reference, :external_metadata, NOW())');
         $transactionInsert = $pdo->prepare('INSERT INTO balance_transactions (user_id, amount, type, description, created_at) VALUES (:user_id, :amount, :type, :description, NOW())');
 
         foreach ($lineDetails as $detail) {
@@ -140,6 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'quantity' => (int)$line['quantity'],
                 'note' => $line['note'] !== '' ? $line['note'] : null,
                 'price' => $lineTotal,
+                'total_amount' => $lineTotal,
                 'status' => 'processing',
                 'source' => 'api',
                 'external_reference' => $orderReference,
