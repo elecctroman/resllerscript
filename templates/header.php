@@ -6,13 +6,29 @@ use App\Database;
 use App\Lang;
 use App\FeatureToggle;
 use App\ResellerPolicy;
+use App\Services\LanguageService;
+use App\Services\AnnouncementService;
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
 
-$user = isset($_SESSION['user']) ? $_SESSION['user'] : null;
-$pageHeadline = isset($pageTitle) ? $pageTitle : 'Panel';
+$user = $_SESSION['user'] ?? null;
+$pageHeadline = $pageTitle ?? 'Panel';
+
+if (!isset($_SESSION['dismissed_announcements']) || !is_array($_SESSION['dismissed_announcements'])) {
+    $_SESSION['dismissed_announcements'] = array();
+}
+
+if (isset($_GET['dismiss_announcement'])) {
+    $dismissId = (int) $_GET['dismiss_announcement'];
+    if ($dismissId > 0) {
+        $_SESSION['dismissed_announcements'][$dismissId] = time();
+        if (!headers_sent() && (!isset($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] === 'GET')) {
+            Helpers::redirect(Helpers::urlWithQuery(array('dismiss_announcement' => null)));
+        }
+    }
+}
 
 Lang::boot();
 
@@ -21,35 +37,81 @@ $siteTagline = Helpers::siteTagline();
 $metaDescription = Helpers::seoDescription();
 $metaKeywords = Helpers::seoKeywords();
 
+$activeLocale = Lang::locale();
+$defaultLocale = Lang::defaultLocale();
+
+$languageOptions = array();
+if (class_exists(LanguageService::class)) {
+    foreach (LanguageService::languages(false) as $language) {
+        if (!isset($language['code'])) {
+            continue;
+        }
+        $code = strtolower((string) $language['code']);
+        $languageOptions[$code] = array(
+            'code' => $code,
+            'label' => isset($language['native_name']) && $language['native_name'] !== ''
+                ? (string) $language['native_name']
+                : strtoupper($code),
+            'name' => isset($language['name']) && $language['name'] !== ''
+                ? (string) $language['name']
+                : strtoupper($code),
+        );
+    }
+}
+
+if (!$languageOptions) {
+    foreach (Lang::availableLocales() as $localeOption) {
+        $code = strtolower((string) $localeOption);
+        $languageOptions[$code] = array(
+            'code' => $code,
+            'label' => strtoupper($code),
+            'name' => strtoupper($code),
+        );
+    }
+}
+
+if (!isset($languageOptions[$activeLocale])) {
+    $languageOptions[$activeLocale] = array(
+        'code' => $activeLocale,
+        'label' => strtoupper($activeLocale),
+        'name' => strtoupper($activeLocale),
+    );
+}
+
+$languageOptions = array_values($languageOptions);
+$languageOptionsForScript = array();
+foreach ($languageOptions as $option) {
+    $languageOptionsForScript[] = array(
+        'code' => $option['code'],
+        'label' => $option['label'] ?? strtoupper($option['code']),
+        'name' => $option['name'] ?? ($option['label'] ?? strtoupper($option['code'])),
+    );
+}
+
+$showLanguageSwitch = count($languageOptions) > 1;
+
+$appCsrfToken = Helpers::csrfToken();
+$activeTranslations = class_exists(LanguageService::class) ? LanguageService::catalog($activeLocale) : array();
+$fallbackTranslations = class_exists(LanguageService::class) ? LanguageService::catalog($defaultLocale) : array();
+
 $lowBalanceNotice = null;
 if ($user) {
     $lowBalanceNotice = ResellerPolicy::lowBalanceNotice($user);
 }
 
-if (!isset($GLOBALS['app_lang_buffer_started'])) {
-    $GLOBALS['app_lang_buffer_started'] = true;
-    ob_start(function ($buffer) {
-        return Lang::filterOutput($buffer);
-    });
-}
-
-$menuSections = array();
-$menuBadges = array();
 $currentPath = Helpers::currentPath();
-$isAdminArea = false;
 $isAdminRole = $user ? Auth::isAdminRole($user['role']) : false;
+$isAdminArea = $user && $isAdminRole && strpos($currentPath, '/admin/') === 0;
+$menuBadges = array();
 
-if ($isAdminRole) {
-    $isAdminArea = strpos($currentPath, '/admin/') === 0;
-
+if ($user && $isAdminRole) {
     try {
         $sidebarPdo = Database::connection();
-
         if (Auth::userHasRole($user, array('super_admin', 'admin', 'support'))) {
-            $menuBadges['/admin/orders.php'] = (int)$sidebarPdo
+            $menuBadges['/admin/orders.php'] = (int) $sidebarPdo
                 ->query("SELECT COUNT(*) FROM package_orders WHERE status IN ('pending','paid')")
                 ->fetchColumn();
-            $menuBadges['/admin/product-orders.php'] = (int)$sidebarPdo
+            $menuBadges['/admin/product-orders.php'] = (int) $sidebarPdo
                 ->query("SELECT COUNT(*) FROM product_orders WHERE status IN ('pending','processing')")
                 ->fetchColumn();
         }
@@ -58,8 +120,10 @@ if ($isAdminRole) {
     }
 }
 
+$menuSections = array();
+
 if ($user) {
-    if ($isAdminRole && $isAdminArea) {
+    if ($isAdminRole) {
         $adminSections = array(
             array(
                 'heading' => 'Genel Yönetim',
@@ -73,9 +137,8 @@ if ($user) {
             array(
                 'heading' => 'Sipariş Yönetimi',
                 'items' => array(
-                    array('label' => 'Paket Siparişleri', 'href' => '/admin/orders.php', 'pattern' => '/admin/orders.php', 'icon' => 'bi-receipt', 'roles' => array('super_admin', 'admin', 'support'), 'badge' => isset($menuBadges['/admin/orders.php']) ? (int)$menuBadges['/admin/orders.php'] : 0),
-                    array('label' => 'Ürün Siparişleri', 'href' => '/admin/product-orders.php', 'pattern' => '/admin/product-orders.php', 'icon' => 'bi-basket', 'roles' => array('super_admin', 'admin', 'support'), 'badge' => isset($menuBadges['/admin/product-orders.php']) ? (int)$menuBadges['/admin/product-orders.php'] : 0),
-
+                    array('label' => 'Paket Siparişleri', 'href' => '/admin/orders.php', 'pattern' => '/admin/orders.php', 'icon' => 'bi-receipt', 'roles' => array('super_admin', 'admin', 'support'), 'badge' => $menuBadges['/admin/orders.php'] ?? 0),
+                    array('label' => 'Ürün Siparişleri', 'href' => '/admin/product-orders.php', 'pattern' => '/admin/product-orders.php', 'icon' => 'bi-basket', 'roles' => array('super_admin', 'admin', 'support'), 'badge' => $menuBadges['/admin/product-orders.php'] ?? 0),
                 ),
             ),
             array(
@@ -91,14 +154,7 @@ if ($user) {
                 'items' => array(
                     array('label' => 'Blog Yazıları', 'href' => '/admin/blog-posts.php', 'pattern' => '/admin/blog-posts.php', 'icon' => 'bi-journal-text', 'roles' => array('super_admin', 'admin', 'content')),
                     array('label' => 'Blog Kategorileri', 'href' => '/admin/blog-categories.php', 'pattern' => '/admin/blog-categories.php', 'icon' => 'bi-tags', 'roles' => array('super_admin', 'admin', 'content')),
-                ),
-            ),
-            array(
-                'heading' => 'Entegrasyon & API',
-                'items' => array(
-                    array('label' => 'API Anahtarları', 'href' => '/admin/api-keys.php', 'pattern' => '/admin/api-keys.php', 'icon' => 'bi-key', 'roles' => array('super_admin', 'admin')),
-                    array('label' => 'API Güvenliği', 'href' => '/admin/settings-general.php#api-security', 'pattern' => '/admin/settings-general.php', 'icon' => 'bi-shield-lock', 'roles' => array('super_admin', 'admin')),
-                    array('label' => 'Telegram Entegrasyonu', 'href' => '/admin/settings-telegram.php', 'pattern' => '/admin/settings-telegram.php', 'icon' => 'bi-telegram', 'roles' => array('super_admin', 'admin')),
+                    array('label' => 'Talimatlar', 'href' => '/admin/instructions.php', 'pattern' => '/admin/instructions.php', 'icon' => 'bi-card-checklist', 'roles' => array('super_admin', 'admin', 'content')),
                 ),
             ),
             array(
@@ -120,6 +176,8 @@ if ($user) {
                 'items' => array(
                     array('label' => 'Genel Ayarlar', 'href' => '/admin/settings-general.php', 'pattern' => '/admin/settings-general.php', 'icon' => 'bi-gear', 'roles' => array('super_admin', 'admin')),
                     array('label' => 'Ödeme Methodları', 'href' => '/admin/settings-payments.php', 'pattern' => '/admin/settings-payments.php', 'icon' => 'bi-credit-card', 'roles' => array('super_admin', 'admin', 'finance')),
+                    array('label' => 'Dil Yönetimi', 'href' => '/admin/languages.php', 'pattern' => '/admin/languages.php', 'icon' => 'bi-translate', 'roles' => array('super_admin', 'admin')),
+                    array('label' => 'Telegram Ayarları', 'href' => '/admin/settings-telegram.php', 'pattern' => '/admin/settings-telegram.php', 'icon' => 'bi-telegram', 'roles' => array('super_admin', 'admin')),
                 ),
             ),
             array(
@@ -130,11 +188,10 @@ if ($user) {
             ),
         );
 
-        $menuSections = array();
         foreach ($adminSections as $section) {
             $items = array();
             foreach ($section['items'] as $item) {
-                $allowedRoles = isset($item['roles']) ? $item['roles'] : Auth::adminRoles();
+                $allowedRoles = $item['roles'] ?? Auth::adminRoles();
                 if (Auth::userHasRole($user, $allowedRoles)) {
                     $items[] = $item;
                 }
@@ -154,18 +211,17 @@ if ($user) {
         if (Helpers::featureEnabled('products')) {
             $resellerItems[] = array('label' => 'Ürünler', 'href' => '/products.php', 'pattern' => '/products.php', 'icon' => 'bi-box');
         }
-
         if (Helpers::featureEnabled('orders')) {
             $resellerItems[] = array('label' => 'Siparişlerim', 'href' => '/orders.php', 'pattern' => '/orders.php', 'icon' => 'bi-receipt');
         }
-
         if (Helpers::featureEnabled('balance')) {
             $resellerItems[] = array('label' => 'Bakiyem', 'href' => '/balance.php', 'pattern' => '/balance.php', 'icon' => 'bi-wallet2');
         }
-
         if (Helpers::featureEnabled('support')) {
             $resellerItems[] = array('label' => 'Destek', 'href' => '/support.php', 'pattern' => '/support.php', 'icon' => 'bi-life-preserver');
         }
+
+        $resellerItems[] = array('label' => 'Talimatlar', 'href' => '/instructions.php', 'pattern' => '/instructions.php', 'icon' => 'bi-journal-check');
 
         if (Helpers::featureEnabled('premium_modules')) {
             $resellerItems[] = array('label' => 'Premium Modüller', 'href' => '/premium-modules.php', 'pattern' => '/premium-modules.php', 'icon' => 'bi-gem');
@@ -173,14 +229,26 @@ if ($user) {
 
         $resellerItems[] = array('label' => 'Profilim', 'href' => '/profile.php', 'pattern' => '/profile.php', 'icon' => 'bi-person');
 
-        $menuSections = array(
-            array(
-                'heading' => 'Bayi Paneli',
-                'items' => $resellerItems,
-            ),
+        $menuSections[] = array(
+            'heading' => 'Bayi Paneli',
+            'items' => $resellerItems,
         );
     }
 }
+
+$dismissedAnnouncementIds = array_map('intval', array_keys($_SESSION['dismissed_announcements'] ?? array()));
+$activeAnnouncements = array();
+if ($user && !$isAdminRole) {
+    $activeAnnouncements = AnnouncementService::activeForUser($user, 4, $dismissedAnnouncementIds);
+}
+
+$nameSource = $user['name'] ?? ($user['email'] ?? 'U');
+if (function_exists('mb_substr')) {
+    $avatarInitial = mb_strtoupper(mb_substr($nameSource, 0, 1, 'UTF-8'), 'UTF-8');
+} else {
+    $avatarInitial = strtoupper(substr($nameSource, 0, 1));
+}
+$userRoleLabel = $user ? Auth::roleLabel($user['role']) : '';
 ?>
 <!DOCTYPE html>
 <html lang="<?= Lang::htmlLocale() ?>">
@@ -191,125 +259,220 @@ if ($user) {
     <meta name="description" content="<?= Helpers::sanitize($metaDescription) ?>">
     <meta name="keywords" content="<?= Helpers::sanitize($metaKeywords) ?>">
     <meta property="og:site_name" content="<?= Helpers::sanitize($siteName) ?>">
-    <meta property="og:title" content="<?= Helpers::sanitize(isset($pageTitle) ? $pageTitle : $siteName) ?>">
+    <meta property="og:title" content="<?= Helpers::sanitize($pageHeadline) ?>">
     <meta property="og:description" content="<?= Helpers::sanitize($metaDescription) ?>">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <link href="/assets/css/style.css" rel="stylesheet">
+    <style>
+        .avatar-circle {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+    <script>
+        window.App = window.App || {};
+        window.App.locale = <?= json_encode($activeLocale, JSON_UNESCAPED_UNICODE) ?>;
+        window.App.defaultLocale = <?= json_encode($defaultLocale, JSON_UNESCAPED_UNICODE) ?>;
+        window.App.csrfToken = <?= json_encode($appCsrfToken, JSON_UNESCAPED_UNICODE) ?>;
+        window.App.languages = <?= json_encode($languageOptionsForScript, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+        window.App.translations = <?= json_encode($activeTranslations, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+        window.App.translationFallback = <?= json_encode($fallbackTranslations, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+    </script>
 </head>
 <body>
 <div class="app-shell">
     <?php if ($user): ?>
-        <aside class="app-sidebar" id="appSidebar">
-            <div class="sidebar-brand">
-                <a href="<?= $isAdminArea ? '/admin/dashboard.php' : '/dashboard.php' ?>"><?= Helpers::sanitize($siteName) ?></a>
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
+            <div class="container-fluid">
+                <a class="navbar-brand fw-semibold" href="<?= $isAdminArea ? '/admin/dashboard.php' : '/dashboard.php' ?>">
+                    <?= Helpers::sanitize($siteName) ?>
+                </a>
                 <?php if ($siteTagline): ?>
-                    <div class="sidebar-brand-tagline text-muted small"><?= Helpers::sanitize($siteTagline) ?></div>
+                    <span class="navbar-text text-white-50 d-none d-xl-inline ms-2"><?= Helpers::sanitize($siteTagline) ?></span>
                 <?php endif; ?>
-            </div>
-            <div class="sidebar-user">
-                <div class="sidebar-user-name"><?= Helpers::sanitize($user['name']) ?></div>
-                <div class="sidebar-user-role text-uppercase"><?= Helpers::sanitize(Auth::roleLabel($user['role'])) ?></div>
-                <?php if (Helpers::featureEnabled('balance')): ?>
-                    <div class="sidebar-user-balance">
-                        <?= Helpers::sanitize('Bakiye') ?>:
-                        <strong><?= Helpers::formatCurrency((float)$user['balance']) ?></strong>
-                    </div>
-                <?php endif; ?>
-            </div>
-            <nav class="sidebar-nav">
-                <?php foreach ($menuSections as $section): ?>
-                    <div class="sidebar-section">
-                        <div class="sidebar-section-title"><?= Helpers::sanitize($section['heading']) ?></div>
-                        <ul class="list-unstyled">
-                            <?php foreach ($section['items'] as $item): ?>
-                                <li>
-                                    <?php $badge = isset($item['badge']) ? (int)$item['badge'] : 0; ?>
-                                    <a href="<?= $item['href'] ?>" class="sidebar-link <?= Helpers::isActive($item['pattern']) ? 'active' : '' ?>">
-                                        <?php if (!empty($item['icon'])): ?>
-                                            <span class="sidebar-link-icon"><i class="<?= Helpers::sanitize($item['icon']) ?>"></i></span>
-                                        <?php endif; ?>
-                                        <span class="sidebar-link-text"><?= Helpers::sanitize($item['label']) ?></span>
-                                        <?php if ($badge > 0): ?>
-                                            <span class="sidebar-link-badge"><?= $badge ?></span>
-                                        <?php endif; ?>
-                                    </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#appPrimaryNav" aria-controls="appPrimaryNav" aria-expanded="false" aria-label="Menüyü Aç">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="appPrimaryNav">
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                        <?php foreach ($menuSections as $section): ?>
+                            <?php
+                            $sectionActive = false;
+                            foreach ($section['items'] as $navItem) {
+                                if (Helpers::isActive($navItem['pattern'])) {
+                                    $sectionActive = true;
+                                    break;
+                                }
+                            }
+                            ?>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle <?= $sectionActive ? 'active' : '' ?>" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <?= Helpers::sanitize($section['heading']) ?>
+                                </a>
+                                <ul class="dropdown-menu shadow">
+                                    <?php foreach ($section['items'] as $navItem): ?>
+                                        <?php $itemActive = Helpers::isActive($navItem['pattern']); ?>
+                                        <li>
+                                            <a class="dropdown-item d-flex align-items-center gap-2 <?= $itemActive ? 'active' : '' ?>" href="<?= $navItem['href'] ?>">
+                                                <?php if (!empty($navItem['icon'])): ?>
+                                                    <i class="<?= Helpers::sanitize($navItem['icon']) ?> text-primary"></i>
+                                                <?php endif; ?>
+                                                <span><?= Helpers::sanitize($navItem['label']) ?></span>
+                                                <?php if (!empty($navItem['badge']) && (int) $navItem['badge'] > 0): ?>
+                                                    <span class="badge bg-primary-subtle text-primary ms-auto"><?= (int) $navItem['badge'] ?></span>
+                                                <?php endif; ?>
+                                            </a>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <div class="navbar-nav align-items-center ms-lg-3 flex-row gap-3">
+                        <?php if (Helpers::featureEnabled('balance')): ?>
+                            <span class="badge text-bg-light rounded-pill px-3 py-2 d-none d-lg-inline">
+                                <?= Helpers::sanitize('Bakiye') ?>:
+                                <span class="fw-semibold"><?= Helpers::formatCurrencyHtml((float) $user['balance']) ?></span>
+                            </span>
+                        <?php endif; ?>
+                        <?php if ($showLanguageSwitch): ?>
+                            <div class="nav-item">
+                                <label class="visually-hidden" for="appLanguageSelect"><?= Helpers::sanitize('Dil') ?></label>
+                                <select class="form-select form-select-sm" id="appLanguageSelect" data-initial-locale="<?= Helpers::sanitize($activeLocale) ?>">
+                                    <?php foreach ($languageOptions as $option): ?>
+                                        <option value="<?= Helpers::sanitize($option['code']) ?>" <?= $option['code'] === $activeLocale ? 'selected' : '' ?>>
+                                            <?= Helpers::sanitize($option['label']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        <?php endif; ?>
+                        <div class="nav-item dropdown">
+                            <button class="btn btn-outline-light btn-sm d-flex align-items-center gap-2 dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                <span class="avatar-circle bg-white text-primary fw-semibold"><?= Helpers::sanitize($avatarInitial) ?></span>
+                                <span class="d-none d-sm-inline">&nbsp;<?= Helpers::sanitize($user['name']) ?></span>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow">
+                                <li class="dropdown-header">
+                                    <div class="fw-semibold"><?= Helpers::sanitize($user['name']) ?></div>
+                                    <small class="text-muted"><?= Helpers::sanitize($userRoleLabel) ?></small>
                                 </li>
-                            <?php endforeach; ?>
-                        </ul>
-                    </div>
-                <?php endforeach; ?>
-            </nav>
-            <div class="sidebar-footer">
-                <a href="/logout.php" class="btn btn-outline-light w-100"><?= Helpers::sanitize('Çıkış Yap') ?></a>
-            </div>
-        </aside>
-        <div class="sidebar-backdrop d-lg-none" data-sidebar-close></div>
-    <?php endif; ?>
-    <div class="app-main d-flex flex-column flex-grow-1">
-        <?php if ($user): ?>
-            <header class="app-topbar d-flex align-items-center justify-content-between gap-3 flex-wrap">
-                <div class="d-flex align-items-center gap-3 flex-grow-1">
-                    <button class="btn btn-light border-0 d-lg-none sidebar-toggle" type="button" data-sidebar-toggle aria-controls="appSidebar" aria-expanded="false" aria-label="Menüyü aç">
-                        <i class="bi bi-list"></i>
-                    </button>
-                    <div>
-                        <h1 class="h4 mb-1 mb-lg-0"><?= Helpers::sanitize($pageHeadline) ?></h1>
-                        <p class="text-muted mb-0 small"><?= date('d F Y') ?></p>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="/profile.php"><i class="bi bi-person me-2"></i><?= Helpers::sanitize('Profilim') ?></a></li>
+                                <?php if ($isAdminRole && !$isAdminArea): ?>
+                                    <li><a class="dropdown-item" href="/admin/dashboard.php"><i class="bi bi-speedometer2 me-2"></i><?= Helpers::sanitize('Yönetim Paneli') ?></a></li>
+                                <?php endif; ?>
+                                <li><a class="dropdown-item" href="/logout.php"><i class="bi bi-box-arrow-right me-2"></i><?= Helpers::sanitize('Çıkış Yap') ?></a></li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
-                <?php if ($isAdminRole && !$isAdminArea): ?>
-                    <div class="d-flex align-items-center gap-2">
-                        <a href="/admin/dashboard.php" class="btn btn-sm btn-primary">
-                            <i class="bi bi-speedometer2 me-1"></i> <?= Helpers::sanitize('Yönetim Paneli') ?>
+            </div>
+        </nav>
+    <?php else: ?>
+        <nav class="navbar navbar-light bg-white shadow-sm">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="/"><?= Helpers::sanitize($siteName) ?></a>
+                <?php if ($siteTagline): ?>
+                    <span class="navbar-text text-muted small"><?= Helpers::sanitize($siteTagline) ?></span>
+                <?php endif; ?>
+            </div>
+        </nav>
+    <?php endif; ?>
+    <main class="app-content container-fluid py-4">
+        <?php if ($user): ?>
+            <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
+                <div>
+                    <h1 class="h3 mb-1"><?= Helpers::sanitize($pageHeadline) ?></h1>
+                    <p class="text-muted mb-0 small"><?= date('d F Y') ?></p>
+                </div>
+                <?php if (Helpers::featureEnabled('balance')): ?>
+                    <span class="badge text-bg-primary rounded-pill px-4 py-2 d-lg-none">
+                        <?= Helpers::sanitize('Bakiye') ?>: <span class="fw-semibold"><?= Helpers::formatCurrencyHtml((float) $user['balance']) ?></span>
+                    </span>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+        <?php if ($lowBalanceNotice): ?>
+            <div class="alert alert-warning shadow-sm border-0 rounded-3 p-4 mb-4 d-flex flex-column flex-lg-row align-items-lg-center gap-3">
+                <div class="low-balance-icon text-warning display-6">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <h5 class="mb-2 fw-semibold">Bakiyeniz minimum seviyenin altında</h5>
+                    <?php
+                    $remainingLabel = $lowBalanceNotice['remaining_days'] > 0
+                        ? $lowBalanceNotice['remaining_days'] . ' gün'
+                        : ($lowBalanceNotice['remaining_hours'] > 0 ? $lowBalanceNotice['remaining_hours'] . ' saat' : 'Son saatler');
+                    ?>
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                        <span class="badge bg-warning-subtle text-warning px-3 py-2">
+                            Kalan süre: <?= Helpers::sanitize($remainingLabel) ?>
+                        </span>
+                        <span class="badge bg-light text-dark px-3 py-2">
+                            Son tarih: <?= Helpers::sanitize($lowBalanceNotice['deadline']) ?>
+                        </span>
+                        <span class="badge bg-light text-dark px-3 py-2">
+                            Minimum bakiye: <?= Helpers::formatCurrencyHtml($lowBalanceNotice['threshold']) ?>
+                        </span>
+                    </div>
+                    <p class="mb-2">
+                        Bakiyeniz minimum tutarın altına düştüğü için hesabınız <?= Helpers::sanitize((string) $lowBalanceNotice['grace_days']) ?> gün içinde (<?= Helpers::sanitize($lowBalanceNotice['deadline']) ?>) yeterli bakiye yüklenmezse otomatik olarak pasife alınacaktır.
+                    </p>
+                    <?php if ($lowBalanceNotice['deficit'] > 0): ?>
+                        <p class="mb-0">
+                            Eksik tutar: <strong><?= Helpers::formatCurrencyHtml($lowBalanceNotice['deficit']) ?></strong>. Bayiliğinizi korumak için bakiyenizi en kısa sürede tamamlayın.
+                        </p>
+                    <?php else: ?>
+                        <p class="mb-0">Bayiliğinize devam etmek için minimum bakiye tutarını yüklemeniz gerekmektedir.</p>
+                    <?php endif; ?>
+                </div>
+                <?php if (Helpers::featureEnabled('balance')): ?>
+                    <div class="flex-shrink-0">
+                        <a href="/balance.php" class="btn btn-warning fw-semibold">
+                            <i class="bi bi-wallet2 me-2"></i> Bakiye Yükle
                         </a>
                     </div>
                 <?php endif; ?>
-            </header>
+            </div>
         <?php endif; ?>
-        <main class="app-content flex-grow-1 container-fluid">
-            <?php if ($lowBalanceNotice): ?>
-                <div class="alert alert-warning shadow-sm border-0 rounded-3 p-4 mb-4 d-flex flex-column flex-lg-row align-items-lg-center gap-3">
-                    <div class="low-balance-icon text-warning display-6">
-                        <i class="bi bi-exclamation-triangle-fill"></i>
-                    </div>
-                    <div class="flex-grow-1">
-                        <h5 class="mb-2 fw-semibold">Bakiyeniz minimum seviyenin altında</h5>
-                        <?php
-                        $remainingLabel = $lowBalanceNotice['remaining_days'] > 0
-                            ? $lowBalanceNotice['remaining_days'] . ' gün'
-                            : ($lowBalanceNotice['remaining_hours'] > 0 ? $lowBalanceNotice['remaining_hours'] . ' saat' : 'Son saatler');
-                        ?>
-                        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                            <span class="badge bg-warning-subtle text-warning px-3 py-2">
-                                Kalan süre: <?= Helpers::sanitize($remainingLabel) ?>
-                            </span>
-                            <span class="badge bg-light text-dark px-3 py-2">
-                                Son tarih: <?= Helpers::sanitize($lowBalanceNotice['deadline']) ?>
-                            </span>
-                            <span class="badge bg-light text-dark px-3 py-2">
-                                Minimum bakiye: <?= Helpers::sanitize(Helpers::formatCurrency($lowBalanceNotice['threshold'])) ?>
-                            </span>
+        <?php if (!empty($activeAnnouncements)): ?>
+            <div class="announcement-stack mb-4">
+                <?php foreach ($activeAnnouncements as $announcement): ?>
+                    <?php $announcementId = (int) $announcement['id']; ?>
+                    <div class="card border-0 shadow-sm announcement-card<?= !empty($announcement['pinned']) ? ' announcement-card--pinned' : '' ?> mb-3 p-0 overflow-hidden">
+                        <div class="announcement-card__accent"></div>
+                        <div class="card-body p-4">
+                            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                                <div>
+                                    <div class="d-flex align-items-center gap-2 mb-2">
+                                        <span class="badge bg-primary-subtle text-primary fw-semibold">Duyuru</span>
+                                        <?php if (!empty($announcement['pinned'])): ?>
+                                            <span class="badge bg-danger-subtle text-danger fw-semibold">Öne Çıkan</span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <h3 class="h5 mb-2 fw-semibold text-dark"><?= Helpers::sanitize($announcement['title']) ?></h3>
+                                    <div class="text-muted small mb-3">
+                                        <?php if (!empty($announcement['starts_at'])): ?>
+                                            <span class="me-3"><i class="bi bi-play-fill me-1"></i><?= date('d.m.Y H:i', strtotime($announcement['starts_at'])) ?></span>
+                                        <?php endif; ?>
+                                        <?php if (!empty($announcement['ends_at'])): ?>
+                                            <span><i class="bi bi-flag me-1"></i><?= date('d.m.Y H:i', strtotime($announcement['ends_at'])) ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <p class="mb-0 announcement-card__body"><?= nl2br(Helpers::sanitize($announcement['body'])) ?></p>
+                                </div>
+                                <a class="btn btn-sm btn-outline-secondary" href="<?= Helpers::sanitize(Helpers::urlWithQuery(array('dismiss_announcement' => $announcementId))) ?>">
+                                    <i class="bi bi-x me-1"></i> Gizle
+                                </a>
+                            </div>
                         </div>
-                        <p class="mb-2">
-                            Bakiyeniz minimum tutarın altına düştüğü için hesabınız <?= Helpers::sanitize((string)$lowBalanceNotice['grace_days']) ?> gün içinde
-                            (<?= Helpers::sanitize($lowBalanceNotice['deadline']) ?>) yeterli bakiye yüklenmezse otomatik olarak pasife alınacaktır.
-                        </p>
-                        <?php if ($lowBalanceNotice['deficit'] > 0): ?>
-                            <p class="mb-0">
-                                Eksik tutar: <strong><?= Helpers::sanitize(Helpers::formatCurrency($lowBalanceNotice['deficit'])) ?></strong>.
-                                Bayiliğinizi korumak için bakiyenizi en kısa sürede tamamlayın.
-                            </p>
-                        <?php else: ?>
-                            <p class="mb-0">Bayiliğinize devam etmek için minimum bakiye tutarını yüklemeniz gerekmektedir.</p>
-                        <?php endif; ?>
                     </div>
-                    <?php if (Helpers::featureEnabled('balance')): ?>
-                        <div class="flex-shrink-0">
-                            <a href="/balance.php" class="btn btn-warning fw-semibold">
-                                <i class="bi bi-wallet2 me-2"></i> Bakiye Yükle
-                            </a>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            <?php endif; ?>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>

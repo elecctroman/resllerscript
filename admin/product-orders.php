@@ -7,7 +7,6 @@ use App\Helpers;
 use App\Database;
 use App\Telegram;
 use App\Notifications\ResellerNotifier;
-use App\ApiToken;
 
 Auth::requireRoles(array('super_admin', 'admin', 'support'));
 
@@ -127,46 +126,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 ));
                             }
 
-                            if (!empty($order['api_token_id'])) {
-                                $metadata = null;
-                                $externalReference = isset($order['external_reference']) ? $order['external_reference'] : null;
-                                if ((!$externalReference || $externalReference === '') && isset($order['external_metadata']) && $order['external_metadata'] !== '') {
-                                    $metadata = json_decode($order['external_metadata'], true);
-                                    if (is_array($metadata) && isset($metadata['external_order']['id'])) {
-                                        $externalReference = (string)$metadata['external_order']['id'];
-                                    }
-                                }
-
-                                $adminNotePayload = $statusNote !== '' ? $statusNote : (isset($order['admin_note']) ? $order['admin_note'] : null);
-
-                                $payload = array(
-                                    'event' => 'order_status_changed',
-                                    'order_id' => (int)$orderId,
-                                    'remote_order_id' => (int)$orderId,
-                                    'status' => $newStatus,
-                                    'previous_status' => $currentStatus,
-                                    'external_reference' => $externalReference,
-                                    'sku' => isset($order['sku']) ? $order['sku'] : null,
-                                    'quantity' => isset($order['quantity']) ? (int)$order['quantity'] : 1,
-                                    'total' => (float)$order['price'],
-                                );
-
-                                if ($adminNotePayload !== null && $adminNotePayload !== '') {
-                                    $payload['admin_note'] = $adminNotePayload;
-                                } else {
-                                    $payload['admin_note'] = null;
-                                }
-
-                                if (is_array($metadata) && isset($metadata['external_order'])) {
-                                    $payload['external_order'] = $metadata['external_order'];
-                                }
-
-                                $webhookResult = ApiToken::notifyWebhook((int)$order['api_token_id'], $payload);
-                                if (!$webhookResult['success']) {
-                                    $formErrors[] = 'API webhook bildirimi gönderilemedi: ' . (isset($webhookResult['error']) ? $webhookResult['error'] : 'Bilinmeyen hata');
-                                }
-                            }
-
                             if (!$formErrors) {
                                 $formSuccess = 'Sipariş durumu güncellendi.';
                                 AuditLog::record(
@@ -270,23 +229,11 @@ include __DIR__ . '/../templates/header.php';
                     <tbody>
                     <?php foreach ($orders as $order): ?>
                         <?php
-                        $providerName = '';
-                        $providerStatus = '';
                         $deliveryContent = '';
 
                         if (!empty($order['external_metadata'])) {
                             $metadata = json_decode($order['external_metadata'], true);
                             if (is_array($metadata)) {
-                                if (!empty($metadata['provider'])) {
-                                    $providerName = (string)$metadata['provider'];
-                                }
-
-                                if (isset($metadata['provider_response']['data']['status'])) {
-                                    $providerStatus = (string)$metadata['provider_response']['data']['status'];
-                                } elseif (isset($metadata['provider_error']['message']) && $metadata['provider_error']['message'] !== '') {
-                                    $providerStatus = 'failed';
-                                }
-
                                 if (!empty($metadata['delivery_content'])) {
                                     $deliveryContent = (string)$metadata['delivery_content'];
                                 } elseif (!empty($metadata['provider_response']['data']['content'])) {
@@ -306,16 +253,9 @@ include __DIR__ . '/../templates/header.php';
                             <td>
                                 <strong><?= Helpers::sanitize($order['product_name']) ?></strong><br>
                                 <small class="text-muted">Kategori: <?= Helpers::sanitize(isset($order['category_name']) ? $order['category_name'] : '-') ?> | SKU: <?= Helpers::sanitize(isset($order['sku']) ? $order['sku'] : '-') ?></small>
-                                <?php if ($providerName !== ''): ?>
-                                    <div class="text-muted small mt-1">
-                                        Sağlayıcı: <?= Helpers::sanitize(strtoupper($providerName)) ?><?php if ($providerStatus !== ''): ?> (<?= Helpers::sanitize(strtoupper($providerStatus)) ?>)<?php endif; ?>
-                                    </div>
-                                <?php elseif ($providerStatus !== ''): ?>
-                                    <div class="text-muted small mt-1">Sağlayıcı Durumu: <?= Helpers::sanitize(strtoupper($providerStatus)) ?></div>
-                                <?php endif; ?>
                             </td>
                             <td><?= isset($order['quantity']) ? (int)$order['quantity'] : 1 ?></td>
-                            <td><?= Helpers::sanitize(Helpers::formatCurrency((float)$order['price'])) ?></td>
+                            <td><?= Helpers::formatCurrencyHtml((float)$order['price']) ?></td>
                             <td>
                                 <?php
                                 $source = isset($order['source']) ? $order['source'] : 'panel';
@@ -353,7 +293,7 @@ include __DIR__ . '/../templates/header.php';
                                                 <small class="text-muted">Kategori: <?= Helpers::sanitize(isset($order['category_name']) ? $order['category_name'] : '-') ?> | SKU: <?= Helpers::sanitize(isset($order['sku']) ? $order['sku'] : '-') ?></small>
                                             </dd>
                                             <dt class="col-sm-4">Fiyat</dt>
-                                            <dd class="col-sm-8"><?= Helpers::sanitize(Helpers::formatCurrency((float)$order['price'])) ?></dd>
+                                            <dd class="col-sm-8"><?= Helpers::formatCurrencyHtml((float)$order['price']) ?></dd>
                                             <dt class="col-sm-4">Adet</dt>
                                             <dd class="col-sm-8"><?= isset($order['quantity']) ? (int)$order['quantity'] : 1 ?></dd>
                                             <dt class="col-sm-4">Kaynak</dt>
@@ -366,17 +306,6 @@ include __DIR__ . '/../templates/header.php';
                                                 }
                                                 ?>
                                             </dd>
-                                            <?php if ($providerName !== '' || $providerStatus !== ''): ?>
-                                                <dt class="col-sm-4">Sağlayıcı</dt>
-                                                <dd class="col-sm-8">
-                                                    <?php if ($providerName !== ''): ?>
-                                                        <div>Ad: <strong><?= Helpers::sanitize(strtoupper($providerName)) ?></strong></div>
-                                                    <?php endif; ?>
-                                                    <?php if ($providerStatus !== ''): ?>
-                                                        <div>Durum: <span class="badge bg-light text-dark"><?= Helpers::sanitize(strtoupper($providerStatus)) ?></span></div>
-                                                    <?php endif; ?>
-                                                </dd>
-                                            <?php endif; ?>
                                             <?php if ($deliveryContent !== ''): ?>
                                                 <dt class="col-sm-4">Teslimat İçeriği</dt>
                                                 <dd class="col-sm-8"><pre class="bg-light p-2 small mb-0"><?= Helpers::sanitize($deliveryContent) ?></pre></dd>
