@@ -1,0 +1,98 @@
+.reseller-api-wrap {
+    max-width: 960px;
+}
+
+.reseller-api-layout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.reseller-api-column {
+    flex: 1 1 360px;
+    min-width: 320px;
+}
+
+.reseller-api-column--widgets {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.reseller-api-card {
+    background: #fff;
+    border: 1px solid #dcdfe6;
+    border-radius: 8px;
+    padding: 1.25rem;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+}
+
+.reseller-api-card__header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.reseller-api-card__header .dashicons {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    color: #2563eb;
+}
+
+.reseller-api-card__lead {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem;
+}
+
+.reseller-api-card__lead.status-ok {
+    color: #15803d;
+}
+
+.reseller-api-card__lead.status-error {
+    color: #b91c1c;
+}
+
+.reseller-api-card .button {
+    margin-top: 0.5rem;
+}
+
+.reseller-api-column--widgets table.widefat {
+    margin-top: 0.75rem;
+}
+
+.reseller-api-column--widgets table.widefat tbody tr.placeholder td {
+    text-align: center;
+    color: #6b7280;
+}
+
+.reseller-api-actions {
+    margin: 1.5rem 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+#reseller-api-console {
+    margin-top: 1.5rem;
+}
+
+#reseller-api-console .notice {
+    margin-bottom: 0.75rem;
+}
+
+.reseller-api-settings-form .form-table th {
+    width: 220px;
+}
+
+@media (max-width: 782px) {
+    .reseller-api-column {
+        min-width: 100%;
+    }
+}
+
