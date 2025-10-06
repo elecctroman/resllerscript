@@ -1,0 +1,51 @@
+.reseller-api-wrap {
+    max-width: 900px;
+}
+
+.reseller-api-cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.reseller-api-card {
+    flex: 1 1 260px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.reseller-api-card h3 {
+    margin-top: 0;
+}
+
+.reseller-api-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.reseller-api-orders {
+    max-height: 260px;
+    overflow: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 12px;
+    background: #fff;
+}
+
+.reseller-api-orders table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.reseller-api-orders th,
+.reseller-api-orders td {
+    text-align: left;
+    padding: 8px;
+    border-bottom: 1px solid #edf2f7;
+}
+
