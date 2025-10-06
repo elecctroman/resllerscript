@@ -149,6 +149,7 @@ CREATE TABLE IF NOT EXISTS product_orders (
     note TEXT NULL,
     admin_note TEXT NULL,
     price DECIMAL(12,2) NOT NULL,
+    total_amount DECIMAL(12,2) NOT NULL,
     source VARCHAR(50) NULL,
     external_reference VARCHAR(191) NULL,
     external_metadata TEXT NULL,

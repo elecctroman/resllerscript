@@ -60,7 +60,7 @@ class Reporting
             }
         }
 
-        $productStmt = $pdo->prepare("SELECT DATE_FORMAT(created_at, '%Y-%m') AS month_key, COUNT(*) AS total_orders, SUM(CASE WHEN status IN ('processing','completed') THEN price * quantity ELSE 0 END) AS revenue FROM product_orders WHERE created_at >= :start AND created_at < :end GROUP BY month_key");
+        $productStmt = $pdo->prepare("SELECT DATE_FORMAT(created_at, '%Y-%m') AS month_key, COUNT(*) AS total_orders, SUM(CASE WHEN status IN ('processing','completed') THEN total_amount ELSE 0 END) AS revenue FROM product_orders WHERE created_at >= :start AND created_at < :end GROUP BY month_key");
         $productStmt->execute($bounds);
         foreach ($productStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $monthKey = isset($row['month_key']) ? $row['month_key'] : '';
@@ -118,7 +118,7 @@ class Reporting
         $packageStmt->execute($bounds);
         $package = $packageStmt->fetch(PDO::FETCH_ASSOC) ?: array('total_orders' => 0, 'revenue' => 0);
 
-        $productStmt = $pdo->prepare("SELECT COUNT(*) AS total_orders, SUM(CASE WHEN status IN ('processing','completed') THEN price * quantity ELSE 0 END) AS revenue FROM product_orders WHERE created_at >= :start AND created_at < :end");
+        $productStmt = $pdo->prepare("SELECT COUNT(*) AS total_orders, SUM(CASE WHEN status IN ('processing','completed') THEN total_amount ELSE 0 END) AS revenue FROM product_orders WHERE created_at >= :start AND created_at < :end");
         $productStmt->execute($bounds);
         $product = $productStmt->fetch(PDO::FETCH_ASSOC) ?: array('total_orders' => 0, 'revenue' => 0);
 
