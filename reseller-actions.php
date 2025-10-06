@@ -120,7 +120,9 @@ try {
 } catch (RuntimeException $exception) {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => $exception->getMessage()]);
-
+    exit;
+} catch (\Throwable $exception) {
     http_response_code(500);
     echo json_encode(['success' => false, 'error' => 'Beklenmeyen bir hata oluştu.']);
+    exit;
 }

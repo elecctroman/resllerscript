@@ -1,4 +1,12 @@
 <?php
+$requestUri = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
+$normalized = rtrim($requestUri, '/');
+
+if (stripos($requestUri, '/api/') === 0 || $normalized === '/api' || $normalized === '/api/v1') {
+    require __DIR__ . '/api/index.php';
+    return;
+}
+
 session_start();
 
 $autoloader = __DIR__ . '/vendor/autoload.php';
@@ -26,38 +34,92 @@ spl_autoload_register(function ($class) {
 $configPath = __DIR__ . '/config/config.php';
 
 if (!file_exists($configPath)) {
-
-    App\Helpers::includeTemplate('auth-header.php');
     ?>
-    <div class="auth-wrapper">
+    <!DOCTYPE html>
+    <html lang="tr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Authero - Yapılandırma Gerekli</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 2rem;
+            }
+            
+            .auth-card {
+                background: white;
+                border-radius: 1rem;
+                padding: 2rem;
+                max-width: 500px;
+                width: 100%;
+                box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            }
+            
+            .brand {
+                color: #3b82f6;
+                font-size: 2rem;
+                font-weight: bold;
+                margin-bottom: 1rem;
+            }
+            
+            .alert {
+                padding: 1rem;
+                border-radius: 0.5rem;
+                margin-bottom: 1rem;
+            }
+            
+            .alert-warning {
+                background: #fef3c7;
+                border: 1px solid #d97706;
+                color: #92400e;
+            }
+            
+            code {
+                background: #f3f4f6;
+                padding: 0.2rem 0.4rem;
+                border-radius: 0.25rem;
+                font-size: 0.875rem;
+            }
+        </style>
+    </head>
+    <body>
         <div class="auth-card">
             <div class="text-center mb-4">
-                <div class="brand">Bayi Yönetim Sistemi</div>
-                <p class="text-muted mt-2">Kuruluma başlamadan önce yapılandırmayı tamamlayın</p>
+                <div class="brand">Authero</div>
+                <p style="color: #6b7280; margin-top: 0.5rem;">Kuruluma başlamadan önce yapılandırmayı tamamlayın</p>
             </div>
             <div class="alert alert-warning">
-                <h5 class="alert-heading">Yapılandırma Gerekli</h5>
-                <p class="mb-2">Lütfen <code>config/config.sample.php</code> dosyasını <code>config/config.php</code> olarak
-                    kopyalayın ve MySQL bağlantı bilgilerinizi girin.</p>
-                <ol class="mb-0 text-start">
+                <h5 style="margin-bottom: 0.5rem; color: #92400e;">Yapılandırma Gerekli</h5>
+                <p style="margin-bottom: 0.5rem;">Lütfen <code>config/config.sample.php</code> dosyasını <code>config/config.php</code> olarak kopyalayın ve MySQL bağlantı bilgilerinizi girin.</p>
+                <ol style="margin-bottom: 0; padding-left: 1.5rem;">
                     <li><code>config/config.sample.php</code> dosyasını kopyalayın.</li>
-                    <li>Yeni dosyada <code>DB_HOST</code>, <code>DB_NAME</code>, <code>DB_USER</code> ve <code>DB_PASSWORD</code>
-                        değerlerini güncelleyin.</li>
+                    <li>Yeni dosyada <code>DB_HOST</code>, <code>DB_NAME</code>, <code>DB_USER</code> ve <code>DB_PASSWORD</code> değerlerini güncelleyin.</li>
                     <li>Veritabanınızı oluşturup <code>schema.sql</code> dosyasındaki tabloları içeri aktarın.</li>
                     <li>Ardından bu sayfayı yenileyerek giriş ekranına ulaşın.</li>
                 </ol>
             </div>
         </div>
-    </div>
+    </body>
+    </html>
     <?php
-    App\Helpers::includeTemplate('auth-footer.php');
     exit;
 }
 
 require $configPath;
 
 use App\Auth;
-use App\Blog\BlogRepository;
 use App\Helpers;
 use App\Lang;
 use App\Settings;
@@ -70,23 +132,81 @@ try {
         'password' => DB_PASSWORD,
     ]);
 } catch (\PDOException $exception) {
-    App\Helpers::includeTemplate('auth-header.php');
     ?>
-    <div class="auth-wrapper">
+    <!DOCTYPE html>
+    <html lang="tr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Authero - Veritabanı Hatası</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 2rem;
+            }
+            
+            .auth-card {
+                background: white;
+                border-radius: 1rem;
+                padding: 2rem;
+                max-width: 500px;
+                width: 100%;
+                box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            }
+            
+            .brand {
+                color: #3b82f6;
+                font-size: 2rem;
+                font-weight: bold;
+                margin-bottom: 1rem;
+            }
+            
+            .alert {
+                padding: 1rem;
+                border-radius: 0.5rem;
+                margin-bottom: 1rem;
+            }
+            
+            .alert-danger {
+                background: #fee2e2;
+                border: 1px solid #dc2626;
+                color: #991b1b;
+            }
+            
+            code {
+                background: #f3f4f6;
+                padding: 0.2rem 0.4rem;
+                border-radius: 0.25rem;
+                font-size: 0.875rem;
+            }
+        </style>
+    </head>
+    <body>
         <div class="auth-card">
             <div class="text-center mb-4">
-                <div class="brand">Bayi Yönetim Sistemi</div>
-                <p class="text-muted mt-2">Veritabanı bağlantısı kurulamadı</p>
+                <div class="brand">Authero</div>
+                <p style="color: #6b7280; margin-top: 0.5rem;">Veritabanı bağlantısı kurulamadı</p>
             </div>
             <div class="alert alert-danger">
-                <h5 class="alert-heading">Bağlantı Hatası</h5>
-                <p class="mb-2">Lütfen <code>config/config.php</code> dosyanızdaki MySQL bilgilerini kontrol edin ve veritabanı sunucunuzu doğrulayın.</p>
-                <p class="mb-0 small text-muted">Hata detayı: <?= Helpers::sanitize($exception->getMessage()) ?></p>
+                <h5 style="margin-bottom: 0.5rem; color: #991b1b;">Bağlantı Hatası</h5>
+                <p style="margin-bottom: 0.5rem;">Lütfen <code>config/config.php</code> dosyanızdaki MySQL bilgilerini kontrol edin ve veritabanı sunucunuzu doğrulayın.</p>
+                <p style="margin-bottom: 0; font-size: 0.875rem; color: #6b7280;">Hata detayı: <?= Helpers::sanitize($exception->getMessage()) ?></p>
             </div>
         </div>
-    </div>
+    </body>
+    </html>
     <?php
-    App\Helpers::includeTemplate('auth-footer.php');
     exit;
 }
 
@@ -104,7 +224,7 @@ $flashSuccess = isset($_SESSION['flash_success']) ? $_SESSION['flash_success'] :
 $flashWarning = isset($_SESSION['flash_warning']) ? $_SESSION['flash_warning'] : null;
 unset($_SESSION['flash_success'], $_SESSION['flash_warning']);
 
-$errors = [];
+$errors = array();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!Helpers::verifyCsrf(isset($_POST['csrf_token']) ? $_POST['csrf_token'] : '')) {
@@ -133,389 +253,373 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
-
-try {
-    $pdo = App\Database::connection();
-} catch (\PDOException $exception) {
-    $pdo = null;
-}
-
-$topCategories = array();
-if ($pdo instanceof \PDO) {
-    try {
-        $categoryStmt = $pdo->query(
-            "SELECT id, name, description FROM categories WHERE parent_id IS NULL ORDER BY created_at DESC LIMIT 6"
-        );
-        if ($categoryStmt) {
-            $topCategories = $categoryStmt->fetchAll(\PDO::FETCH_ASSOC) ?: array();
-        }
-    } catch (\PDOException $exception) {
-        $topCategories = array();
-    }
-}
-
-$featuredProducts = array();
-if ($pdo instanceof \PDO) {
-    try {
-        $productStmt = $pdo->query(
-            "SELECT p.id, p.name, p.price, p.description, p.created_at,"
-            . " c.name AS category_name"
-            . " FROM products AS p"
-            . " LEFT JOIN categories AS c ON c.id = p.category_id"
-            . " WHERE p.status = 'active'"
-            . " ORDER BY p.updated_at DESC, p.created_at DESC"
-            . " LIMIT 12"
-        );
-        if ($productStmt) {
-            $featuredProducts = $productStmt->fetchAll(\PDO::FETCH_ASSOC) ?: array();
-        }
-    } catch (\PDOException $exception) {
-        $featuredProducts = array();
-    }
-}
-
-$blogHighlights = array();
-try {
-    $blogHighlights = BlogRepository::latestPosts(3);
-} catch (\Throwable $exception) {
-    $blogHighlights = array();
-}
-
-$metrics = array(
-    'orders' => 0,
-    'revenue' => 0.0,
-    'products' => 0,
-    'resellers' => 0,
-);
-
-if ($pdo instanceof \PDO) {
-    try {
-        $metrics['orders'] = (int) $pdo->query("SELECT COUNT(*) FROM product_orders")->fetchColumn();
-    } catch (\PDOException $exception) {
-        $metrics['orders'] = 0;
-    }
-
-    try {
-        $metrics['revenue'] = (float) $pdo->query("SELECT COALESCE(SUM(price), 0) FROM product_orders")->fetchColumn();
-    } catch (\PDOException $exception) {
-        $metrics['revenue'] = 0.0;
-    }
-
-    try {
-        $metrics['products'] = (int) $pdo->query("SELECT COUNT(*) FROM products WHERE status = 'active'")->fetchColumn();
-    } catch (\PDOException $exception) {
-        $metrics['products'] = 0;
-    }
-
-    try {
-        $metrics['resellers'] = (int) $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'reseller' AND status = 'active'")->fetchColumn();
-    } catch (\PDOException $exception) {
-        $metrics['resellers'] = 0;
-    }
-}
-
-$pageTitle = 'Ana Sayfa';
-$metaDescription = 'Reseller automation platformu ile E-Pin, lisans ve hesap satışlarınızı tek panelden yönetin.';
-$brandUrl = '/';
-$navLinks = array(
-    array('label' => 'Özellikler', 'url' => '#features'),
-    array('label' => 'Ürünler', 'url' => '#featured-products'),
-    array('label' => 'Blog', 'url' => '/blog/'),
-    array('label' => 'Destek', 'url' => '/support.php'),
-    array('label' => 'Bayi Ol', 'url' => '/register.php', 'is_button' => true),
-);
-
-Helpers::includeTemplate('public-header.php');
 ?>
-<section class="public-hero-home position-relative overflow-hidden" id="login-card">
-    <div class="row align-items-center g-5">
-        <div class="col-lg-7 position-relative">
-            <span class="public-hero-badge">
-                <i class="bi bi-lightning-charge-fill"></i>
-                Anlık Teslimat &amp; Otomasyon
-            </span>
-            <h1 class="mt-4 mb-3"><?= Helpers::sanitize($siteName) ?></h1>
-            <p class="lead mb-4">
-                <?= Helpers::sanitize($siteTagline ?: 'E-Pin, oyun içi para ve lisans satışlarınızı tek panelden yönetin. Otomatik teslimat, gelişmiş raporlama ve müşteri paneli tek pakette.') ?>
-            </p>
-            <div class="d-flex flex-wrap gap-3">
-                <a href="/register.php" class="btn btn-primary btn-lg px-4">Bayi Ol</a>
-                <a href="/customer/register.php" class="btn btn-outline-light btn-lg px-4">Müşteri Paneline Katıl</a>
-            </div>
-            <div class="public-hero-feature-list">
-                <div class="public-hero-feature">
-                    <i class="bi bi-shield-check"></i>
-                    256-bit SSL ve gelişmiş güvenlik
-                </div>
-                <div class="public-hero-feature">
-                    <i class="bi bi-wallet2"></i>
-                    Shopier, Papara, PayTR ve cüzdan entegrasyonu
-                </div>
-                <div class="public-hero-feature">
-                    <i class="bi bi-graph-up"></i>
-                    Gerçek zamanlı raporlama ve stok uyarıları
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-5">
-            <div class="public-login-card p-4 p-lg-5">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <div>
-                        <h5 class="mb-1">Bayi Yönetim Paneli</h5>
-                        <p class="text-muted mb-0">Hızlı giriş yapın, siparişleri yönetin.</p>
-                    </div>
-                    <a href="/customer/login.php" class="public-pill-link">
-                        <i class="bi bi-people"></i>
-                        Müşteri Girişi
-                    </a>
-                </div>
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authero - Giriş Yap</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+        }
+        
+        .container {
+            display: flex;
+            width: 100%;
+            min-height: 100vh;
+        }
+        
+        .left-panel {
+            flex: 1;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        
+        .right-panel {
+            flex: 1;
+            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), #364352;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            position: relative;
+        }
+        
+        .form-container {
+            width: 100%;
+            max-width: 400px;
+        }
+        
+        .logo {
+            color: #3b82f6;
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 2rem;
+        }
+        
+        .form-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 0.5rem;
+        }
+        
+        .form-subtitle {
+            color: #6b7280;
+            margin-bottom: 2rem;
+        }
+        
+        .form-subtitle a {
+            color: #3b82f6;
+            text-decoration: none;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #374151;
+            font-weight: 500;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+            background: #f9fafb;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            background: white;
+        }
+        
+        .form-input::placeholder {
+            color: #9ca3af;
+        }
+        
+        .forgot-password {
+            text-align: right;
+            margin-top: 0.5rem;
+        }
+        
+        .forgot-password a {
+            color: #3b82f6;
+            text-decoration: none;
+            font-size: 0.875rem;
+        }
+        
+        .btn-primary {
+            width: 100%;
+            padding: 0.875rem;
+            background: linear-gradient(135deg, #8b5cf6, #3b82f6);
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin-bottom: 1.5rem;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-1px);
+        }
+        
+        .btn-secondary {
+            width: 100%;
+            padding: 0.875rem;
+            background: white;
+            color: #374151;
+            border: 2px solid #e5e7eb;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: background-color 0.2s;
+        }
+        
+        .btn-secondary:hover {
+            background: #f9fafb;
+        }
+        
+        .google-icon {
+            width: 20px;
+            height: 20px;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="%23EA4335" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="%2334A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="%23FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="%23EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>') no-repeat center;
+            background-size: contain;
+        }
+        
+        .facebook-icon {
+            width: 20px;
+            height: 20px;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="%231877F2" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>') no-repeat center;
+            background-size: contain;
+        }
+        
+        .promo-content {
+            text-align: center;
+            z-index: 1;
+            position: relative;
+        }
+        
+        .promo-title {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 2rem;
+            line-height: 1.2;
+        }
+        
+        .features {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1rem;
+        }
+        
+        .feature-icon {
+            width: 20px;
+            height: 20px;
+            background: #3b82f6;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .feature-icon::after {
+            content: '✓';
+            color: white;
+            font-size: 0.75rem;
+        }
+        
+        .alert {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid;
+        }
+        
+        .alert-success {
+            background: #dcfce7;
+            border-color: #16a34a;
+            color: #166534;
+        }
+        
+        .alert-warning {
+            background: #fef3c7;
+            border-color: #d97706;
+            color: #92400e;
+        }
+        
+        .alert-danger {
+            background: #fee2e2;
+            border-color: #dc2626;
+            color: #991b1b;
+        }
+        
+        .alert ul {
+            margin: 0;
+            padding-left: 1rem;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .right-panel {
+                order: -1;
+                min-height: 300px;
+            }
+            
+            .promo-title {
+                font-size: 1.8rem;
+            }
+            
+            .features {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="left-panel">
+            <div class="form-container">
+                <div class="logo">Authero</div>
+                
+                <h1 class="form-title">Giriş Yap</h1>
+                <p class="form-subtitle">
+                    Hesabınız yok mu? <a href="register.php">Kayıt Olun</a>
+                </p>
+                
                 <?php if ($flashSuccess): ?>
-                    <div class="alert alert-success">
-                        <?= Helpers::sanitize($flashSuccess) ?>
-                    </div>
+                    <div class="alert alert-success"><?= Helpers::sanitize($flashSuccess) ?></div>
                 <?php endif; ?>
+
                 <?php if ($flashWarning): ?>
-                    <div class="alert alert-warning">
-                        <?= Helpers::sanitize($flashWarning) ?>
-                    </div>
+                    <div class="alert alert-warning"><?= Helpers::sanitize($flashWarning) ?></div>
                 <?php endif; ?>
+
                 <?php if ($errors): ?>
                     <div class="alert alert-danger">
-                        <ul class="mb-0">
+                        <ul>
                             <?php foreach ($errors as $error): ?>
                                 <li><?= Helpers::sanitize($error) ?></li>
                             <?php endforeach; ?>
                         </ul>
                     </div>
                 <?php endif; ?>
-                <form method="post" class="needs-validation" novalidate>
+                
+                <form method="post">
                     <input type="hidden" name="csrf_token" value="<?= Helpers::sanitize(Helpers::csrfToken()) ?>">
-                    <div class="mb-3">
-                        <label for="email" class="form-label">E-posta Adresi veya Kullanıcı Adı</label>
-                        <input type="text" class="form-control" id="email" name="email" required placeholder="ornek@bayinetwork.com" value="<?= Helpers::sanitize(isset($_POST['email']) ? $_POST['email'] : '') ?>">
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="loginEmail">Kullanıcı adı veya e-posta</label>
+                        <input 
+                            type="text" 
+                            id="loginEmail" 
+                            name="email" 
+                            class="form-input" 
+                            placeholder="ornek@bayi.com"
+                            value="<?= isset($_POST['email']) ? Helpers::sanitize($_POST['email']) : '' ?>"
+                            required 
+                            autofocus
+                        >
                     </div>
-                    <div class="mb-3">
-                        <label for="password" class="form-label">Şifre</label>
-                        <input type="password" class="form-control" id="password" name="password" required placeholder="Şifreniz">
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="loginPassword">Şifre</label>
+                        <input 
+                            type="password" 
+                            id="loginPassword" 
+                            name="password" 
+                            class="form-input" 
+                            placeholder="••••••••"
+                            required
+                        >
+                        <div class="forgot-password">
+                            <a href="forgot-password.php">Şifremi Unuttum</a>
+                        </div>
                     </div>
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <a href="/password-reset.php" class="small">Şifremi Unuttum</a>
-                        <a href="/register.php" class="small">Yeni Bayilik Başvurusu</a>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100">Panele Giriş Yap</button>
-                    <div class="text-center mt-3">
-                        <a href="/admin/" class="small text-muted">Yönetici misiniz? Admin girişine gidin.</a>
-                    </div>
+                    
+                    <button type="submit" class="btn-primary">Giriş Yap</button>
                 </form>
+                
+                <!-- OAuth butonları (isteğe bağlı) -->
+                <!--
+                <button type="button" class="btn-secondary">
+                    <div class="google-icon"></div>
+                    Google ile Giriş Yap
+                </button>
+                
+                <button type="button" class="btn-secondary">
+                    <div class="facebook-icon"></div>
+                    Facebook ile Giriş Yap
+                </button>
+                -->
             </div>
         </div>
-    </div>
-</section>
-
-<section class="mt-5">
-    <div class="row g-3">
-        <div class="col-6 col-lg-3">
-            <div class="public-metric-card text-center h-100">
-                <div class="public-metric-number"><?= Helpers::sanitize(number_format($metrics['orders'])) ?></div>
-                <div class="public-metric-label">Toplam Sipariş</div>
-            </div>
-        </div>
-        <div class="col-6 col-lg-3">
-            <div class="public-metric-card text-center h-100">
-                <div class="public-metric-number"><?= Helpers::sanitize(number_format($metrics['products'])) ?></div>
-                <div class="public-metric-label">Aktif Ürün</div>
-            </div>
-        </div>
-        <div class="col-6 col-lg-3">
-            <div class="public-metric-card text-center h-100">
-                <div class="public-metric-number"><?= Helpers::sanitize(number_format($metrics['resellers'])) ?></div>
-                <div class="public-metric-label">Aktif Bayi</div>
-            </div>
-        </div>
-        <div class="col-6 col-lg-3">
-            <div class="public-metric-card text-center h-100">
-                <div class="public-metric-number"><?= Helpers::sanitize(Helpers::formatCurrency($metrics['revenue'])) ?></div>
-                <div class="public-metric-label">İşlenen Tutar</div>
-            </div>
-        </div>
-    </div>
-</section>
-
-<section class="py-5" id="features">
-    <div class="text-center mb-5">
-        <h2 class="public-section-title">Tek panelde uçtan uca satış otomasyonu</h2>
-        <p class="public-section-subtitle mx-auto">Stok yönetiminden müşteri paneline kadar tüm iş akışınızı hızlandırmak için tasarlandı.</p>
-    </div>
-    <div class="row g-4">
-        <div class="col-md-4">
-            <div class="public-feature-card h-100">
-                <div class="public-feature-icon"><i class="bi bi-cloud-arrow-down-fill"></i></div>
-                <h5 class="mb-3">Otomatik Teslimat</h5>
-                <p class="text-muted mb-0">Satın alınan lisans, hesap veya E-Pin saniyeler içinde müşteriye ulaştırılır. Stok azaldığında otomatik uyarılar alın.</p>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="public-feature-card h-100">
-                <div class="public-feature-icon"><i class="bi bi-kanban"></i></div>
-                <h5 class="mb-3">Gelişmiş Panel</h5>
-                <p class="text-muted mb-0">Bayi, müşteri ve admin panelleri ile tüm rolleri ayrı ayrı yönetin. Destek talepleri, kuponlar ve affiliate yönetimi tek ekranda.</p>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="public-feature-card h-100">
-                <div class="public-feature-icon"><i class="bi bi-credit-card"></i></div>
-                <h5 class="mb-3">Çoklu Ödeme</h5>
-                <p class="text-muted mb-0">Shopier, Papara, PayTR ve cüzdan ile tahsilat alın. Otomatik bakiye yüklemeleri ve kupon kodu desteği sunun.</p>
-            </div>
-        </div>
-    </div>
-</section>
-
-<?php if ($topCategories): ?>
-    <section class="py-5 border-top border-opacity-10 border-light">
-        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-            <div>
-                <h2 class="public-section-title mb-1">Popüler kategoriler</h2>
-                <p class="public-section-subtitle mb-0">En çok satan oyunlar, yazılımlar ve dijital kodlar tek panelde.</p>
-            </div>
-            <a href="/products.php" class="public-pill-link">
-                Tüm ürünlere göz at
-                <i class="bi bi-arrow-right"></i>
-            </a>
-        </div>
-        <div class="row g-4">
-            <?php foreach ($topCategories as $category): ?>
-                <div class="col-md-6 col-xl-4">
-                    <div class="public-category-card h-100">
-                        <div class="public-category-icon"><i class="bi bi-collection"></i></div>
-                        <h5 class="mb-2"><?= Helpers::sanitize($category['name']) ?></h5>
-                        <p class="text-muted mb-3">
-                            <?= Helpers::sanitize($category['description'] ?: 'Bu kategoride yüzlerce stok ve anlık teslimat seçeneği bulunur.') ?>
-                        </p>
-                        <a href="/products.php?category=<?= Helpers::sanitize((int)$category['id']) ?>" class="public-pill-link">
-                            Ürünleri İncele
-                            <i class="bi bi-arrow-up-right"></i>
-                        </a>
+        
+        <div class="right-panel">
+            <div class="promo-content">
+                <h2 class="promo-title"><?= Helpers::sanitize($siteName ?: 'Bayi Yönetim Sistemi') ?></h2>
+                <div class="features">
+                    <div class="feature-item">
+                        <div class="feature-icon"></div>
+                        Güvenli Giriş
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon"></div>
+                        Kolay Yönetim
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon"></div>
+                        Hızlı İşlemler
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon"></div>
+                        7/24 Destek
                     </div>
                 </div>
-            <?php endforeach; ?>
-        </div>
-    </section>
-<?php endif; ?>
-
-<section class="py-5" id="featured-products">
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-        <div>
-            <h2 class="public-section-title mb-1">Trend ürünler</h2>
-            <p class="public-section-subtitle mb-0">Güncel stoklar, otomatik fiyatlandırma ve esnek teslimat seçenekleri.</p>
-        </div>
-        <a href="/products.php" class="btn btn-outline-light">Tüm ürünler</a>
-    </div>
-    <div class="row g-4">
-        <?php if ($featuredProducts): ?>
-            <?php foreach ($featuredProducts as $product): ?>
-                <div class="col-md-6 col-lg-4 col-xl-3">
-                    <div class="public-product-card h-100">
-                        <span class="badge mb-3"><?= Helpers::sanitize($product['category_name'] ?: 'Kategori') ?></span>
-                        <div class="public-product-title"><?= Helpers::sanitize($product['name']) ?></div>
-                        <p class="public-product-meta mb-4">
-                            <?= Helpers::sanitize($product['description'] ?: Helpers::defaultProductDescription()) ?>
-                        </p>
-                        <div class="d-flex justify-content-between align-items-end">
-                            <div>
-                                <div class="public-product-price"><?= Helpers::sanitize(Helpers::formatCurrency((float)$product['price'])) ?></div>
-                                <small class="text-muted">Anında teslimat</small>
-                            </div>
-                            <a href="/products.php?product=<?= Helpers::sanitize((int)$product['id']) ?>" class="public-pill-link">
-                                Satın Al
-                                <i class="bi bi-cart3"></i>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            <?php endforeach; ?>
-        <?php else: ?>
-            <div class="col-12">
-                <div class="public-product-card text-center">
-                    <h5 class="mb-2">Henüz ürün eklenmedi</h5>
-                    <p class="text-muted mb-4">Admin panelinden ürün oluşturduğunuzda bu alan otomatik olarak güncellenecektir.</p>
-                    <a href="/admin/products.php" class="public-pill-link">
-                        Admin paneline git
-                        <i class="bi bi-gear"></i>
-                    </a>
-                </div>
             </div>
-        <?php endif; ?>
-    </div>
-</section>
-
-<section class="py-5 border-top border-opacity-10 border-light">
-    <div class="text-center mb-4">
-        <h2 class="public-section-title mb-1">Tercih edilen ödeme sağlayıcıları</h2>
-        <p class="public-section-subtitle mb-0">Müşterilerinize güvenilir ödeme deneyimi sunun.</p>
-    </div>
-    <div class="d-flex flex-wrap justify-content-center gap-3">
-        <span class="public-partner-logo">Shopier</span>
-        <span class="public-partner-logo">PayTR</span>
-        <span class="public-partner-logo">Papara</span>
-        <span class="public-partner-logo">FastPay</span>
-        <span class="public-partner-logo">Havale / EFT</span>
-    </div>
-</section>
-
-<?php if ($blogHighlights): ?>
-    <section class="py-5 border-top border-opacity-10 border-light">
-        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-            <div>
-                <h2 class="public-section-title mb-1">Blogdan öne çıkanlar</h2>
-                <p class="public-section-subtitle mb-0">Satış stratejileri, oyun haberleri ve güncel kampanyalar.</p>
-            </div>
-            <a href="/blog/" class="public-pill-link">
-                Tüm yazıları oku
-                <i class="bi bi-arrow-right-circle"></i>
-            </a>
-        </div>
-        <div class="row g-4">
-            <?php foreach ($blogHighlights as $post): ?>
-                <div class="col-md-6 col-xl-4">
-                    <article class="public-blog-card h-100">
-                        <?php if (!empty($post['image_url'])): ?>
-                            <img src="<?= Helpers::sanitize($post['image_url']) ?>" alt="<?= Helpers::sanitize($post['title']) ?>">
-                        <?php endif; ?>
-                        <div class="card-body d-flex flex-column">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="badge bg-primary bg-opacity-25 text-light"><?= Helpers::sanitize($post['category_name'] ?: 'Genel') ?></span>
-                                <?php if (!empty($post['published_at'])): ?>
-                                    <span class="public-blog-meta">
-                                        <?= Helpers::sanitize(date('d.m.Y', strtotime($post['published_at']))) ?>
-                                    </span>
-                                <?php endif; ?>
-                            </div>
-                            <h5 class="mb-2"><?= Helpers::sanitize($post['title']) ?></h5>
-                            <p class="text-muted mb-4 flex-grow-1">
-                                <?= Helpers::sanitize($post['excerpt'] ?: Helpers::seoDescription()) ?>
-                            </p>
-                            <a class="public-pill-link mt-auto" href="/blog/<?= Helpers::sanitize($post['slug']) ?>">
-                                Yazıyı Oku
-                                <i class="bi bi-arrow-up-right"></i>
-                            </a>
-                        </div>
-                    </article>
-                </div>
-            <?php endforeach; ?>
-        </div>
-    </section>
-<?php endif; ?>
-
-<section class="py-5 text-center">
-    <div class="public-hero-home py-5">
-        <h2 class="public-section-title mb-3">Hazır mısınız?</h2>
-        <p class="public-section-subtitle mx-auto mb-4">Reseller ağınızı büyütmek ve müşteri memnuniyetini artırmak için hemen ücretsiz deneme hesabı oluşturun.</p>
-        <div class="d-flex flex-wrap justify-content-center gap-3">
-            <a href="/register.php" class="btn btn-primary btn-lg px-4">Bayilik Başvurusu</a>
-            <a href="/customer/register.php" class="btn btn-outline-light btn-lg px-4">Müşteri Hesabı Aç</a>
         </div>
     </div>
-</section>
-
-<?php Helpers::includeTemplate('public-footer.php'); ?>
+</body>
+</html>
