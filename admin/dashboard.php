@@ -61,7 +61,7 @@ include __DIR__ . '/../templates/header.php';
                     <h4 class="mb-1"><?= Helpers::sanitize('Merhaba') ?>, <?= Helpers::sanitize($user['name']) ?></h4>
                     <p class="text-muted mb-0"><?= Helpers::sanitize('Sistemi buradan yönetebilir, bayilerinizi ve siparişleri takip edebilirsiniz.') ?></p>
                 </div>
-                <span class="badge bg-success rounded-pill fs-6"><?= Helpers::sanitize('Toplam Bakiye') ?>: <?= Helpers::sanitize(Helpers::formatCurrency((float)$user['balance'])) ?></span>
+                <span class="badge bg-success rounded-pill fs-6"><?= Helpers::sanitize('Toplam Bakiye') ?>: <?= Helpers::formatCurrencyHtml((float)$user['balance']) ?></span>
             </div>
         </div>
     </div>
@@ -126,21 +126,21 @@ include __DIR__ . '/../templates/header.php';
                     <div class="col-12 col-md-6">
                         <div class="border rounded p-3 h-100">
                             <h6 class="text-uppercase text-muted">Gelir</h6>
-                            <p class="fs-4 mb-1"><?= Helpers::sanitize(Helpers::formatCurrency($monthlySummary['revenue'])) ?></p>
+                            <p class="fs-4 mb-1"><?= Helpers::formatCurrencyHtml($monthlySummary['revenue']) ?></p>
                             <small class="text-muted">Tamamlanan siparişler</small>
                         </div>
                     </div>
                     <div class="col-12 col-md-6">
                         <div class="border rounded p-3 h-100">
                             <h6 class="text-uppercase text-muted">Bakiye Kredileri</h6>
-                            <p class="fs-4 mb-1"><?= Helpers::sanitize(Helpers::formatCurrency($monthlySummary['balance_credits'])) ?></p>
+                            <p class="fs-4 mb-1"><?= Helpers::formatCurrencyHtml($monthlySummary['balance_credits']) ?></p>
                             <small class="text-muted">Son 6 aydaki toplam krediler</small>
                         </div>
                     </div>
                     <div class="col-12 col-md-6">
                         <div class="border rounded p-3 h-100">
                             <h6 class="text-uppercase text-muted">Bakiye Borçları</h6>
-                            <p class="fs-4 mb-1"><?= Helpers::sanitize(Helpers::formatCurrency($monthlySummary['balance_debits'])) ?></p>
+                            <p class="fs-4 mb-1"><?= Helpers::formatCurrencyHtml($monthlySummary['balance_debits']) ?></p>
                             <small class="text-muted">Son 6 aydaki toplam borçlar</small>
                         </div>
                     </div>
@@ -172,13 +172,13 @@ include __DIR__ . '/../templates/header.php';
                                 <?= (int)$month['package_orders'] + (int)$month['product_orders'] ?>
                             </td>
                             <td class="text-end">
-                                <?= Helpers::sanitize(Helpers::formatCurrency((float)$month['revenue'])) ?>
+                                <?= Helpers::formatCurrencyHtml((float)$month['revenue']) ?>
                             </td>
                             <td class="text-end">
-                                <?= Helpers::sanitize(Helpers::formatCurrency((float)$month['balance_credits'])) ?>
+                                <?= Helpers::formatCurrencyHtml((float)$month['balance_credits']) ?>
                             </td>
                             <td class="text-end">
-                                <?= Helpers::sanitize(Helpers::formatCurrency((float)$month['balance_debits'])) ?>
+                                <?= Helpers::formatCurrencyHtml((float)$month['balance_debits']) ?>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -211,9 +211,6 @@ include __DIR__ . '/../templates/header.php';
                     </div>
                     <div class="col-sm-6 col-xl-3">
                         <a href="/admin/balances.php" class="btn btn-outline-primary w-100">Bakiyeler</a>
-                    </div>
-                    <div class="col-sm-6 col-xl-3">
-                        <a href="/admin/api-keys.php" class="btn btn-outline-primary w-100">API Yönetimine Git</a>
                     </div>
                     <div class="col-sm-6 col-xl-3">
                         <a href="/admin/reports.php" class="btn btn-outline-primary w-100">Raporlar</a>
