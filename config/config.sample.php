@@ -17,3 +17,9 @@ define('TELEGRAM_CHAT_ID', '');
 define('PREMIUM_MODULE_API_KEY', 'change-this-key');
 
 define('DEFAULT_LANGUAGE', 'en');
+
+// Master secret used for signing reseller API tokens and hashing API secrets.
+define('API_MASTER_SECRET', 'change-this-secret');
+
+// Default hourly rate limit per reseller API key.
+define('API_RATE_LIMIT_PER_HOUR', 1000);

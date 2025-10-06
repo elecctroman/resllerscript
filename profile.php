@@ -2,7 +2,6 @@
 require __DIR__ . '/bootstrap.php';
 
 use App\Auth;
-use App\ApiToken;
 use App\Database;
 use App\Helpers;
 
@@ -15,14 +14,8 @@ $user = $_SESSION['user'];
 $pdo = Database::connection();
 $errors = array();
 $successMessages = array();
-$displayToken = '';
-
-try {
-    $activeToken = ApiToken::getOrCreateForUser($user['id']);
-} catch (\Throwable $exception) {
-    $activeToken = null;
-    $errors[] = 'API anahtarınıza erişilirken bir sorun oluştu: ' . $exception->getMessage();
-}
+$apiBaseUrl = Helpers::apiBaseUrl(true);
+$apiDocsUrl = Helpers::url('api/docs', true);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = isset($_POST['action']) ? $_POST['action'] : 'profile';
@@ -39,16 +32,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $telegramBotToken = isset($_POST['telegram_bot_token']) ? trim($_POST['telegram_bot_token']) : '';
             $telegramChatId = isset($_POST['telegram_chat_id']) ? trim($_POST['telegram_chat_id']) : '';
             $locale = isset($_POST['locale']) ? strtolower((string)$_POST['locale']) : '';
-            $currency = isset($_POST['currency']) ? strtoupper((string)$_POST['currency']) : '';
 
             $availableLocales = App\Lang::availableLocales();
             if (!in_array($locale, $availableLocales, true)) {
                 $locale = App\Lang::defaultLocale();
-            }
-
-            $currencyOptions = array('TRY', 'USD', 'EUR');
-            if (!in_array($currency, $currencyOptions, true)) {
-                $currency = Helpers::activeCurrency();
             }
 
             if ($name === '') {
@@ -94,14 +81,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
 
                     if (!$errors) {
-                        $pdo->prepare('UPDATE users SET name = :name, telegram_bot_token = :bot, telegram_chat_id = :chat, locale = :locale, currency = :currency, updated_at = NOW() WHERE id = :id')->execute(array(
-                            'name' => $name,
-                            'bot' => $telegramBotToken,
-                            'chat' => $telegramChatId,
-                            'locale' => $locale,
-                            'currency' => $currency,
-                            'id' => $user['id'],
-                        ));
+                    $pdo->prepare('UPDATE users SET name = :name, telegram_bot_token = :bot, telegram_chat_id = :chat, locale = :locale, updated_at = NOW() WHERE id = :id')->execute(array(
+                        'name' => $name,
+                        'bot' => $telegramBotToken,
+                        'chat' => $telegramChatId,
+                        'locale' => $locale,
+                        'id' => $user['id'],
+                    ));
 
                         if ($changingPassword) {
                             $pdo->prepare('UPDATE users SET password_hash = :password WHERE id = :id')->execute(array(
@@ -135,37 +121,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $errors[] = 'Profiliniz güncellenirken bir hata oluştu: ' . $exception->getMessage();
                 }
             }
-        } elseif ($action === 'webhook' && $activeToken) {
-            $webhookUrl = isset($_POST['webhook_url']) ? trim($_POST['webhook_url']) : '';
-
-            if ($webhookUrl !== '' && !filter_var($webhookUrl, FILTER_VALIDATE_URL)) {
-                $errors[] = 'Geçerli bir webhook adresi giriniz.';
-            }
-
-            if (!$errors) {
-                ApiToken::updateWebhook((int)$activeToken['id'], $webhookUrl !== '' ? $webhookUrl : null);
-                $successMessages[] = 'Webhook adresiniz güncellendi.';
-                if ($activeToken) {
-                    $activeToken['webhook_url'] = $webhookUrl !== '' ? $webhookUrl : null;
-                }
-            }
-        } elseif ($action === 'regenerate_token') {
-            try {
-                $newToken = ApiToken::regenerateForUser($user['id']);
-                $displayToken = $newToken['token'];
-                $successMessages[] = 'Yeni API anahtarınız oluşturuldu. Lütfen güvenli bir yerde saklayın.';
-                $activeToken = array(
-                    'id' => $newToken['id'],
-                    'user_id' => $user['id'],
-                    'token' => $newToken['token'],
-                    'label' => 'Panel API Anahtarı',
-                    'webhook_url' => null,
-                    'created_at' => date('Y-m-d H:i:s'),
-                    'last_used_at' => null,
-                );
-            } catch (\Throwable $exception) {
-                $errors[] = 'API anahtarınız yenilenirken bir sorun oluştu: ' . $exception->getMessage();
-            }
         } elseif ($action === 'notifications') {
             $prefOrder = isset($_POST['notify_order_completed']) ? '1' : '0';
             $prefBalance = isset($_POST['notify_balance_approved']) ? '1' : '0';
@@ -190,42 +145,86 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } catch (\PDOException $exception) {
                 $errors[] = 'Bildirim tercihlerin kaydedilirken bir hata oluştu: ' . $exception->getMessage();
             }
+        } elseif ($action === 'api-key') {
+            $hadKey = isset($user['api_key']) && $user['api_key'] !== '';
+            $newKey = null;
+
+            try {
+                for ($attempt = 0; $attempt < 5; $attempt++) {
+                    $candidate = bin2hex(random_bytes(32));
+                    $check = $pdo->prepare('SELECT id FROM users WHERE api_key = :api_key LIMIT 1');
+                    $check->execute(array('api_key' => $candidate));
+
+                    if (!$check->fetch(\PDO::FETCH_ASSOC)) {
+                        $newKey = $candidate;
+                        break;
+                    }
+                }
+            } catch (\Exception $exception) {
+                $newKey = null;
+            }
+
+            if ($newKey === null) {
+                $errors[] = 'API anahtarı oluşturulurken teknik bir sorun oluştu. Lütfen tekrar deneyin.';
+            } else {
+                try {
+                    $pdo->prepare('UPDATE users SET api_key = :api_key, updated_at = NOW() WHERE id = :id')
+                        ->execute(array(
+                            'api_key' => $newKey,
+                            'id' => $user['id'],
+                        ));
+
+                    $freshUser = Auth::findUser($user['id']);
+                    if ($freshUser) {
+                        $_SESSION['user'] = $freshUser;
+                        $user = $freshUser;
+                    }
+
+                    $successMessages[] = $hadKey
+                        ? 'API anahtarınız yenilendi.'
+                        : 'API anahtarınız oluşturuldu.';
+                } catch (\PDOException $exception) {
+                    $errors[] = 'API anahtarı veritabanına kaydedilirken bir hata oluştu: ' . $exception->getMessage();
+                }
+            }
         }
     }
 }
+
+$hasApiKey = isset($user['api_key']) && $user['api_key'] !== '';
 
 $pageTitle = 'Profilim';
 
 include __DIR__ . '/templates/header.php';
 ?>
+<?php if ($errors): ?>
+    <div class="alert alert-danger">
+        <ul class="mb-0">
+            <?php foreach ($errors as $error): ?>
+                <li><?= Helpers::sanitize($error) ?></li>
+            <?php endforeach; ?>
+        </ul>
+    </div>
+<?php endif; ?>
+
+<?php if ($successMessages): ?>
+    <div class="alert alert-success">
+        <ul class="mb-0">
+            <?php foreach ($successMessages as $message): ?>
+                <li><?= Helpers::sanitize($message) ?></li>
+            <?php endforeach; ?>
+        </ul>
+    </div>
+<?php endif; ?>
+
 <div class="row g-4">
-    <div class="col-12 col-lg-6">
+    <div class="col-12 col-xl-7">
         <div class="card border-0 shadow-sm h-100">
             <div class="card-header bg-white">
                 <h5 class="mb-0">Profil Bilgileri</h5>
                 <small class="text-muted">Bayi iletişim ve şifre ayarlarınızı güncelleyin.</small>
             </div>
             <div class="card-body">
-                <?php if ($errors): ?>
-                    <div class="alert alert-danger">
-                        <ul class="mb-0">
-                            <?php foreach ($errors as $error): ?>
-                                <li><?= Helpers::sanitize($error) ?></li>
-                            <?php endforeach; ?>
-                        </ul>
-                    </div>
-                <?php endif; ?>
-
-                <?php if ($successMessages): ?>
-                    <div class="alert alert-success">
-                        <ul class="mb-0">
-                            <?php foreach ($successMessages as $message): ?>
-                                <li><?= Helpers::sanitize($message) ?></li>
-                            <?php endforeach; ?>
-                        </ul>
-                    </div>
-                <?php endif; ?>
-
                 <form method="post" class="mb-4">
                     <input type="hidden" name="csrf_token" value="<?= Helpers::sanitize(Helpers::csrfToken()) ?>">
                     <input type="hidden" name="action" value="profile">
@@ -248,25 +247,14 @@ include __DIR__ . '/templates/header.php';
                         <input type="text" name="telegram_chat_id" class="form-control" value="<?= Helpers::sanitize(isset($user['telegram_chat_id']) ? $user['telegram_chat_id'] : '') ?>" required>
                         <small class="text-muted">Bildirimlerin gönderileceği kullanıcı veya kanal kimliği.</small>
                     </div>
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Panel Dili</label>
-                            <select name="locale" class="form-select">
-                                <?php foreach (App\Lang::availableLocales() as $localeOption): ?>
-                                    <option value="<?= Helpers::sanitize($localeOption) ?>" <?= (isset($user['locale']) && $user['locale'] === $localeOption) ? 'selected' : '' ?>><?= strtoupper(Helpers::sanitize($localeOption)) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                            <small class="text-muted">Bayi panelinde kullanılacak varsayılan dil.</small>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Tercih Edilen Para Birimi</label>
-                            <select name="currency" class="form-select">
-                                <?php foreach (array('TRY' => 'Türk Lirası', 'USD' => 'ABD Doları', 'EUR' => 'Euro') as $code => $label): ?>
-                                    <option value="<?= Helpers::sanitize($code) ?>" <?= (isset($user['currency']) && strtoupper((string)$user['currency']) === $code) ? 'selected' : '' ?>><?= Helpers::sanitize($label) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                            <small class="text-muted">Grafik ve fiyatlar bu para birimine göre gösterilecektir.</small>
-                        </div>
+                    <div class="mb-3">
+                        <label class="form-label">Panel Dili</label>
+                        <select name="locale" class="form-select">
+                            <?php foreach (App\Lang::availableLocales() as $localeOption): ?>
+                                <option value="<?= Helpers::sanitize($localeOption) ?>" <?= (isset($user['locale']) && $user['locale'] === $localeOption) ? 'selected' : '' ?>><?= strtoupper(Helpers::sanitize($localeOption)) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small class="text-muted">Bayi panelinde kullanılacak varsayılan dil.</small>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Mevcut Şifre</label>
@@ -295,7 +283,39 @@ include __DIR__ . '/templates/header.php';
                 </dl>
             </div>
         </div>
-        <div class="card border-0 shadow-sm mt-4">
+    </div>
+    <div class="col-12 col-xl-5">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">API Erişimi</h5>
+                <small class="text-muted">Dış sistemlerinizden entegrasyon kurmak için anahtarınızı kullanın.</small>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <span class="text-muted text-uppercase d-block fs-12 fw-semibold">Temel URL</span>
+                    <code class="d-inline-block text-break"><?= Helpers::sanitize($apiBaseUrl) ?></code>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="apiKeyField">API Anahtarı</label>
+                    <div class="input-group">
+                        <input type="text" id="apiKeyField" class="form-control" value="<?= Helpers::sanitize(isset($user['api_key']) ? $user['api_key'] : '') ?>" readonly>
+                        <button type="button" class="btn btn-outline-secondary" id="copyApiKeyButton" <?= $hasApiKey ? '' : 'disabled' ?>>Kopyala</button>
+                    </div>
+                    <small class="text-muted d-block">Anahtarı güvenli bir yerde saklayın ve üçüncü kişilerle paylaşmayın.</small>
+                </div>
+
+                <div class="d-flex flex-column flex-md-row gap-2 justify-content-between align-items-md-center">
+                    <a class="btn btn-link px-0" href="<?= Helpers::sanitize($apiDocsUrl) ?>" target="_blank" rel="noopener">API Dokümantasyonu</a>
+                    <form method="post" class="text-md-end">
+                        <input type="hidden" name="csrf_token" value="<?= Helpers::sanitize(Helpers::csrfToken()) ?>">
+                        <input type="hidden" name="action" value="api-key">
+                        <button type="submit" class="btn btn-outline-primary"><?= Helpers::sanitize($hasApiKey ? 'API Anahtarını Yenile' : 'API Anahtarı Oluştur') ?></button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-white">
                 <h5 class="mb-0">Telegram Bildirimleri</h5>
                 <small class="text-muted">Telegram üzerinden hangi bildirimleri almak istediğinizi seçin.</small>
@@ -329,78 +349,44 @@ include __DIR__ . '/templates/header.php';
                 </form>
             </div>
         </div>
-    </div>
-    <div class="col-12 col-lg-6">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <div>
-                    <h5 class="mb-0">API Erişimi</h5>
-                    <small class="text-muted">Tüm platformlardan sipariş, bakiye ve bildirim entegrasyonları için REST API bilgileri.</small>
-                </div>
-                <form method="post">
-                    <input type="hidden" name="csrf_token" value="<?= Helpers::sanitize(Helpers::csrfToken()) ?>">
-                    <input type="hidden" name="action" value="regenerate_token">
-                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Yeni bir API anahtarı oluşturmak istediğinize emin misiniz? Mevcut anahtar kullanım dışı kalacaktır.');">Anahtarı Yenile</button>
-                </form>
-            </div>
-            <div class="card-body">
-                <?php if ($displayToken !== ''): ?>
-                    <div class="alert alert-warning">
-                        <strong>Yeni API Anahtarı:</strong>
-                        <div class="mt-2"><code><?= Helpers::sanitize($displayToken) ?></code></div>
-                        <p class="mb-0 small text-muted">Bu anahtar yalnızca bir kez gösterilir. Lütfen güvenli bir yerde saklayın.</p>
-                    </div>
-                <?php endif; ?>
 
-                <?php if ($activeToken): ?>
-                    <div class="mb-4">
-                        <label class="form-label">API Temel URL</label>
-                        <div class="input-group">
-                            <input type="text" class="form-control" value="<?= Helpers::sanitize(Helpers::apiBaseUrl()) ?>" readonly>
-                            <button type="button" class="btn btn-outline-secondary" onclick="navigator.clipboard.writeText('<?= Helpers::sanitize(Helpers::apiBaseUrl()) ?>'); this.textContent='Kopyalandı'; setTimeout(()=>{this.textContent='Kopyala';},2000);">Kopyala</button>
-                        </div>
-                        <small class="text-muted d-block mt-2">Tüm uç noktalar bu adres ile başlar (örneğin <code>/orders</code>, <code>/products</code>).</small>
-                    </div>
-
-                    <div class="mb-4">
-                        <label class="form-label">Aktif API Anahtarı</label>
-                        <div class="input-group">
-                            <input type="text" class="form-control" value="<?= Helpers::sanitize($activeToken['token']) ?>" readonly>
-                            <button type="button" class="btn btn-outline-secondary" onclick="navigator.clipboard.writeText('<?= Helpers::sanitize($activeToken['token']) ?>'); this.textContent='Kopyalandı'; setTimeout(()=>{this.textContent='Kopyala';},2000);">Kopyala</button>
-                        </div>
-                        <?php if (!empty($activeToken['last_used_at'])): ?>
-                            <small class="text-muted d-block mt-2">Son kullanım: <?= date('d.m.Y H:i', strtotime($activeToken['last_used_at'])) ?></small>
-                        <?php endif; ?>
-                    </div>
-
-                    <div class="mb-4">
-                        <label class="form-label">Webhook Adresi</label>
-                        <form method="post" class="d-flex gap-2 flex-column flex-lg-row">
-                            <input type="hidden" name="csrf_token" value="<?= Helpers::sanitize(Helpers::csrfToken()) ?>">
-                            <input type="hidden" name="action" value="webhook">
-                            <input type="url" name="webhook_url" class="form-control" placeholder="https://ornek.com/webhooks/reseller-status" value="<?= Helpers::sanitize(isset($activeToken['webhook_url']) ? $activeToken['webhook_url'] : '') ?>">
-                            <button type="submit" class="btn btn-outline-primary">Kaydet</button>
-                        </form>
-                        <small class="text-muted">Sipariş durumu, bakiye ve stok bildirimleri bu adrese JSON formatında iletilir.</small>
-                    </div>
-
-                    <div class="border rounded p-3 bg-light">
-                        <h6>Entegrasyon İpuçları</h6>
-                        <ul class="small mb-3">
-                            <li>Yetkilendirme: <code>Authorization: Bearer <?= Helpers::sanitize($activeToken['token']) ?></code> veya <code>X-API-Key</code> başlığını kullanın.</li>
-                            <li>API Dökümanı: <a href="/api/v1/" target="_blank" rel="noopener">JSON uç noktalarını görüntüleyin</a> veya Postman koleksiyonunu indirin.</li>
-                            <li>Sandbox: Gerçek bakiye harcamadan test etmek için <strong>"test"</strong> parametresini kullanabilirsiniz.</li>
-                        </ul>
-                        <pre class="bg-dark text-white p-3 rounded small mb-0"><code>curl -X POST "<?= Helpers::sanitize(Helpers::apiBaseUrl()) ?>/orders"
-  -H "Authorization: Bearer <?= Helpers::sanitize($activeToken['token']) ?>"
-  -H "Content-Type: application/json"
-  -d '{"order_id":"EX-1001","items":[{"sku":"SKU-001","quantity":1}]}'</code></pre>
-                    </div>
-                <?php else: ?>
-                    <p class="text-muted mb-0">API anahtarınız oluşturulamadı. Lütfen daha sonra tekrar deneyin veya destek ekibine ulaşın.</p>
-                <?php endif; ?>
-            </div>
-        </div>
     </div>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var copyButton = document.getElementById('copyApiKeyButton');
+    if (!copyButton) {
+        return;
+    }
+
+    copyButton.addEventListener('click', function () {
+        var input = document.getElementById('apiKeyField');
+        if (!input || !input.value) {
+            return;
+        }
+
+        var originalText = copyButton.innerText;
+        var fallbackCopy = function () {
+            input.focus();
+            input.select();
+            document.execCommand('copy');
+            copyButton.innerText = 'Kopyalandı';
+            setTimeout(function () {
+                copyButton.innerText = originalText;
+            }, 2000);
+        };
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(input.value).then(function () {
+                copyButton.innerText = 'Kopyalandı';
+                setTimeout(function () {
+                    copyButton.innerText = originalText;
+                }, 2000);
+            }).catch(fallbackCopy);
+        } else {
+            fallbackCopy();
+        }
+    });
+});
+</script>
 <?php include __DIR__ . '/templates/footer.php';
