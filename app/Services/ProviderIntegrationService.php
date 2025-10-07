@@ -1,8 +1,7 @@
 <?php
 
 namespace App\Services;
-use GuzzleHttp\Client;
-use GuzzleHttp\Exception\GuzzleException;
+
 use PDO;
 use PDOException;
 
@@ -93,38 +92,12 @@ class ProviderIntegrationService
      */
     public function testConnection(array $provider): array
     {
-        $client = $this->createHttpClient($provider);
 
-        try {
-            $response = $client->get('api/user', array(
-                'headers' => $this->buildAuthHeaders($provider),
-                'query' => array('apikey' => $provider['api_key']),
-                'http_errors' => false,
-            ));
-            $statusCode = $response->getStatusCode();
-            $body = (string) $response->getBody();
-            $data = json_decode($body, true);
-
-            $message = $statusCode === 200 ? 'API bağlantısı başarılı.' : sprintf('API bağlantısı başarısız (HTTP %d).', $statusCode);
-
-            $this->storeTestResult((int) $provider['id'], $statusCode, $body);
-
-            return array(
-                'success' => $statusCode === 200,
-                'status' => $statusCode,
-                'message' => $message,
-                'data' => is_array($data) ? $data : array(),
-            );
-        } catch (GuzzleException $exception) {
-            $this->storeTestResult((int) $provider['id'], 0, $exception->getMessage());
 
             return array(
                 'success' => false,
                 'status' => 0,
-                'message' => 'API isteği gönderilemedi: ' . $exception->getMessage(),
-                'data' => array(),
-            );
-        }
+
     }
 
     /**
@@ -133,59 +106,7 @@ class ProviderIntegrationService
      */
     public function fetchProducts(array $provider)
     {
-        $client = $this->createHttpClient($provider);
 
-        try {
-            $response = $client->get('api/products', array(
-                'headers' => $this->buildAuthHeaders($provider),
-                'query' => array('apikey' => $provider['api_key']),
-                'http_errors' => false,
-            ));
-            $statusCode = $response->getStatusCode();
-            $body = (string) $response->getBody();
-            $json = json_decode($body, true);
-
-            if ($statusCode !== 200 || !is_array($json)) {
-                return array(
-                    'success' => false,
-                    'status' => $statusCode,
-                    'message' => $statusCode === 0 ? 'API yanıtı alınamadı.' : sprintf('Beklenmeyen yanıt (HTTP %d).', $statusCode),
-                    'data' => array(),
-                );
-            }
-
-            $items = array();
-            if (isset($json['data']) && is_array($json['data'])) {
-                foreach ($json['data'] as $product) {
-                    if (!is_array($product)) {
-                        continue;
-                    }
-
-                    $items[] = array(
-                        'id' => isset($product['id']) ? (string) $product['id'] : '',
-                        'title' => isset($product['title']) ? (string) $product['title'] : '',
-                        'content' => isset($product['content']) ? (string) $product['content'] : '',
-                        'amount' => isset($product['amount']) ? (string) $product['amount'] : '0',
-                        'stock' => isset($product['stock']) ? (int) $product['stock'] : 0,
-                        'available' => isset($product['available']) ? (bool) $product['available'] : false,
-                    );
-                }
-            }
-
-            return array(
-                'success' => (bool)($json['success'] ?? false),
-                'status' => $statusCode,
-                'message' => isset($json['message']) ? (string) $json['message'] : 'Ürünler alındı.',
-                'data' => $items,
-            );
-        } catch (GuzzleException $exception) {
-            return array(
-                'success' => false,
-                'status' => 0,
-                'message' => 'Ürün listesi alınamadı: ' . $exception->getMessage(),
-                'data' => array(),
-            );
-        }
     }
 
     /**
@@ -220,7 +141,7 @@ class ProviderIntegrationService
         ));
     }
 
-    private function createHttpClient(array $provider): Client
+
     {
         $baseUrl = isset($provider['base_url']) ? (string) $provider['base_url'] : '';
         $baseUrl = trim($baseUrl);
@@ -231,11 +152,6 @@ class ProviderIntegrationService
 
         $baseUrl = rtrim($baseUrl, '/') . '/';
 
-        return new Client(array(
-            'base_uri' => $baseUrl,
-            'timeout' => 15,
-            'verify' => false,
-        ));
     }
 
     /**
@@ -248,6 +164,7 @@ class ProviderIntegrationService
         return array(
             'Accept' => 'application/json',
             'X-API-Key' => $apiKey,
+
         );
     }
 
