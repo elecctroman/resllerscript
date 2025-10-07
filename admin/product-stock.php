@@ -213,8 +213,19 @@ if ($productId > 0) {
                                 <tbody>
                                 <?php foreach ($items as $item): ?>
                                     <tr>
-                                        <td><?= (int) $item['id'] ?></td>
-                                        <td class="font-monospace small"><?= nl2br(Helpers::sanitize($item['content'])) ?></td>
+                                        <td>
+                                            <?php if (isset($item['id'])): ?>
+                                                <?= (int) $item['id'] ?>
+                                            <?php else: ?>
+                                                -
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="font-monospace small">
+                                            <?php
+                                            $content = isset($item['content']) ? (string) $item['content'] : '';
+                                            echo nl2br(Helpers::sanitize($content));
+                                            ?>
+                                        </td>
                                         <td>
                                             <?php
                                             $badgeMap = array(
