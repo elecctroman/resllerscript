@@ -6,6 +6,68 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
 
+if (!defined('APP_ERROR_LOG_INITIALIZED')) {
+    $logDirectory = $rootPath . '/admin';
+    $logFile = $logDirectory . '/error.log';
+
+    if (!defined('APP_ERROR_LOG_PATH')) {
+        define('APP_ERROR_LOG_PATH', $logFile);
+    }
+
+    if (!is_dir($logDirectory)) {
+        @mkdir($logDirectory, 0775, true);
+    }
+
+    if (!is_file($logFile)) {
+        @touch($logFile);
+        if (is_file($logFile)) {
+            @chmod($logFile, 0664);
+        }
+    }
+
+    if (is_writable($logFile) || is_writable($logDirectory)) {
+        error_reporting(E_ALL);
+        ini_set('display_errors', '0');
+        ini_set('log_errors', '1');
+        ini_set('error_log', $logFile);
+
+        $formatter = static function (string $type, string $message, ?string $file = null, ?int $line = null): string {
+            $timestamp = date('Y-m-d H:i:s');
+            $location = '';
+            if ($file !== null) {
+                $location = ' in ' . $file;
+                if ($line !== null) {
+                    $location .= ':' . $line;
+                }
+            }
+
+            return sprintf('[%s] %s: %s%s', $timestamp, $type, $message, $location);
+        };
+
+        set_error_handler(static function (int $severity, string $message, ?string $file = null, ?int $line = null) use ($formatter): bool {
+            if (!(error_reporting() & $severity)) {
+                return false;
+            }
+
+            error_log($formatter('PHP Error', $message, $file, $line));
+            return false;
+        });
+
+        set_exception_handler(static function (Throwable $throwable) use ($formatter): void {
+            error_log($formatter('Uncaught Exception', $throwable->getMessage(), $throwable->getFile(), $throwable->getLine()));
+        });
+
+        register_shutdown_function(static function () use ($formatter): void {
+            $error = error_get_last();
+            if ($error !== null) {
+                error_log($formatter('Shutdown Error', (string) $error['message'], $error['file'], (int) $error['line']));
+            }
+        });
+
+        define('APP_ERROR_LOG_INITIALIZED', true);
+    }
+}
+
 $forwardedScheme = null;
 if (isset($_SERVER['HTTP_CF_VISITOR'])) {
     $visitorMeta = json_decode((string)$_SERVER['HTTP_CF_VISITOR'], true);
