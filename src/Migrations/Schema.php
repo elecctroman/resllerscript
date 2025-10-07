@@ -23,6 +23,8 @@ final class Schema
         self::ensureProductsTable($pdo);
         self::ensureProductStockTable($pdo);
         self::ensureProductOrdersTable($pdo);
+        self::ensureExternalProvidersTable($pdo);
+        self::ensureExternalProviderProductsTable($pdo);
         self::ensureResellerFavoritesTable($pdo);
         self::ensureStockWatchersTable($pdo);
         self::ensureAutoTopupTable($pdo);
@@ -201,6 +203,44 @@ final class Schema
         self::addIndex($pdo, 'product_orders', 'idx_product_orders_user_created', 'ADD INDEX idx_product_orders_user_created (user_id, created_at)');
         self::addIndex($pdo, 'product_orders', 'idx_product_orders_status', 'ADD INDEX idx_product_orders_status (status)');
         self::addIndex($pdo, 'product_orders', 'idx_product_orders_external', 'ADD INDEX idx_product_orders_external (external_reference)');
+    }
+
+    private static function ensureExternalProvidersTable(PDO $pdo): void
+    {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS external_providers (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(150) NOT NULL,
+            base_url VARCHAR(255) NOT NULL,
+            api_key VARCHAR(191) NOT NULL,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            last_tested_at DATETIME NULL,
+            last_test_response TEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        self::ensureColumn($pdo, 'external_providers', 'is_active', 'TINYINT(1) NOT NULL DEFAULT 1');
+        self::ensureColumn($pdo, 'external_providers', 'last_tested_at', 'DATETIME NULL');
+        self::ensureColumn($pdo, 'external_providers', 'last_test_response', 'TEXT NULL');
+    }
+
+    private static function ensureExternalProviderProductsTable(PDO $pdo): void
+    {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS external_provider_products (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            provider_id INT NOT NULL,
+            provider_product_id VARCHAR(100) NOT NULL,
+            product_id INT NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_external_provider_product (provider_id, provider_product_id),
+            UNIQUE KEY uniq_external_provider_local (product_id),
+            CONSTRAINT fk_external_provider_product_provider FOREIGN KEY (provider_id) REFERENCES external_providers(id) ON DELETE CASCADE,
+            CONSTRAINT fk_external_provider_product_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        self::addIndex($pdo, 'external_provider_products', 'uniq_external_provider_product', 'ADD UNIQUE INDEX uniq_external_provider_product (provider_id, provider_product_id)');
+        self::addIndex($pdo, 'external_provider_products', 'uniq_external_provider_local', 'ADD UNIQUE INDEX uniq_external_provider_local (product_id)');
     }
 
     private static function ensureResellerFavoritesTable(PDO $pdo): void
