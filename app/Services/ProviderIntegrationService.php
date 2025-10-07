@@ -21,6 +21,7 @@ class ProviderIntegrationService
     public function listProviders(): array
     {
 
+
         return $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : array();
     }
 
@@ -78,7 +79,6 @@ class ProviderIntegrationService
     public function testConnection(array $provider): array
     {
 
-
             return array(
                 'success' => false,
                 'status' => 0,
@@ -115,6 +115,7 @@ class ProviderIntegrationService
     public function saveMapping(int $providerId, string $remoteProductId, int $productId): void
     {
 
+
         $baseUrl = isset($provider['base_url']) ? (string) $provider['base_url'] : '';
         $baseUrl = trim($baseUrl);
 
@@ -143,6 +144,7 @@ class ProviderIntegrationService
     private function storeTestResult(int $providerId, int $status, string $response): void
     {
 
+
         try {
             $stmt = $this->pdo->prepare('UPDATE external_providers SET last_tested_at = NOW(), last_test_response = :response, updated_at = NOW() WHERE id = :id');
             $stmt->execute(array(
@@ -153,5 +155,6 @@ class ProviderIntegrationService
             error_log('[ProviderIntegrationService] Test sonucu kaydedilemedi: ' . $exception->getMessage());
         }
     }
+
 
 }

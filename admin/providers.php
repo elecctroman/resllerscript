@@ -1,4 +1,5 @@
 <?php
+
 require __DIR__ . '/../bootstrap.php';
 
 use App\AuditLog;
@@ -9,9 +10,6 @@ use App\Services\ProviderIntegrationService;
 
 Auth::requireRoles(array('super_admin', 'admin'));
 
-$pdo = Database::connection();
-$service = new ProviderIntegrationService($pdo);
-$currentUser = $_SESSION['user'];
 
 $errors = array();
 $success = '';
@@ -19,203 +17,12 @@ $testResult = null;
 $productsFetchResult = null;
 
 
-$selectedProviderId = isset($_GET['provider_id']) ? (int) $_GET['provider_id'] : 0;
-
-if ($selectedProviderId === 0 && $providers) {
-    $selectedProviderId = (int) $providers[0]['id'];
-}
-
-$selectedProvider = $selectedProviderId ? $service->findProvider($selectedProviderId) : null;
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = isset($_POST['action']) ? (string) $_POST['action'] : '';
-    $token = isset($_POST['csrf_token']) ? (string) $_POST['csrf_token'] : '';
-
-    if (!Helpers::verifyCsrf($token)) {
-        $errors[] = 'Geçersiz istek. Lütfen sayfayı yenileyip tekrar deneyin.';
-    } else {
-        if ($action === 'create_provider') {
-            $name = isset($_POST['name']) ? trim((string) $_POST['name']) : '';
-            $baseUrl = isset($_POST['base_url']) ? trim((string) $_POST['base_url']) : '';
-            $apiKey = isset($_POST['api_key']) ? trim((string) $_POST['api_key']) : '';
-            $isActive = isset($_POST['is_active']);
-
-            if ($name === '' || $baseUrl === '' || $apiKey === '') {
-                $errors[] = 'Sağlayıcı adı, API adresi ve anahtar alanları zorunludur.';
-            }
-
-            if (!$errors) {
-                $providerId = $service->createProvider($name, $baseUrl, $apiKey, $isActive);
-
-            }
-        } elseif ($action === 'update_provider') {
-            $providerId = isset($_POST['provider_id']) ? (int) $_POST['provider_id'] : 0;
-            $name = isset($_POST['name']) ? trim((string) $_POST['name']) : '';
-            $baseUrl = isset($_POST['base_url']) ? trim((string) $_POST['base_url']) : '';
-            $apiKey = isset($_POST['api_key']) ? trim((string) $_POST['api_key']) : '';
-            $isActive = isset($_POST['is_active']);
-
-            if ($providerId <= 0 || !$service->findProvider($providerId)) {
-                $errors[] = 'Seçili sağlayıcı bulunamadı.';
-            }
-
-            if ($name === '' || $baseUrl === '' || $apiKey === '') {
-                $errors[] = 'Sağlayıcı adı, API adresi ve anahtar alanları zorunludur.';
-            }
-
-            if (!$errors) {
-
-            }
-        } elseif ($action === 'delete_provider') {
-            $providerId = isset($_POST['provider_id']) ? (int) $_POST['provider_id'] : 0;
-            if ($providerId > 0 && $service->findProvider($providerId)) {
-
-                }
-            }
-        } elseif ($action === 'test_provider') {
-            $providerId = isset($_POST['provider_id']) ? (int) $_POST['provider_id'] : 0;
-            if ($providerId > 0) {
-                $selectedProviderId = $providerId;
-                $selectedProvider = $service->findProvider($selectedProviderId);
-
-                if ($selectedProvider) {
-                    $testResult = $service->testConnection($selectedProvider);
-                    $success = $testResult['success'] ? 'API bağlantısı başarılı.' : $success;
-                    if (!$testResult['success']) {
-                        $errors[] = $testResult['message'];
-                    }
-                } else {
-                    $errors[] = 'Sağlayıcı bulunamadı.';
-                }
-            }
-        } elseif ($action === 'fetch_products') {
-            $providerId = isset($_POST['provider_id']) ? (int) $_POST['provider_id'] : 0;
-            if ($providerId > 0) {
-                $selectedProviderId = $providerId;
-                $selectedProvider = $service->findProvider($selectedProviderId);
-
-                if ($selectedProvider) {
-                    $productsFetchResult = $service->fetchProducts($selectedProvider);
-                    if (!$productsFetchResult['success']) {
-                        $errors[] = $productsFetchResult['message'];
-                    } else {
-                        $success = 'Ürün listesi güncellendi.';
-                    }
-                } else {
-                    $errors[] = 'Sağlayıcı bulunamadı.';
-                }
-            }
-        } elseif ($action === 'import_product') {
-            $providerId = isset($_POST['provider_id']) ? (int) $_POST['provider_id'] : 0;
-            $remoteProductId = isset($_POST['remote_product_id']) ? trim((string) $_POST['remote_product_id']) : '';
-            $name = isset($_POST['product_name']) ? trim((string) $_POST['product_name']) : '';
-            $description = isset($_POST['product_description']) ? trim((string) $_POST['product_description']) : '';
-            $remoteAmount = isset($_POST['remote_amount']) ? trim((string) $_POST['remote_amount']) : '';
-            $categoryId = isset($_POST['category_id']) ? (int) $_POST['category_id'] : 0;
-
-            $selectedProviderId = $providerId;
-            $selectedProvider = $providerId > 0 ? $service->findProvider($providerId) : null;
-
-
-            if (!$selectedProvider) {
-                $errors[] = 'Sağlayıcı bulunamadı.';
-            }
-
-            $costSanitized = preg_replace('/[^0-9.,-]/', '', $remoteAmount);
-            $costSanitized = str_replace(',', '.', (string) $costSanitized);
-            $costPrice = $costSanitized !== '' ? (float) $costSanitized : 0.0;
-
-            if ($remoteProductId === '' || $name === '' || $categoryId <= 0 || $costPrice <= 0) {
-                $errors[] = 'Ürün adı, fiyatı ve kategori seçimi zorunludur.';
-            }
-
-            if (!$errors && $selectedProvider) {
-                $salePrice = Helpers::priceFromCostTry($costPrice);
-
-                $mapping = $service->findMapping($providerId, $remoteProductId);
-                $skuSuffix = preg_replace('/[^A-Za-z0-9_-]/', '', $remoteProductId);
-                if ($skuSuffix === '') {
-                    $skuSuffix = (string) $remoteProductId;
-                }
-                $sku = substr('EXT-' . $providerId . '-' . $skuSuffix, 0, 150);
-
-                if ($mapping) {
-                    $productId = (int) $mapping['product_id'];
-                    $stmt = $pdo->prepare('UPDATE products SET name = :name, category_id = :category_id, cost_price_try = :cost_price_try, price = :price, description = :description, updated_at = NOW() WHERE id = :id');
-                    $stmt->execute(array(
-                        'id' => $productId,
-                        'name' => $name,
-                        'category_id' => $categoryId,
-                        'cost_price_try' => $costPrice,
-                        'price' => $salePrice,
-                        'description' => $description !== '' ? $description : null,
-                    ));
-
-                    $service->saveMapping($providerId, $remoteProductId, $productId);
-                    $success = 'Ürün güncellendi.';
-
-                    AuditLog::record(
-                        $currentUser['id'],
-                        'provider.product_update',
-                        'product',
-                        $productId,
-                        sprintf('Sağlayıcı ürünü güncellendi: %s', $name)
-                    );
-                } else {
-                    $stmt = $pdo->prepare('INSERT INTO products (name, category_id, cost_price_try, price, description, sku, status, automatic_delivery, created_at) VALUES (:name, :category_id, :cost_price_try, :price, :description, :sku, :status, :automatic_delivery, NOW())');
-                    $stmt->execute(array(
-                        'name' => $name,
-                        'category_id' => $categoryId,
-                        'cost_price_try' => $costPrice,
-                        'price' => $salePrice,
-                        'description' => $description !== '' ? $description : null,
-                        'sku' => $sku,
-                        'status' => 'active',
-                        'automatic_delivery' => 0,
-                    ));
-
-                    $productId = (int) $pdo->lastInsertId();
-                    $service->saveMapping($providerId, $remoteProductId, $productId);
-                    $success = 'Ürün içe aktarıldı.';
-
-                    AuditLog::record(
-                        $currentUser['id'],
-                        'provider.product_import',
-                        'product',
-                        $productId,
-                        sprintf('Sağlayıcıdan ürün içe aktarıldı: %s', $name)
-                    );
-                }
-
-                $productsFetchResult = $service->fetchProducts($selectedProvider);
-            }
-        }
-    }
-}
-
-if (!$providers) {
-    $providers = $service->listProviders();
-
-}
-
-if (!$selectedProvider && $selectedProviderId) {
-    $selectedProvider = $service->findProvider($selectedProviderId);
-
-}
-
-$categories = array();
-try {
-    $stmt = $pdo->query('SELECT id, name FROM categories ORDER BY name ASC');
-    if ($stmt) {
-        $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-} catch (\Throwable $exception) {
-    $categories = array();
 }
 
 $pageTitle = 'Sağlayıcılar';
 include __DIR__ . '/../templates/header.php';
 ?>
+
 
 <div class="row g-4">
     <div class="col-lg-4">
