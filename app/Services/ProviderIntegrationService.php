@@ -2,16 +2,17 @@
 
 namespace App\Services;
 
-use PDO;
-use PDOException;
+
 
 class ProviderIntegrationService
 {
     private PDO $pdo;
 
+
     public function __construct(PDO $pdo)
     {
         $this->pdo = $pdo;
+
     }
 
     /**
@@ -19,7 +20,7 @@ class ProviderIntegrationService
      */
     public function listProviders(): array
     {
-        $stmt = $this->pdo->query('SELECT * FROM external_providers ORDER BY name ASC');
+
         return $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : array();
     }
 
@@ -29,9 +30,7 @@ class ProviderIntegrationService
      */
     public function findProvider(int $id): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT * FROM external_providers WHERE id = :id');
-        $stmt->execute(array('id' => $id));
-        $provider = $stmt->fetch(PDO::FETCH_ASSOC);
+
 
         return $provider ?: null;
     }
@@ -45,13 +44,7 @@ class ProviderIntegrationService
      */
     public function createProvider(string $name, string $baseUrl, string $apiKey, bool $isActive): int
     {
-        $stmt = $this->pdo->prepare('INSERT INTO external_providers (name, base_url, api_key, is_active, created_at) VALUES (:name, :base_url, :api_key, :is_active, NOW())');
-        $stmt->execute(array(
-            'name' => $name,
-            'base_url' => $baseUrl,
-            'api_key' => $apiKey,
-            'is_active' => $isActive ? 1 : 0,
-        ));
+
 
         return (int) $this->pdo->lastInsertId();
     }
@@ -66,14 +59,7 @@ class ProviderIntegrationService
      */
     public function updateProvider(int $id, string $name, string $baseUrl, string $apiKey, bool $isActive): bool
     {
-        $stmt = $this->pdo->prepare('UPDATE external_providers SET name = :name, base_url = :base_url, api_key = :api_key, is_active = :is_active, updated_at = NOW() WHERE id = :id');
-        return $stmt->execute(array(
-            'id' => $id,
-            'name' => $name,
-            'base_url' => $baseUrl,
-            'api_key' => $apiKey,
-            'is_active' => $isActive ? 1 : 0,
-        ));
+
     }
 
     /**
@@ -82,8 +68,7 @@ class ProviderIntegrationService
      */
     public function deleteProvider(int $id): bool
     {
-        $stmt = $this->pdo->prepare('DELETE FROM external_providers WHERE id = :id');
-        return $stmt->execute(array('id' => $id));
+
     }
 
     /**
@@ -116,10 +101,7 @@ class ProviderIntegrationService
      */
     public function findMapping(int $providerId, string $remoteProductId): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT * FROM external_provider_products WHERE provider_id = :provider_id AND provider_product_id = :remote_id');
-        $stmt->execute(array('provider_id' => $providerId, 'remote_id' => $remoteProductId));
 
-        $mapping = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return $mapping ?: null;
     }
@@ -132,17 +114,7 @@ class ProviderIntegrationService
      */
     public function saveMapping(int $providerId, string $remoteProductId, int $productId): void
     {
-        $stmt = $this->pdo->prepare('INSERT INTO external_provider_products (provider_id, provider_product_id, product_id, created_at, updated_at) VALUES (:provider_id, :remote_id, :product_id, NOW(), NOW())
-            ON DUPLICATE KEY UPDATE product_id = VALUES(product_id), updated_at = NOW()');
-        $stmt->execute(array(
-            'provider_id' => $providerId,
-            'remote_id' => $remoteProductId,
-            'product_id' => $productId,
-        ));
-    }
 
-
-    {
         $baseUrl = isset($provider['base_url']) ? (string) $provider['base_url'] : '';
         $baseUrl = trim($baseUrl);
 
@@ -170,14 +142,16 @@ class ProviderIntegrationService
 
     private function storeTestResult(int $providerId, int $status, string $response): void
     {
+
         try {
             $stmt = $this->pdo->prepare('UPDATE external_providers SET last_tested_at = NOW(), last_test_response = :response, updated_at = NOW() WHERE id = :id');
             $stmt->execute(array(
                 'id' => $providerId,
-                'response' => $response !== '' ? mb_substr($response, 0, 1000) : null,
+
             ));
         } catch (PDOException $exception) {
             error_log('[ProviderIntegrationService] Test sonucu kaydedilemedi: ' . $exception->getMessage());
         }
     }
+
 }

@@ -18,7 +18,7 @@ $success = '';
 $testResult = null;
 $productsFetchResult = null;
 
-$providers = $service->listProviders();
+
 $selectedProviderId = isset($_GET['provider_id']) ? (int) $_GET['provider_id'] : 0;
 
 if ($selectedProviderId === 0 && $providers) {
@@ -46,18 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if (!$errors) {
                 $providerId = $service->createProvider($name, $baseUrl, $apiKey, $isActive);
-                $success = 'Sağlayıcı eklendi.';
-                AuditLog::record(
-                    $currentUser['id'],
-                    'provider.create',
-                    'external_provider',
-                    $providerId,
-                    sprintf('Yeni sağlayıcı eklendi: %s', $name)
-                );
 
-                $selectedProviderId = $providerId;
-                $selectedProvider = $service->findProvider($selectedProviderId);
-                $providers = $service->listProviders();
             }
         } elseif ($action === 'update_provider') {
             $providerId = isset($_POST['provider_id']) ? (int) $_POST['provider_id'] : 0;
@@ -75,36 +64,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             if (!$errors) {
-                $service->updateProvider($providerId, $name, $baseUrl, $apiKey, $isActive);
-                $success = 'Sağlayıcı güncellendi.';
-                AuditLog::record(
-                    $currentUser['id'],
-                    'provider.update',
-                    'external_provider',
-                    $providerId,
-                    sprintf('Sağlayıcı güncellendi: %s', $name)
-                );
 
-                $selectedProviderId = $providerId;
-                $selectedProvider = $service->findProvider($selectedProviderId);
-                $providers = $service->listProviders();
             }
         } elseif ($action === 'delete_provider') {
             $providerId = isset($_POST['provider_id']) ? (int) $_POST['provider_id'] : 0;
             if ($providerId > 0 && $service->findProvider($providerId)) {
-                $service->deleteProvider($providerId);
-                $success = 'Sağlayıcı silindi.';
-                AuditLog::record(
-                    $currentUser['id'],
-                    'provider.delete',
-                    'external_provider',
-                    $providerId,
-                    sprintf('Sağlayıcı silindi: #%d', $providerId)
-                );
-                $providers = $service->listProviders();
-                if ($selectedProviderId === $providerId) {
-                    $selectedProviderId = $providers ? (int) $providers[0]['id'] : 0;
-                    $selectedProvider = $selectedProviderId ? $service->findProvider($selectedProviderId) : null;
+
                 }
             }
         } elseif ($action === 'test_provider') {
@@ -112,6 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($providerId > 0) {
                 $selectedProviderId = $providerId;
                 $selectedProvider = $service->findProvider($selectedProviderId);
+
                 if ($selectedProvider) {
                     $testResult = $service->testConnection($selectedProvider);
                     $success = $testResult['success'] ? 'API bağlantısı başarılı.' : $success;
@@ -127,6 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($providerId > 0) {
                 $selectedProviderId = $providerId;
                 $selectedProvider = $service->findProvider($selectedProviderId);
+
                 if ($selectedProvider) {
                     $productsFetchResult = $service->fetchProducts($selectedProvider);
                     if (!$productsFetchResult['success']) {
@@ -148,6 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $selectedProviderId = $providerId;
             $selectedProvider = $providerId > 0 ? $service->findProvider($providerId) : null;
+
 
             if (!$selectedProvider) {
                 $errors[] = 'Sağlayıcı bulunamadı.';
@@ -227,10 +195,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 if (!$providers) {
     $providers = $service->listProviders();
+
 }
 
 if (!$selectedProvider && $selectedProviderId) {
     $selectedProvider = $service->findProvider($selectedProviderId);
+
 }
 
 $categories = array();
@@ -246,6 +216,7 @@ try {
 $pageTitle = 'Sağlayıcılar';
 include __DIR__ . '/../templates/header.php';
 ?>
+
 <div class="row g-4">
     <div class="col-lg-4">
         <div class="card border-0 shadow-sm mb-4">
@@ -411,7 +382,7 @@ include __DIR__ . '/../templates/header.php';
                                             <td>
                                                 <strong><?= Helpers::sanitize($remoteProduct['title']) ?></strong>
                                                 <?php if (!empty($remoteProduct['content'])): ?>
-                                                    <p class="small text-muted mb-0"><?= nl2br(Helpers::sanitize(mb_strimwidth($remoteProduct['content'], 0, 180, '…', 'UTF-8'))) ?></p>
+
                                                 <?php endif; ?>
                                             </td>
                                             <td><?= Helpers::sanitize($remoteProduct['amount']) ?></td>
