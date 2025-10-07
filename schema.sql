@@ -172,6 +172,31 @@ CREATE TABLE IF NOT EXISTS product_orders (
     INDEX idx_product_orders_external (external_reference)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS external_providers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    base_url VARCHAR(255) NOT NULL,
+    api_key VARCHAR(191) NOT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    last_tested_at DATETIME NULL,
+    last_test_response TEXT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS external_provider_products (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    provider_id INT NOT NULL,
+    provider_product_id VARCHAR(100) NOT NULL,
+    product_id INT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_external_provider_product (provider_id, provider_product_id),
+    UNIQUE KEY uniq_external_provider_local (product_id),
+    CONSTRAINT fk_external_provider_product_provider FOREIGN KEY (provider_id) REFERENCES external_providers(id) ON DELETE CASCADE,
+    CONSTRAINT fk_external_provider_product_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS support_tickets (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,

@@ -21,3 +21,14 @@ Bu depo, ePin, lisans ve dijital hesap satış süreçlerini yönetmek için gel
 1. `composer install`
 2. `cp config/config.sample.php config/config.php` ve veritabanı bilgilerini güncelleyin.
 3. `php -S localhost:8000` ile yerel ortamda test edin.
+
+## Sağlayıcı Entegrasyonu
+
+Admin panelinde **Ürün & Stok → Sağlayıcılar** bölümünü kullanarak Lotus Lisans API bilgilerinizi kaydedebilir, bağlantı testi yapabilir ve sağlayıcı ürünlerini panelinize aktarabilirsiniz. Entegrasyon akışı şu adımlardan oluşur:
+
+1. Sağlayıcı adı, temel API adresi ve API anahtarını girerek kaydedin.
+2. "API Testi Yap" butonu ile bağlantıyı doğrulayın.
+3. "Ürünleri Getir" seçeneği ile sağlayıcı kataloğunu listeleyin.
+4. Her bir ürün için kategori seçerek "İçe Aktar" butonu ile ürünü sitenize ekleyin veya güncelleyin.
+
+Postman üzerinden hızlı testler yapmak için `integrations/postman/lotus-provider.postman_collection.json` koleksiyonunu içeri aktarabilirsiniz. Koleksiyonda kullanıcı bilgisi, ürün listesi ve sipariş oluşturma uç noktaları örnek olarak yapılandırılmıştır.
