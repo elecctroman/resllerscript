@@ -100,3 +100,22 @@ if (class_exists(App\Migrations\Schema::class)) {
         error_log('[Bootstrap] Şema güncellenemedi: ' . $schemaException->getMessage());
     }
 }
+
+if (!empty($_SESSION['user']) && isset($_SESSION['user']['id'])) {
+    try {
+        $pdo = App\Database::connection();
+        if ($pdo) {
+            $stmt = $pdo->prepare('SELECT * FROM users WHERE id = :id LIMIT 1');
+            $stmt->execute(array('id' => (int) $_SESSION['user']['id']));
+            $freshUser = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+            if ($freshUser) {
+                $_SESSION['user'] = array_merge($_SESSION['user'], $freshUser);
+            } else {
+                unset($_SESSION['user']);
+            }
+        }
+    } catch (\Throwable $refreshException) {
+        error_log('[Bootstrap] Oturum kullanıcısı yenilenemedi: ' . $refreshException->getMessage());
+    }
+}
