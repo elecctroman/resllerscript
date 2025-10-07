@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+<?php
 
 $rootPath = __DIR__;
 
@@ -31,7 +31,7 @@ if (!defined('APP_ERROR_LOG_INITIALIZED')) {
         ini_set('log_errors', '1');
         ini_set('error_log', $logFile);
 
-        $formatter = static function (string $type, string $message, ?string $file = null, ?int $line = null): string {
+
             $timestamp = date('Y-m-d H:i:s');
             $location = '';
             if ($file !== null) {
@@ -44,7 +44,7 @@ if (!defined('APP_ERROR_LOG_INITIALIZED')) {
             return sprintf('[%s] %s: %s%s', $timestamp, $type, $message, $location);
         };
 
-        set_error_handler(static function (int $severity, string $message, ?string $file = null, ?int $line = null) use ($formatter): bool {
+
             if (!(error_reporting() & $severity)) {
                 return false;
             }
@@ -53,11 +53,7 @@ if (!defined('APP_ERROR_LOG_INITIALIZED')) {
             return false;
         });
 
-        set_exception_handler(static function (Throwable $throwable) use ($formatter): void {
-            error_log($formatter('Uncaught Exception', $throwable->getMessage(), $throwable->getFile(), $throwable->getLine()));
-        });
 
-        register_shutdown_function(static function () use ($formatter): void {
             $error = error_get_last();
             if ($error !== null) {
                 error_log($formatter('Shutdown Error', (string) $error['message'], $error['file'], (int) $error['line']));
@@ -92,7 +88,7 @@ if (is_file($composerAutoload)) {
     require_once $composerAutoload;
 }
 
-spl_autoload_register(static function ($class) use ($rootPath): void {
+spl_autoload_register(static function ($class) use ($rootPath) {
     $prefix = 'App\\';
     $length = strlen($prefix);
 
@@ -117,13 +113,21 @@ spl_autoload_register(static function ($class) use ($rootPath): void {
 });
 
 if (!function_exists('envStr')) {
-    function envStr(string $key, ?string $default = null): ?string
+    function envStr($key, $default = null)
     {
-        return $_ENV[$key] ?? $_SERVER[$key] ?? $default;
+        if (isset($_ENV[$key])) {
+            return $_ENV[$key];
+        }
+
+        if (isset($_SERVER[$key])) {
+            return $_SERVER[$key];
+        }
+
+        return $default;
     }
 }
 
-if (class_exists(\Dotenv\Dotenv::class)) {
+if (class_exists('\\Dotenv\\Dotenv')) {
     \Dotenv\Dotenv::createImmutable($rootPath)->safeLoad();
 } elseif (is_file($rootPath . '/env.php')) {
     /** @noinspection PhpIncludeInspection */
@@ -150,7 +154,7 @@ if ($dbName !== '') {
             'user' => $dbUser,
             'password' => $dbPassword,
         ));
-    } catch (\Throwable $connectionException) {
+    } catch (Exception $connectionException) {
         error_log('[Bootstrap] Veritabanı bağlantısı kurulamadı: ' . $connectionException->getMessage());
     }
 }
@@ -158,7 +162,7 @@ if ($dbName !== '') {
 if (class_exists(App\Migrations\Schema::class)) {
     try {
         App\Migrations\Schema::ensure();
-    } catch (\Throwable $schemaException) {
+    } catch (Exception $schemaException) {
         error_log('[Bootstrap] Şema güncellenemedi: ' . $schemaException->getMessage());
     }
 }
@@ -177,7 +181,7 @@ if (!empty($_SESSION['user']) && isset($_SESSION['user']['id'])) {
                 unset($_SESSION['user']);
             }
         }
-    } catch (\Throwable $refreshException) {
+    } catch (Exception $refreshException) {
         error_log('[Bootstrap] Oturum kullanıcısı yenilenemedi: ' . $refreshException->getMessage());
     }
 }
