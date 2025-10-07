@@ -133,6 +133,7 @@ if ($user) {
                     array('label' => 'Raporlar', 'href' => '/admin/reports.php', 'pattern' => '/admin/reports.php', 'icon' => 'bi-graph-up', 'roles' => array('super_admin', 'admin', 'finance')),
                     array('label' => 'Paketler', 'href' => '/admin/packages.php', 'pattern' => '/admin/packages.php', 'icon' => 'bi-box-seam', 'roles' => array('super_admin', 'admin')),
                     array('label' => 'Bayiler', 'href' => '/admin/users.php', 'pattern' => '/admin/users.php', 'icon' => 'bi-people', 'roles' => array('super_admin', 'admin')),
+                    array('label' => 'Aktivite Kayıtları', 'href' => '/admin/activity-logs.php', 'pattern' => '/admin/activity-logs.php', 'icon' => 'bi-clipboard-data', 'roles' => array('super_admin', 'admin')),
                 ),
             ),
             array(
@@ -147,6 +148,7 @@ if ($user) {
                 'items' => array(
                     array('label' => 'Ürünler', 'href' => '/admin/products.php', 'pattern' => '/admin/products.php', 'icon' => 'bi-box', 'roles' => array('super_admin', 'admin', 'content')),
                     array('label' => 'Stok Yönetimi', 'href' => '/admin/product-stock.php', 'pattern' => '/admin/product-stock.php', 'icon' => 'bi-archive', 'roles' => array('super_admin', 'admin', 'content')),
+                    array('label' => 'Sağlayıcılar', 'href' => '/admin/providers.php', 'pattern' => '/admin/providers.php', 'icon' => 'bi-plug', 'roles' => array('super_admin', 'admin')),
                     array('label' => 'Kategoriler', 'href' => '/admin/categories.php', 'pattern' => '/admin/categories.php', 'icon' => 'bi-diagram-3', 'roles' => array('super_admin', 'admin', 'content')),
                 ),
             ),
@@ -179,12 +181,6 @@ if ($user) {
                     array('label' => 'Ödeme Methodları', 'href' => '/admin/settings-payments.php', 'pattern' => '/admin/settings-payments.php', 'icon' => 'bi-credit-card', 'roles' => array('super_admin', 'admin', 'finance')),
                     array('label' => 'Dil Yönetimi', 'href' => '/admin/languages.php', 'pattern' => '/admin/languages.php', 'icon' => 'bi-translate', 'roles' => array('super_admin', 'admin')),
                     array('label' => 'Telegram Ayarları', 'href' => '/admin/settings-telegram.php', 'pattern' => '/admin/settings-telegram.php', 'icon' => 'bi-telegram', 'roles' => array('super_admin', 'admin')),
-                ),
-            ),
-            array(
-                'heading' => 'Denetim',
-                'items' => array(
-                    array('label' => 'Aktivite Kayıtları', 'href' => '/admin/activity-logs.php', 'pattern' => '/admin/activity-logs.php', 'icon' => 'bi-clipboard-data', 'roles' => array('super_admin', 'admin')),
                 ),
             ),
         );
@@ -278,74 +274,81 @@ $userRoleLabel = $user ? Auth::roleLabel($user['role']) : '';
 <body>
 <div class="app-shell">
     <?php if ($user): ?>
-        <aside class="app-sidebar" id="appSidebar">
-            <div class="sidebar-brand">
-                <a href="<?= $isAdminArea ? '/admin/dashboard.php' : '/dashboard.php' ?>"><?= Helpers::sanitize($siteName) ?></a>
-                <?php if ($siteTagline): ?>
-                    <div class="sidebar-brand-tagline text-muted small"><?= Helpers::sanitize($siteTagline) ?></div>
-                <?php endif; ?>
-            </div>
-            <div class="sidebar-user d-flex align-items-center gap-3">
-                <span class="avatar-circle avatar-circle--sidebar fw-semibold flex-shrink-0"><?= Helpers::sanitize($avatarInitial) ?></span>
-                <div class="flex-grow-1">
-                    <div class="sidebar-user-name fw-semibold mb-1"><?= Helpers::sanitize($user['name']) ?></div>
-                    <div class="sidebar-user-role text-uppercase small mb-2"><?= Helpers::sanitize($userRoleLabel) ?></div>
-                    <?php if (Helpers::featureEnabled('balance')): ?>
-                        <div class="sidebar-user-balance small text-white-75">
-                            <?= Helpers::sanitize('Bakiye') ?>:
-                            <strong><?= Helpers::formatCurrencyHtml((float) $user['balance']) ?></strong>
+        <header class="app-navbar navbar navbar-expand-lg navbar-dark" id="appNavbar" role="banner">
+            <div class="container-fluid">
+                <a class="navbar-brand d-flex flex-column" href="<?= $isAdminArea ? '/admin/dashboard.php' : '/dashboard.php' ?>">
+                    <span class="navbar-brand-title"><?= Helpers::sanitize($siteName) ?></span>
+                    <?php if ($siteTagline): ?>
+                        <small class="navbar-brand-tagline text-white-50 fw-normal"><?= Helpers::sanitize($siteTagline) ?></small>
+                    <?php endif; ?>
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#appNavbarNav" aria-controls="appNavbarNav" aria-expanded="false" aria-label="<?= Helpers::sanitize('Menüyü Aç') ?>">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="appNavbarNav" role="navigation" aria-label="<?= Helpers::sanitize('Ana menü') ?>">
+                    <?php if ($menuSections): ?>
+                        <div class="navbar-menu-scroll flex-grow-1" tabindex="0">
+                            <ul class="navbar-nav flex-lg-wrap align-items-lg-center" role="menubar" aria-label="<?= Helpers::sanitize('Birincil menü') ?>">
+                                <?php foreach ($menuSections as $section): ?>
+                                    <?php
+                                    $sectionItems = $section['items'] ?? array();
+                                    $hasMultiple = count($sectionItems) > 1;
+                                    $sectionActive = false;
+                                    foreach ($sectionItems as $sectionItem) {
+                                        if (Helpers::isActive($sectionItem['pattern'])) {
+                                            $sectionActive = true;
+                                            break;
+                                        }
+                                    }
+                                    ?>
+                                    <?php if ($hasMultiple): ?>
+                                        <li class="nav-item dropdown" role="none">
+                                            <a class="nav-link dropdown-toggle<?= $sectionActive ? ' active' : '' ?>" href="#" id="dropdown-<?= md5($section['heading']) ?>" role="menuitem" data-bs-toggle="dropdown" data-bs-display="static" aria-haspopup="true" aria-expanded="false">
+                                                <span class="nav-link-text"><?= Helpers::sanitize($section['heading']) ?></span>
+                                            </a>
+                                            <ul class="dropdown-menu" aria-labelledby="dropdown-<?= md5($section['heading']) ?>" role="menu" aria-label="<?= Helpers::sanitize($section['heading']) ?>">
+                                                <?php foreach ($sectionItems as $navItem): ?>
+                                                    <?php $itemActive = Helpers::isActive($navItem['pattern']); ?>
+                                                    <li role="none">
+                                                        <a class="dropdown-item d-flex align-items-center gap-2<?= $itemActive ? ' active' : '' ?>" href="<?= $navItem['href'] ?>" role="menuitem"<?= $itemActive ? ' aria-current="page"' : '' ?>>
+                                                            <?php if (!empty($navItem['icon'])): ?>
+                                                                <i class="<?= Helpers::sanitize($navItem['icon']) ?>"></i>
+                                                            <?php endif; ?>
+                                                            <span><?= Helpers::sanitize($navItem['label']) ?></span>
+                                                            <?php if (!empty($navItem['badge']) && (int) $navItem['badge'] > 0): ?>
+                                                                <span class="menu-badge ms-auto"><?= (int) $navItem['badge'] ?></span>
+                                                            <?php endif; ?>
+                                                        </a>
+                                                    </li>
+                                                <?php endforeach; ?>
+                                            </ul>
+                                        </li>
+                                    <?php else: ?>
+                                        <?php $navItem = reset($sectionItems); ?>
+                                        <?php if ($navItem): ?>
+                                            <?php $itemActive = Helpers::isActive($navItem['pattern']); ?>
+                                            <li class="nav-item" role="none">
+                                                <a class="nav-link d-flex align-items-center gap-2<?= $itemActive ? ' active' : '' ?>" href="<?= $navItem['href'] ?>" role="menuitem"<?= $itemActive ? ' aria-current="page"' : '' ?>>
+                                                    <?php if (!empty($navItem['icon'])): ?>
+                                                        <i class="<?= Helpers::sanitize($navItem['icon']) ?>"></i>
+                                                    <?php endif; ?>
+                                                    <span class="nav-link-text"><?= Helpers::sanitize($navItem['label']) ?></span>
+                                                    <?php if (!empty($navItem['badge']) && (int) $navItem['badge'] > 0): ?>
+                                                        <span class="menu-badge ms-lg-1"><?= (int) $navItem['badge'] ?></span>
+                                                    <?php endif; ?>
+                                                </a>
+                                            </li>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            </ul>
                         </div>
                     <?php endif; ?>
-                </div>
-            </div>
-            <nav class="sidebar-nav" id="sidebarNav">
-                <?php foreach ($menuSections as $section): ?>
-                    <div class="sidebar-section">
-                        <div class="sidebar-section-heading text-uppercase text-white-75 small fw-semibold">
-                            <?= Helpers::sanitize($section['heading']) ?>
-                        </div>
-                        <ul class="list-unstyled mb-0 sidebar-section-list">
-                            <?php foreach ($section['items'] as $navItem): ?>
-                                <?php $itemActive = Helpers::isActive($navItem['pattern']); ?>
-                                <li>
-                                    <a href="<?= $navItem['href'] ?>" class="sidebar-link <?= $itemActive ? 'active' : '' ?>">
-                                        <?php if (!empty($navItem['icon'])): ?>
-                                            <span class="sidebar-link-icon"><i class="<?= Helpers::sanitize($navItem['icon']) ?>"></i></span>
-                                        <?php endif; ?>
-                                        <span class="sidebar-link-text"><?= Helpers::sanitize($navItem['label']) ?></span>
-                                        <?php if (!empty($navItem['badge']) && (int) $navItem['badge'] > 0): ?>
-                                            <span class="sidebar-link-badge"><?= (int) $navItem['badge'] ?></span>
-                                        <?php endif; ?>
-                                    </a>
-                                </li>
-                            <?php endforeach; ?>
-                        </ul>
-                    </div>
-                <?php endforeach; ?>
-            </nav>
-            <div class="sidebar-footer mt-auto">
-                <a href="/logout.php" class="btn btn-outline-light w-100"><i class="bi bi-box-arrow-right me-2"></i><?= Helpers::sanitize('Çıkış Yap') ?></a>
-            </div>
-        </aside>
-        <div class="sidebar-backdrop d-lg-none" data-sidebar-close></div>
-    <?php endif; ?>
-    <div class="app-main d-flex flex-column flex-grow-1">
-        <?php if ($user): ?>
-            <header class="app-topbar d-flex align-items-center justify-content-between gap-3 flex-wrap">
-                <div class="d-flex align-items-center gap-3">
-                    <button class="sidebar-toggle btn btn-light border-0 d-lg-none" type="button" data-sidebar-toggle aria-controls="appSidebar" aria-expanded="false" aria-label="<?= Helpers::sanitize('Menüyü Aç') ?>">
-                        <i class="bi bi-list"></i>
-                    </button>
-                    <div>
-                        <h1 class="h4 mb-1"><?= Helpers::sanitize($pageHeadline) ?></h1>
-                        <p class="text-muted mb-0 small"><?= date('d F Y') ?></p>
-                    </div>
-                </div>
-                <?php if ($hasTopbarActions): ?>
-                    <div class="app-topbar-actions d-flex align-items-center flex-wrap gap-3 ms-lg-auto">
+                    <div class="navbar-divider d-lg-none my-3"></div>
+                    <div class="navbar-actions d-flex flex-column flex-lg-row align-items-lg-center gap-3 ms-lg-4">
                         <?php if ($showLanguageSwitch): ?>
                             <div class="app-language-switcher">
-                                <label class="form-label form-label-sm text-muted mb-1" for="appLanguageSelect"><?= Helpers::sanitize('Dil') ?></label>
+                                <label class="form-label form-label-sm text-white-50 mb-1" for="appLanguageSelect"><?= Helpers::sanitize('Dil') ?></label>
                                 <select class="form-select form-select-sm" id="appLanguageSelect" data-initial-locale="<?= Helpers::sanitize($activeLocale) ?>">
                                     <?php foreach ($languageOptions as $option): ?>
                                         <option value="<?= Helpers::sanitize($option['code']) ?>" <?= $option['code'] === $activeLocale ? 'selected' : '' ?>>
@@ -355,8 +358,33 @@ $userRoleLabel = $user ? Auth::roleLabel($user['role']) : '';
                                 </select>
                             </div>
                         <?php endif; ?>
+                        <div class="navbar-user d-flex align-items-center gap-3">
+                            <span class="avatar-circle avatar-circle--navbar fw-semibold flex-shrink-0"><?= Helpers::sanitize($avatarInitial) ?></span>
+                            <div class="navbar-user-details">
+                                <div class="navbar-user-name fw-semibold mb-1 text-white"><?= Helpers::sanitize($user['name']) ?></div>
+                                <div class="navbar-user-meta small text-uppercase text-white-50">
+                                    <?= Helpers::sanitize($userRoleLabel) ?>
+                                    <?php if (Helpers::featureEnabled('balance')): ?>
+                                        <span class="ms-2">· <?= Helpers::sanitize('Bakiye') ?>: <strong><?= Helpers::formatCurrencyHtml((float) $user['balance']) ?></strong></span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                        <a href="/logout.php" class="btn btn-outline-light btn-sm d-inline-flex align-items-center gap-2"><i class="bi bi-box-arrow-right"></i><?= Helpers::sanitize('Çıkış Yap') ?></a>
                     </div>
-                <?php endif; ?>
+                </div>
+            </div>
+        </header>
+    <?php endif; ?>
+    <div class="app-main d-flex flex-column flex-grow-1">
+        <?php if ($user): ?>
+            <header class="app-topbar">
+                <div class="app-topbar-inner d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
+                    <div>
+                        <h1 class="h4 mb-1"><?= Helpers::sanitize($pageHeadline) ?></h1>
+                        <p class="text-muted mb-0 small"><?= date('d F Y') ?></p>
+                    </div>
+                </div>
             </header>
         <?php else: ?>
             <header class="app-topbar app-topbar--guest shadow-sm">

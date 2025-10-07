@@ -225,6 +225,9 @@ $flashWarning = isset($_SESSION['flash_warning']) ? $_SESSION['flash_warning'] :
 unset($_SESSION['flash_success'], $_SESSION['flash_warning']);
 
 $errors = array();
+$googleClientId = Settings::get('google_oauth_client_id');
+$googleClientSecret = Settings::get('google_oauth_client_secret');
+$googleLoginEnabled = $googleClientId && $googleClientSecret;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!Helpers::verifyCsrf(isset($_POST['csrf_token']) ? $_POST['csrf_token'] : '')) {
@@ -582,18 +585,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <button type="submit" class="btn-primary">Giriş Yap</button>
                 </form>
                 
-                <!-- OAuth butonları (isteğe bağlı) -->
-                <!--
-                <button type="button" class="btn-secondary">
-                    <div class="google-icon"></div>
-                    Google ile Giriş Yap
-                </button>
-                
-                <button type="button" class="btn-secondary">
-                    <div class="facebook-icon"></div>
-                    Facebook ile Giriş Yap
-                </button>
-                -->
+                <?php if ($googleLoginEnabled): ?>
+                    <a class="btn-secondary" href="/oauth/google.php" style="text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 0.75rem;">
+                        <div class="google-icon"></div>
+                        Google ile Giriş Yap
+                    </a>
+                <?php endif; ?>
             </div>
         </div>
         
