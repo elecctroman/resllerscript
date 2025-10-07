@@ -18,22 +18,7 @@ $success = '';
 $testResult = null;
 $productsFetchResult = null;
 
-$addError = static function (string $message) use (&$errors): void {
-    $message = trim($message);
-    if ($message === '') {
-        return;
-    }
 
-    if (!in_array($message, $errors, true)) {
-        $errors[] = $message;
-    }
-};
-
-$providers = $service->listProviders();
-$serviceError = $service->getLastError();
-if ($serviceError !== '') {
-    $addError($serviceError);
-}
 $selectedProviderId = isset($_GET['provider_id']) ? (int) $_GET['provider_id'] : 0;
 
 if ($selectedProviderId === 0 && $providers) {
@@ -61,22 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if (!$errors) {
                 $providerId = $service->createProvider($name, $baseUrl, $apiKey, $isActive);
-                if ($providerId > 0) {
-                    $success = 'Sağlayıcı eklendi.';
-                    AuditLog::record(
-                        $currentUser['id'],
-                        'provider.create',
-                        'external_provider',
-                        $providerId,
-                        sprintf('Yeni sağlayıcı eklendi: %s', $name)
-                    );
 
-                    $selectedProviderId = $providerId;
-                    $selectedProvider = $service->findProvider($selectedProviderId);
-                    $providers = $service->listProviders();
-                } else {
-                    $addError($service->getLastError() ?: 'Sağlayıcı eklenemedi.');
-                }
             }
         } elseif ($action === 'update_provider') {
             $providerId = isset($_POST['provider_id']) ? (int) $_POST['provider_id'] : 0;
@@ -94,42 +64,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             if (!$errors) {
-                if ($service->updateProvider($providerId, $name, $baseUrl, $apiKey, $isActive)) {
-                    $success = 'Sağlayıcı güncellendi.';
-                    AuditLog::record(
-                        $currentUser['id'],
-                        'provider.update',
-                        'external_provider',
-                        $providerId,
-                        sprintf('Sağlayıcı güncellendi: %s', $name)
-                    );
 
-                    $selectedProviderId = $providerId;
-                    $selectedProvider = $service->findProvider($selectedProviderId);
-                    $providers = $service->listProviders();
-                } else {
-                    $addError($service->getLastError() ?: 'Sağlayıcı güncellenemedi.');
-                }
             }
         } elseif ($action === 'delete_provider') {
             $providerId = isset($_POST['provider_id']) ? (int) $_POST['provider_id'] : 0;
             if ($providerId > 0 && $service->findProvider($providerId)) {
-                if ($service->deleteProvider($providerId)) {
-                    $success = 'Sağlayıcı silindi.';
-                    AuditLog::record(
-                        $currentUser['id'],
-                        'provider.delete',
-                        'external_provider',
-                        $providerId,
-                        sprintf('Sağlayıcı silindi: #%d', $providerId)
-                    );
-                    $providers = $service->listProviders();
-                    if ($selectedProviderId === $providerId) {
-                        $selectedProviderId = $providers ? (int) $providers[0]['id'] : 0;
-                        $selectedProvider = $selectedProviderId ? $service->findProvider($selectedProviderId) : null;
-                    }
-                } else {
-                    $addError($service->getLastError() ?: 'Sağlayıcı silinemedi.');
+
                 }
             }
         } elseif ($action === 'test_provider') {
@@ -137,10 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($providerId > 0) {
                 $selectedProviderId = $providerId;
                 $selectedProvider = $service->findProvider($selectedProviderId);
-                $serviceError = $service->getLastError();
-                if ($serviceError !== '') {
-                    $addError($serviceError);
-                }
+
                 if ($selectedProvider) {
                     $testResult = $service->testConnection($selectedProvider);
                     $success = $testResult['success'] ? 'API bağlantısı başarılı.' : $success;
@@ -156,10 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($providerId > 0) {
                 $selectedProviderId = $providerId;
                 $selectedProvider = $service->findProvider($selectedProviderId);
-                $serviceError = $service->getLastError();
-                if ($serviceError !== '') {
-                    $addError($serviceError);
-                }
+
                 if ($selectedProvider) {
                     $productsFetchResult = $service->fetchProducts($selectedProvider);
                     if (!$productsFetchResult['success']) {
@@ -181,10 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $selectedProviderId = $providerId;
             $selectedProvider = $providerId > 0 ? $service->findProvider($providerId) : null;
-            $serviceError = $service->getLastError();
-            if ($serviceError !== '') {
-                $addError($serviceError);
-            }
+
 
             if (!$selectedProvider) {
                 $errors[] = 'Sağlayıcı bulunamadı.';
@@ -264,18 +195,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 if (!$providers) {
     $providers = $service->listProviders();
-    $serviceError = $service->getLastError();
-    if ($serviceError !== '') {
-        $addError($serviceError);
-    }
+
 }
 
 if (!$selectedProvider && $selectedProviderId) {
     $selectedProvider = $service->findProvider($selectedProviderId);
-    $serviceError = $service->getLastError();
-    if ($serviceError !== '') {
-        $addError($serviceError);
-    }
+
 }
 
 $categories = array();
@@ -292,19 +217,6 @@ $pageTitle = 'Sağlayıcılar';
 include __DIR__ . '/../templates/header.php';
 ?>
 
-<?php
-$truncateContent = static function (string $text): string {
-    if ($text === '') {
-        return '';
-    }
-
-    if (function_exists('mb_strimwidth')) {
-        return mb_strimwidth($text, 0, 180, '…', 'UTF-8');
-    }
-
-    return rtrim(substr($text, 0, 180)) . '…';
-};
-?>
 <div class="row g-4">
     <div class="col-lg-4">
         <div class="card border-0 shadow-sm mb-4">
@@ -470,7 +382,7 @@ $truncateContent = static function (string $text): string {
                                             <td>
                                                 <strong><?= Helpers::sanitize($remoteProduct['title']) ?></strong>
                                                 <?php if (!empty($remoteProduct['content'])): ?>
-                                                    <p class="small text-muted mb-0"><?= nl2br(Helpers::sanitize($truncateContent((string) $remoteProduct['content']))) ?></p>
+
                                                 <?php endif; ?>
                                             </td>
                                             <td><?= Helpers::sanitize($remoteProduct['amount']) ?></td>
