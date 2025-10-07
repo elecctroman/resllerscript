@@ -31,7 +31,7 @@ if (!defined('APP_ERROR_LOG_INITIALIZED')) {
         ini_set('log_errors', '1');
         ini_set('error_log', $logFile);
 
-        $formatter = static function ($type, $message, $file = null, $line = null) {
+
             $timestamp = date('Y-m-d H:i:s');
             $location = '';
             if ($file !== null) {
@@ -44,7 +44,7 @@ if (!defined('APP_ERROR_LOG_INITIALIZED')) {
             return sprintf('[%s] %s: %s%s', $timestamp, $type, $message, $location);
         };
 
-        set_error_handler(static function ($severity, $message, $file = null, $line = null) use ($formatter) {
+
             if (!(error_reporting() & $severity)) {
                 return false;
             }
@@ -53,21 +53,7 @@ if (!defined('APP_ERROR_LOG_INITIALIZED')) {
             return false;
         });
 
-        set_exception_handler(static function ($throwable) use ($formatter) {
-            $isThrowable = $throwable instanceof Exception;
-            if (!$isThrowable && class_exists('Throwable')) {
-                $isThrowable = is_a($throwable, 'Throwable');
-            }
 
-            if ($isThrowable && is_object($throwable)) {
-                error_log($formatter('Uncaught Exception', $throwable->getMessage(), $throwable->getFile(), $throwable->getLine()));
-                return;
-            }
-
-            error_log($formatter('Uncaught Error', is_object($throwable) ? get_class($throwable) : (string) $throwable));
-        });
-
-        register_shutdown_function(static function () use ($formatter) {
             $error = error_get_last();
             if ($error !== null) {
                 error_log($formatter('Shutdown Error', (string) $error['message'], $error['file'], (int) $error['line']));
