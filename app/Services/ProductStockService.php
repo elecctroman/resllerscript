@@ -24,7 +24,7 @@ class ProductStockService
         }
 
         $pdo = Database::connection();
-        $insert = $pdo->prepare('INSERT INTO product_stock_items (product_id, content, content_hash, status, created_at) VALUES (:product_id, :content, :hash, \"available\", NOW())');
+        $insert = $pdo->prepare('INSERT INTO product_stock_items (product_id, content, content_hash, status, created_at) VALUES (:product_id, :content, :hash, :status, NOW())');
 
         $added = 0;
         $skipped = 0;
@@ -43,6 +43,7 @@ class ProductStockService
                     'product_id' => $productId,
                     'content' => $content,
                     'hash' => $hash,
+                    'status' => 'available',
                 ));
                 if ($insert->rowCount() > 0) {
                     $added++;
@@ -73,8 +74,8 @@ class ProductStockService
     public static function availableStockCount(int $productId): int
     {
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('SELECT COUNT(*) FROM product_stock_items WHERE product_id = :product_id AND status = \"available\"');
-        $stmt->execute(array('product_id' => $productId));
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM product_stock_items WHERE product_id = :product_id AND status = :status');
+        $stmt->execute(array('product_id' => $productId, 'status' => 'available'));
         return (int) $stmt->fetchColumn();
     }
 
@@ -153,8 +154,8 @@ class ProductStockService
     public static function deleteStockItem(int $productId, int $stockId): bool
     {
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('DELETE FROM product_stock_items WHERE id = :id AND product_id = :product_id AND status = \"available\"');
-        $stmt->execute(array('id' => $stockId, 'product_id' => $productId));
+        $stmt = $pdo->prepare('DELETE FROM product_stock_items WHERE id = :id AND product_id = :product_id AND status = :status');
+        $stmt->execute(array('id' => $stockId, 'product_id' => $productId, 'status' => 'available'));
         if ($stmt->rowCount() > 0) {
             self::logger()->info(sprintf('Ürün #%d stok kaydı #%d silindi.', $productId, $stockId));
             return true;
@@ -195,8 +196,9 @@ class ProductStockService
                 return array('success' => true, 'status' => 'completed', 'message' => 'Sipariş zaten tamamlanmış.');
             }
 
-            $stockStmt = $pdo->prepare('SELECT id, content FROM product_stock_items WHERE product_id = :product_id AND status = \"available\" ORDER BY id ASC LIMIT :limit FOR UPDATE');
+            $stockStmt = $pdo->prepare('SELECT id, content FROM product_stock_items WHERE product_id = :product_id AND status = :status ORDER BY id ASC LIMIT :limit FOR UPDATE');
             $stockStmt->bindValue(':product_id', $productId, PDO::PARAM_INT);
+            $stockStmt->bindValue(':status', 'available');
             $stockStmt->bindValue(':limit', $quantity, PDO::PARAM_INT);
             $stockStmt->execute();
             $stockRows = $stockStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -215,8 +217,8 @@ class ProductStockService
             }
 
             $placeholders = implode(',', array_fill(0, count($stockIds), '?'));
-            $update = $pdo->prepare('UPDATE product_stock_items SET status = \"delivered\", order_id = ?, reserved_at = COALESCE(reserved_at, NOW()), delivered_at = NOW(), updated_at = NOW() WHERE id IN (' . $placeholders . ')');
-            $update->execute(array_merge(array($orderId), $stockIds));
+            $update = $pdo->prepare('UPDATE product_stock_items SET status = ?, order_id = ?, reserved_at = COALESCE(reserved_at, NOW()), delivered_at = NOW(), updated_at = NOW() WHERE id IN (' . $placeholders . ')');
+            $update->execute(array_merge(array('delivered', $orderId), $stockIds));
 
             $deliveryContent = implode(PHP_EOL, $contents);
 
