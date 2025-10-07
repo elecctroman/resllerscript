@@ -79,8 +79,8 @@ final class ProductOrderService
             $automaticDelivery = isset($product['automatic_delivery']) ? (int)$product['automatic_delivery'] === 1 : false;
 
             if (!$automaticDelivery) {
-                $stockCheck = $pdo->prepare('SELECT COUNT(*) FROM product_stock_items WHERE product_id = :product_id AND status = "available" FOR UPDATE');
-                $stockCheck->execute(['product_id' => $productId]);
+                $stockCheck = $pdo->prepare('SELECT COUNT(*) FROM product_stock_items WHERE product_id = :product_id AND status = :status FOR UPDATE');
+                $stockCheck->execute(['product_id' => $productId, 'status' => 'available']);
                 $availableStock = (int)$stockCheck->fetchColumn();
                 if ($availableStock < 1) {
                     $pdo->rollBack();

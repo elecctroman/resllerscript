@@ -58,7 +58,7 @@ try {
         $favoritePlaceholders = implode(',', array_fill(0, count($favoriteProductIds), '?'));
         $favoriteQuery = 'SELECT pr.*, cat.name AS category_name, (
                 SELECT COUNT(*) FROM product_stock_items psi
-                WHERE psi.product_id = pr.id AND psi.status = "available"
+                WHERE psi.product_id = pr.id AND psi.status = \'available\'
             ) AS available_stock
             FROM products pr
             INNER JOIN categories cat ON pr.category_id = cat.id
@@ -254,7 +254,7 @@ try {
         }
 
         $placeholders = implode(',', array_fill(0, count($categoryIds), '?'));
-        $productsQuery = 'SELECT pr.*, cat.name AS category_name, (SELECT COUNT(*) FROM product_stock_items psi WHERE psi.product_id = pr.id AND psi.status = "available") AS available_stock FROM products pr INNER JOIN categories cat ON pr.category_id = cat.id WHERE pr.status = ? AND pr.category_id IN (' . $placeholders . ')';
+        $productsQuery = 'SELECT pr.*, cat.name AS category_name, (SELECT COUNT(*) FROM product_stock_items psi WHERE psi.product_id = pr.id AND psi.status = \'available\') AS available_stock FROM products pr INNER JOIN categories cat ON pr.category_id = cat.id WHERE pr.status = ? AND pr.category_id IN (' . $placeholders . ')';
         $productParams = array_merge(['active'], $categoryIds);
 
         if ($searchTerm !== '') {
@@ -269,7 +269,7 @@ try {
         $products = $productsStmt->fetchAll();
     } else {
         if ($searchTerm !== '') {
-            $productsQuery = 'SELECT pr.*, cat.name AS category_name, (SELECT COUNT(*) FROM product_stock_items psi WHERE psi.product_id = pr.id AND psi.status = "available") AS available_stock FROM products pr INNER JOIN categories cat ON pr.category_id = cat.id WHERE pr.status = ?';
+            $productsQuery = 'SELECT pr.*, cat.name AS category_name, (SELECT COUNT(*) FROM product_stock_items psi WHERE psi.product_id = pr.id AND psi.status = \'available\') AS available_stock FROM products pr INNER JOIN categories cat ON pr.category_id = cat.id WHERE pr.status = ?';
             $productParams = ['active'];
 
             if ($searchTerm !== '') {
