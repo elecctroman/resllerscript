@@ -102,6 +102,62 @@ CREATE TABLE IF NOT EXISTS products (
     FOREIGN KEY (category_id) REFERENCES categories(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS provider_sources (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    base_url VARCHAR(255) NOT NULL,
+    consumer_key VARCHAR(191) NULL,
+    consumer_secret VARCHAR(191) NULL,
+    webhook_secret VARCHAR(191) NULL,
+    status ENUM('active','inactive') NOT NULL DEFAULT 'inactive',
+    last_synced_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_provider_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS provider_remote_categories (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    provider_id INT NOT NULL,
+    remote_id BIGINT NOT NULL,
+    parent_remote_id BIGINT NULL,
+    name VARCHAR(191) NOT NULL,
+    slug VARCHAR(191) NULL,
+    mapped_category_id INT NULL,
+    last_synced_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_provider_remote_category (provider_id, remote_id),
+    INDEX idx_provider_category_lookup (provider_id, mapped_category_id),
+    FOREIGN KEY (provider_id) REFERENCES provider_sources(id) ON DELETE CASCADE,
+    FOREIGN KEY (mapped_category_id) REFERENCES categories(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS provider_remote_products (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    provider_id INT NOT NULL,
+    remote_id BIGINT NOT NULL,
+    name VARCHAR(191) NOT NULL,
+    slug VARCHAR(191) NULL,
+    price DECIMAL(12,2) NULL,
+    currency VARCHAR(10) NULL,
+    status VARCHAR(50) NULL,
+    remote_category_id BIGINT NULL,
+    remote_category_name VARCHAR(191) NULL,
+    stock_quantity INT NULL,
+    stock_status VARCHAR(50) NULL,
+    imported_product_id INT NULL,
+    announcement_id INT NULL,
+    last_synced_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_provider_remote_product (provider_id, remote_id),
+    INDEX idx_provider_remote_category (provider_id, remote_category_id),
+    FOREIGN KEY (provider_id) REFERENCES provider_sources(id) ON DELETE CASCADE,
+    FOREIGN KEY (imported_product_id) REFERENCES products(id) ON DELETE SET NULL,
+    FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS reseller_favorites (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,

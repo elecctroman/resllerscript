@@ -58,8 +58,12 @@ try {
         $favoritePlaceholders = implode(',', array_fill(0, count($favoriteProductIds), '?'));
         $favoriteQuery = 'SELECT pr.*, cat.name AS category_name, (
                 SELECT COUNT(*) FROM product_stock_items psi
-                WHERE psi.product_id = pr.id AND psi.status = "available"
-            ) AS available_stock
+                WHERE psi.product_id = pr.id AND psi.status = \'available\'
+            ) AS available_stock,
+            (
+                SELECT COUNT(*) FROM product_stock_items psi_all
+                WHERE psi_all.product_id = pr.id
+            ) AS total_stock_items
             FROM products pr
             INNER JOIN categories cat ON pr.category_id = cat.id
             WHERE pr.status = ? AND pr.id IN (' . $favoritePlaceholders . ')
@@ -254,7 +258,10 @@ try {
         }
 
         $placeholders = implode(',', array_fill(0, count($categoryIds), '?'));
-        $productsQuery = 'SELECT pr.*, cat.name AS category_name, (SELECT COUNT(*) FROM product_stock_items psi WHERE psi.product_id = pr.id AND psi.status = "available") AS available_stock FROM products pr INNER JOIN categories cat ON pr.category_id = cat.id WHERE pr.status = ? AND pr.category_id IN (' . $placeholders . ')';
+        $productsQuery = 'SELECT pr.*, cat.name AS category_name,
+            (SELECT COUNT(*) FROM product_stock_items psi WHERE psi.product_id = pr.id AND psi.status = \'available\') AS available_stock,
+            (SELECT COUNT(*) FROM product_stock_items psi_all WHERE psi_all.product_id = pr.id) AS total_stock_items
+            FROM products pr INNER JOIN categories cat ON pr.category_id = cat.id WHERE pr.status = ? AND pr.category_id IN (' . $placeholders . ')';
         $productParams = array_merge(['active'], $categoryIds);
 
         if ($searchTerm !== '') {
@@ -269,7 +276,10 @@ try {
         $products = $productsStmt->fetchAll();
     } else {
         if ($searchTerm !== '') {
-            $productsQuery = 'SELECT pr.*, cat.name AS category_name, (SELECT COUNT(*) FROM product_stock_items psi WHERE psi.product_id = pr.id AND psi.status = "available") AS available_stock FROM products pr INNER JOIN categories cat ON pr.category_id = cat.id WHERE pr.status = ?';
+            $productsQuery = 'SELECT pr.*, cat.name AS category_name,
+                (SELECT COUNT(*) FROM product_stock_items psi WHERE psi.product_id = pr.id AND psi.status = \'available\') AS available_stock,
+                (SELECT COUNT(*) FROM product_stock_items psi_all WHERE psi_all.product_id = pr.id) AS total_stock_items
+                FROM products pr INNER JOIN categories cat ON pr.category_id = cat.id WHERE pr.status = ?';
             $productParams = ['active'];
 
             if ($searchTerm !== '') {
@@ -322,16 +332,32 @@ $renderProductCard = function (array $product, $highlight = false) use ($categor
     $shortDescription = Helpers::truncate($rawDescription, 140);
     $skuValue = (isset($product['sku']) && $product['sku'] !== '') ? $product['sku'] : null;
     $automaticDelivery = isset($product['automatic_delivery']) ? (int)$product['automatic_delivery'] === 1 : false;
-    $isStockBased = !$automaticDelivery;
+    $totalStockItems = isset($product['total_stock_items']) ? (int)$product['total_stock_items'] : 0;
+    $usesStock = !$automaticDelivery || $totalStockItems > 0;
     $availableStock = isset($product['available_stock']) ? (int)$product['available_stock'] : 0;
     $stockBadgeClass = 'bg-info text-dark';
     $stockLabel = 'Teslimat durumunu yöneticinizden öğrenin';
+    $stockDetail = '';
     $restockHint = '';
 
-    if ($automaticDelivery && !$isStockBased) {
+    if ($automaticDelivery) {
         $stockBadgeClass = 'bg-primary';
         $stockLabel = 'Otomatik teslimat';
-    } elseif ($isStockBased) {
+        if ($usesStock) {
+            if ($availableStock > 0) {
+                $stockDetail = sprintf('Stok: %d adet', $availableStock);
+                if ($availableStock <= 3) {
+                    $restockHint = 'Stok seviyesi kritik, yöneticinizden yenileme talep edin.';
+                }
+            } else {
+                $stockBadgeClass = 'bg-danger';
+                $stockDetail = 'Stok tükendi';
+                $restockHint = 'Bu ürün için stok bildirimi ayarlayabilirsiniz.';
+            }
+        } else {
+            $stockDetail = 'Sınırsız teslimat';
+        }
+    } elseif ($usesStock) {
         if ($availableStock > 0) {
             $stockBadgeClass = 'bg-success';
             $stockLabel = sprintf('Stokta %d adet', $availableStock);
@@ -347,7 +373,7 @@ $renderProductCard = function (array $product, $highlight = false) use ($categor
 
     $isFavorited = in_array($productId, $favoriteProductIds, true) || $highlight;
     $isWatching = in_array($productId, $watchingProductIds, true);
-    $buttonDisabled = $isStockBased && $availableStock <= 0;
+    $buttonDisabled = $usesStock && $availableStock <= 0;
 
     $cardClasses = 'product-card';
     if ($highlight) {
@@ -369,6 +395,9 @@ $renderProductCard = function (array $product, $highlight = false) use ($categor
         <?php endif; ?>
         <div class="product-card__stock">
             <span class="badge <?= htmlspecialchars($stockBadgeClass, ENT_QUOTES, 'UTF-8') ?>"><?= Helpers::sanitize($stockLabel) ?></span>
+            <?php if ($stockDetail !== ''): ?>
+                <div class="product-card__stock-detail text-muted small mt-1"><?= Helpers::sanitize($stockDetail) ?></div>
+            <?php endif; ?>
         </div>
         <p class="product-card__description"><?= Helpers::sanitize($shortDescription) ?></p>
         <?php if ($restockHint !== ''): ?>
