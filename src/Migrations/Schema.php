@@ -18,6 +18,7 @@ final class Schema
         }
 
         self::ensureProductsTable($pdo);
+        self::ensureProductOrdersTable($pdo);
         self::ensureProductStockTable($pdo);
         self::ensureResellerFavoritesTable($pdo);
         self::ensureStockWatchersTable($pdo);
@@ -28,6 +29,8 @@ final class Schema
         self::ensureUserLocaleColumns($pdo);
         self::ensureBlogCategoriesTable($pdo);
         self::ensureBlogPostsTable($pdo);
+        self::ensureProvidersTable($pdo);
+        self::ensureProviderProductsTable($pdo);
 
     }
 
@@ -79,6 +82,33 @@ final class Schema
 
         self::addIndex($pdo, 'product_stock_items', 'idx_stock_status', 'ADD INDEX idx_stock_status (product_id, status)');
         self::addIndex($pdo, 'product_stock_items', 'idx_stock_order', 'ADD INDEX idx_stock_order (order_id)');
+    }
+
+    private static function ensureProductOrdersTable(PDO $pdo): void
+    {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS product_orders (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            product_id INT NOT NULL,
+            user_id INT NOT NULL,
+            api_token_id INT NULL,
+            quantity INT NOT NULL DEFAULT 1,
+            note TEXT NULL,
+            admin_note TEXT NULL,
+            price DECIMAL(12,2) NOT NULL,
+            total_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+            source VARCHAR(50) NULL,
+            external_reference VARCHAR(191) NULL,
+            external_metadata TEXT NULL,
+            status ENUM('pending','processing','completed','cancelled') NOT NULL DEFAULT 'pending',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (product_id) REFERENCES products(id),
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (api_token_id) REFERENCES api_tokens(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        self::ensureColumn($pdo, 'product_orders', 'total_amount', "DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER price");
+        self::ensureColumn($pdo, 'product_orders', 'api_token_id', 'INT NULL');
     }
 
     private static function ensureResellerFavoritesTable(PDO $pdo): void
@@ -215,6 +245,65 @@ final class Schema
         self::ensureColumn($pdo, 'blog_posts', 'meta_description', 'VARCHAR(255) NULL');
         self::ensureColumn($pdo, 'blog_posts', 'author_name', 'VARCHAR(150) NULL');
         self::ensureColumn($pdo, 'blog_posts', 'image_url', 'VARCHAR(255) NULL');
+    }
+
+    private static function ensureProvidersTable(PDO $pdo): void
+    {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS providers (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(150) NOT NULL,
+            slug VARCHAR(100) NOT NULL,
+            api_url VARCHAR(255) NOT NULL,
+            api_key VARCHAR(255) NOT NULL,
+            status ENUM('active','inactive') NOT NULL DEFAULT 'inactive',
+            settings TEXT NULL,
+            last_synced_at DATETIME NULL,
+            last_tested_at DATETIME NULL,
+            last_test_response TEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_provider_slug (slug)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        self::ensureColumn($pdo, 'providers', 'last_test_response', 'TEXT NULL');
+
+        try {
+            $check = $pdo->prepare('SELECT COUNT(*) FROM providers WHERE slug = :slug');
+            $check->execute(array(':slug' => 'lotus'));
+            if ((int) $check->fetchColumn() === 0) {
+                $insert = $pdo->prepare('INSERT INTO providers (name, slug, api_url, api_key, status, created_at) VALUES (:name, :slug, :api_url, :api_key, :status, NOW())');
+                $insert->execute(array(
+                    ':name' => 'Lotus Lisans',
+                    ':slug' => 'lotus',
+                    ':api_url' => 'https://partner.lotuslisans.com.tr/api',
+                    ':api_key' => '',
+                    ':status' => 'inactive',
+                ));
+            }
+        } catch (\Throwable $exception) {
+            error_log('[Schema] Varsayılan sağlayıcı eklenemedi: ' . $exception->getMessage());
+        }
+    }
+
+    private static function ensureProviderProductsTable(PDO $pdo): void
+    {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS provider_products (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            provider_id INT NOT NULL,
+            remote_id VARCHAR(100) NOT NULL,
+            remote_title VARCHAR(255) NOT NULL,
+            remote_price DECIMAL(12,2) NOT NULL DEFAULT 0,
+            remote_stock INT NOT NULL DEFAULT 0,
+            remote_available TINYINT(1) NOT NULL DEFAULT 0,
+            payload MEDIUMTEXT NULL,
+            product_id INT NULL,
+            synced_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_provider_product (provider_id, remote_id),
+            FOREIGN KEY (provider_id) REFERENCES providers(id) ON DELETE CASCADE,
+            FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        self::ensureColumn($pdo, 'provider_products', 'payload', 'MEDIUMTEXT NULL');
     }
 
 

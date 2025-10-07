@@ -47,8 +47,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errors[] = 'Alış fiyatı 0’dan büyük olmalıdır.';
             }
 
-            if ($providerCode !== '' && $providerCode !== 'lotus') {
-                $errors[] = 'Desteklenmeyen sağlayıcı seçildi.';
+            if ($providerCode !== '' && $providerCode !== 'stock' && !isset($providerOptions[$providerCode])) {
+                $errors[] = 'Geçersiz sağlayıcı seçildi.';
             }
 
             if ($providerCode !== '' && $providerProductId === '') {
@@ -107,8 +107,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errors[] = 'Alış fiyatı 0’dan büyük olmalıdır.';
             }
 
-            if ($providerCode !== '' && $providerCode !== 'lotus') {
-                $errors[] = 'Desteklenmeyen sağlayıcı seçildi.';
+            if ($providerCode !== '' && $providerCode !== 'stock' && !isset($providerOptions[$providerCode])) {
+                $errors[] = 'Geçersiz sağlayıcı seçildi.';
             }
 
             if ($providerCode !== '' && $providerProductId === '') {
@@ -159,6 +159,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 );
             }
         }
+    }
+}
+
+$providerRows = $pdo->query('SELECT id, name, slug, status FROM providers ORDER BY name ASC')->fetchAll();
+$providerOptions = array();
+if ($providerRows) {
+    foreach ($providerRows as $providerRow) {
+        $slug = isset($providerRow['slug']) ? strtolower((string) $providerRow['slug']) : '';
+        if ($slug === '') {
+            continue;
+        }
+        $providerOptions[$slug] = $providerRow;
     }
 }
 
@@ -290,8 +302,12 @@ include __DIR__ . '/../templates/header.php';
                             <label class="form-label">Sağlayıcı</label>
                             <select name="provider_code" class="form-select">
                                 <option value="">Panel (Stok Teslimatı)</option>
+                                <?php foreach ($providerOptions as $slug => $providerRow): ?>
+                                    <?php $isActiveProvider = isset($providerRow['status']) && $providerRow['status'] === 'active'; ?>
+                                    <option value="<?= Helpers::sanitize($slug) ?>" <?= $isActiveProvider ? '' : 'disabled' ?>><?= Helpers::sanitize($providerRow['name']) ?><?= $isActiveProvider ? '' : ' (Pasif)' ?></option>
+                                <?php endforeach; ?>
                             </select>
-                            <small class="text-muted">"Stok" seçeneği fiziksel stoğu kullanır. Harici sağlayıcılar şu anda devre dışıdır.</small>
+                            <small class="text-muted">Harici sağlayıcıları yönetmek için <a href="/admin/providers.php">Sağlayıcılar</a> sayfasını ziyaret edin.</small>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Sağlayıcı Ürün ID</label>
@@ -423,11 +439,19 @@ include __DIR__ . '/../templates/header.php';
                                                             <label class="form-label">SKU</label>
                                                             <input type="text" name="sku" class="form-control" value="<?= Helpers::sanitize(isset($product['sku']) ? $product['sku'] : '') ?>">
                                                         </div>
+                                                        <?php $currentProviderCode = isset($product['provider_code']) ? strtolower((string)$product['provider_code']) : ''; ?>
                                                         <div class="col-md-4">
                                                             <label class="form-label">Sağlayıcı</label>
                                                             <select name="provider_code" class="form-select">
-                                                                <option value="">Panel (Stok Teslimatı)</option>
-                                                                <option value="stock" <?= isset($product['provider_code']) && $product['provider_code'] === 'stock' ? 'selected' : '' ?>>Stoktan Teslim</option>
+                                                                <option value="" <?= $currentProviderCode === '' ? 'selected' : '' ?>>Panel (Stok Teslimatı)</option>
+                                                                <option value="stock" <?= $currentProviderCode === 'stock' ? 'selected' : '' ?>>Stoktan Teslim</option>
+                                                                <?php foreach ($providerOptions as $slug => $providerRow): ?>
+                                                                    <?php $isActiveProvider = isset($providerRow['status']) && $providerRow['status'] === 'active'; ?>
+                                                                    <option value="<?= Helpers::sanitize($slug) ?>" <?= $currentProviderCode === $slug ? 'selected' : '' ?> <?= $isActiveProvider ? '' : 'disabled' ?>><?= Helpers::sanitize($providerRow['name']) ?><?= $isActiveProvider ? '' : ' (Pasif)' ?></option>
+                                                                <?php endforeach; ?>
+                                                                <?php if ($currentProviderCode !== '' && $currentProviderCode !== 'stock' && !isset($providerOptions[$currentProviderCode])): ?>
+                                                                    <option value="<?= Helpers::sanitize($currentProviderCode) ?>" selected><?= Helpers::sanitize(strtoupper($currentProviderCode)) ?> (Kayıtsız)</option>
+                                                                <?php endif; ?>
                                                             </select>
                                                         </div>
                                                         <div class="col-md-4">
