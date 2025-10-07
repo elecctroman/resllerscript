@@ -213,8 +213,19 @@ if ($productId > 0) {
                                 <tbody>
                                 <?php foreach ($items as $item): ?>
                                     <tr>
-                                        <td><?= (int) $item['id'] ?></td>
-                                        <td class="font-monospace small"><?= nl2br(Helpers::sanitize($item['content'])) ?></td>
+                                        <td>
+                                            <?php if (isset($item['id'])): ?>
+                                                <?= (int) $item['id'] ?>
+                                            <?php else: ?>
+                                                -
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="font-monospace small">
+                                            <?php
+                                            $content = isset($item['content']) ? (string) $item['content'] : '';
+                                            echo nl2br(Helpers::sanitize($content));
+                                            ?>
+                                        </td>
                                         <td>
                                             <?php
                                             $badgeMap = array(
@@ -276,7 +287,12 @@ if ($productId > 0) {
     exit;
 }
 
-$list = $pdo->query('SELECT pr.id, pr.name, cat.name AS category_name, (SELECT COUNT(*) FROM product_stock_items psi WHERE psi.product_id = pr.id AND psi.status = "available") AS available_stock, (SELECT COUNT(*) FROM product_stock_items psi WHERE psi.product_id = pr.id AND psi.status = "delivered") AS delivered_stock FROM products pr INNER JOIN categories cat ON pr.category_id = cat.id ORDER BY pr.created_at DESC')->fetchAll();
+$list = $pdo->query("SELECT pr.id, pr.name, cat.name AS category_name,
+    (SELECT COUNT(*) FROM product_stock_items psi WHERE psi.product_id = pr.id AND psi.status = 'available') AS available_stock,
+    (SELECT COUNT(*) FROM product_stock_items psi WHERE psi.product_id = pr.id AND psi.status = 'delivered') AS delivered_stock
+    FROM products pr
+    INNER JOIN categories cat ON pr.category_id = cat.id
+    ORDER BY pr.created_at DESC")->fetchAll();
 
 include __DIR__ . '/../templates/header.php';
 ?>

@@ -215,7 +215,11 @@ $categoryPath = function ($categoryId) use (&$categoryMap) {
     return implode(' / ', array_reverse($parts));
 };
 
-$products = $pdo->query('SELECT pr.*, cat.name AS category_name, (SELECT COUNT(*) FROM product_stock_items psi WHERE psi.product_id = pr.id AND psi.status = "available") AS available_stock FROM products pr INNER JOIN categories cat ON pr.category_id = cat.id ORDER BY pr.created_at DESC')->fetchAll();
+$products = $pdo->query("SELECT pr.*, cat.name AS category_name,
+    (SELECT COUNT(*) FROM product_stock_items psi WHERE psi.product_id = pr.id AND psi.status = 'available') AS available_stock
+    FROM products pr
+    INNER JOIN categories cat ON pr.category_id = cat.id
+    ORDER BY pr.created_at DESC")->fetchAll();
 
 $pageTitle = 'Ürünler';
 

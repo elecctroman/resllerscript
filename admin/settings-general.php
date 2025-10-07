@@ -23,7 +23,11 @@ $current = Settings::getMany(array(
     'reseller_auto_suspend_threshold',
     'reseller_auto_suspend_days',
     'platform_default_locale',
+    'google_oauth_client_id',
+    'google_oauth_client_secret',
 ));
+
+$googleRedirectUri = Helpers::url('oauth/google.php', true);
 
 $featureLabels = array(
     'products' => 'Ürün kataloğu ve sipariş verme',
@@ -76,6 +80,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
+            $googleClientId = isset($_POST['google_oauth_client_id']) ? trim($_POST['google_oauth_client_id']) : '';
+            $googleClientSecret = isset($_POST['google_oauth_client_secret']) ? trim($_POST['google_oauth_client_secret']) : '';
+
+            if ($googleClientId !== '' && $googleClientSecret === '') {
+                $errors[] = 'Google Client Secret alanı boş bırakılamaz.';
+            }
+
+            if ($googleClientSecret !== '' && $googleClientId === '') {
+                $errors[] = 'Google Client ID alanı boş bırakılamaz.';
+            }
+
             if (!$errors) {
                 Settings::set('site_name', $siteName);
                 Settings::set('site_tagline', $siteTagline !== '' ? $siteTagline : null);
@@ -99,6 +114,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     Settings::set('reseller_auto_suspend_days', null);
                 }
 
+                Settings::set('google_oauth_client_id', $googleClientId !== '' ? $googleClientId : null);
+                Settings::set('google_oauth_client_secret', $googleClientSecret !== '' ? $googleClientSecret : null);
+
                 $success = 'Genel ayarlar kaydedildi.';
                 AuditLog::record(
                     $currentUser['id'],
@@ -118,6 +136,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'reseller_auto_suspend_threshold',
                     'reseller_auto_suspend_days',
                     'platform_default_locale',
+                    'google_oauth_client_id',
+                    'google_oauth_client_secret',
                 ));
             }
     }
@@ -189,6 +209,25 @@ include __DIR__ . '/../templates/header.php';
                                 <?php endforeach; ?>
                             </select>
                             <small class="text-muted">Bayi profili aksi seçmedikçe bu dil kullanılır.</small>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div>
+                        <h6>Google ile Giriş</h6>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Client ID</label>
+                                <input type="text" name="google_oauth_client_id" class="form-control" value="<?= Helpers::sanitize(isset($current['google_oauth_client_id']) ? $current['google_oauth_client_id'] : '') ?>" placeholder="xxxx.apps.googleusercontent.com">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Client Secret</label>
+                                <input type="text" name="google_oauth_client_secret" class="form-control" value="<?= Helpers::sanitize(isset($current['google_oauth_client_secret']) ? $current['google_oauth_client_secret'] : '') ?>" placeholder="Google secret değeri">
+                            </div>
+                            <div class="col-12">
+                                <small class="text-muted">Google Cloud Console &gt; Credentials üzerinden OAuth 2.0 kimlik bilgileri oluşturun. Yetkili yönlendirme URI'si: <code><?= Helpers::sanitize($googleRedirectUri) ?></code></small>
+                            </div>
                         </div>
                     </div>
 
