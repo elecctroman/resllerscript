@@ -4,11 +4,6 @@ namespace App\Services;
 
 
 
-class ProviderIntegrationService
-{
-    private PDO $pdo;
-
-
     public function __construct(PDO $pdo)
     {
         $this->pdo = $pdo;
@@ -78,6 +73,7 @@ class ProviderIntegrationService
      */
     public function testConnection(array $provider): array
     {
+
 
             return array(
                 'success' => false,

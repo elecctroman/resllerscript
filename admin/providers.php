@@ -1,5 +1,6 @@
 <?php
 
+
 require __DIR__ . '/../bootstrap.php';
 
 use App\AuditLog;
@@ -9,6 +10,7 @@ use App\Helpers;
 use App\Services\ProviderIntegrationService;
 
 Auth::requireRoles(array('super_admin', 'admin'));
+
 
 
 $errors = array();
