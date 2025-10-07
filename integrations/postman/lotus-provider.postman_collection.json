@@ -1,0 +1,132 @@
+{
+  "info": {
+    "name": "Lotus Lisans Sağlayıcı API",
+    "description": "Lotus Lisans sağlayıcı entegrasyonu için temel API istekleri.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": {
+      "major": 1,
+      "minor": 0,
+      "patch": 0
+    }
+  },
+  "item": [
+    {
+      "name": "Kullanıcı Bilgisi",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/user?apikey={{api_key}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "user"
+          ],
+          "query": [
+            {
+              "key": "apikey",
+              "value": "{{api_key}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Ürün Listesi",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/products?apikey={{api_key}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "products"
+          ],
+          "query": [
+            {
+              "key": "apikey",
+              "value": "{{api_key}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Sipariş Oluştur",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"product_id\": {{product_id}},\n  \"note\": \"müşteri notu\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/orders?apikey={{api_key}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "orders"
+          ],
+          "query": [
+            {
+              "key": "apikey",
+              "value": "{{api_key}}"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://partner.lotuslisans.com.tr"
+    },
+    {
+      "key": "api_key",
+      "value": "TEST_KEY"
+    },
+    {
+      "key": "product_id",
+      "value": "57"
+    }
+  ]
+}

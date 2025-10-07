@@ -1,9 +1,81 @@
-<?php declare(strict_types=1);
+<?php
 
 $rootPath = __DIR__;
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
+}
+
+if (!defined('APP_ERROR_LOG_INITIALIZED')) {
+    $logDirectory = $rootPath . '/admin';
+    $logFile = $logDirectory . '/error.log';
+
+    if (!defined('APP_ERROR_LOG_PATH')) {
+        define('APP_ERROR_LOG_PATH', $logFile);
+    }
+
+    if (!is_dir($logDirectory)) {
+        @mkdir($logDirectory, 0775, true);
+    }
+
+    if (!is_file($logFile)) {
+        @touch($logFile);
+        if (is_file($logFile)) {
+            @chmod($logFile, 0664);
+        }
+    }
+
+    if (is_writable($logFile) || is_writable($logDirectory)) {
+        error_reporting(E_ALL);
+        ini_set('display_errors', '0');
+        ini_set('log_errors', '1');
+        ini_set('error_log', $logFile);
+
+        $formatter = static function ($type, $message, $file = null, $line = null) {
+            $timestamp = date('Y-m-d H:i:s');
+            $location = '';
+            if ($file !== null) {
+                $location = ' in ' . $file;
+                if ($line !== null) {
+                    $location .= ':' . $line;
+                }
+            }
+
+            return sprintf('[%s] %s: %s%s', $timestamp, $type, $message, $location);
+        };
+
+        set_error_handler(static function ($severity, $message, $file = null, $line = null) use ($formatter) {
+            if (!(error_reporting() & $severity)) {
+                return false;
+            }
+
+            error_log($formatter('PHP Error', $message, $file, $line));
+            return false;
+        });
+
+        set_exception_handler(static function ($throwable) use ($formatter) {
+            $isThrowable = $throwable instanceof Exception;
+            if (!$isThrowable && class_exists('Throwable')) {
+                $isThrowable = is_a($throwable, 'Throwable');
+            }
+
+            if ($isThrowable && is_object($throwable)) {
+                error_log($formatter('Uncaught Exception', $throwable->getMessage(), $throwable->getFile(), $throwable->getLine()));
+                return;
+            }
+
+            error_log($formatter('Uncaught Error', is_object($throwable) ? get_class($throwable) : (string) $throwable));
+        });
+
+        register_shutdown_function(static function () use ($formatter) {
+            $error = error_get_last();
+            if ($error !== null) {
+                error_log($formatter('Shutdown Error', (string) $error['message'], $error['file'], (int) $error['line']));
+            }
+        });
+
+        define('APP_ERROR_LOG_INITIALIZED', true);
+    }
 }
 
 $forwardedScheme = null;
@@ -30,7 +102,7 @@ if (is_file($composerAutoload)) {
     require_once $composerAutoload;
 }
 
-spl_autoload_register(static function ($class) use ($rootPath): void {
+spl_autoload_register(static function ($class) use ($rootPath) {
     $prefix = 'App\\';
     $length = strlen($prefix);
 
@@ -55,13 +127,21 @@ spl_autoload_register(static function ($class) use ($rootPath): void {
 });
 
 if (!function_exists('envStr')) {
-    function envStr(string $key, ?string $default = null): ?string
+    function envStr($key, $default = null)
     {
-        return $_ENV[$key] ?? $_SERVER[$key] ?? $default;
+        if (isset($_ENV[$key])) {
+            return $_ENV[$key];
+        }
+
+        if (isset($_SERVER[$key])) {
+            return $_SERVER[$key];
+        }
+
+        return $default;
     }
 }
 
-if (class_exists(\Dotenv\Dotenv::class)) {
+if (class_exists('\\Dotenv\\Dotenv')) {
     \Dotenv\Dotenv::createImmutable($rootPath)->safeLoad();
 } elseif (is_file($rootPath . '/env.php')) {
     /** @noinspection PhpIncludeInspection */
@@ -88,7 +168,7 @@ if ($dbName !== '') {
             'user' => $dbUser,
             'password' => $dbPassword,
         ));
-    } catch (\Throwable $connectionException) {
+    } catch (Exception $connectionException) {
         error_log('[Bootstrap] Veritabanı bağlantısı kurulamadı: ' . $connectionException->getMessage());
     }
 }
@@ -96,7 +176,7 @@ if ($dbName !== '') {
 if (class_exists(App\Migrations\Schema::class)) {
     try {
         App\Migrations\Schema::ensure();
-    } catch (\Throwable $schemaException) {
+    } catch (Exception $schemaException) {
         error_log('[Bootstrap] Şema güncellenemedi: ' . $schemaException->getMessage());
     }
 }
@@ -115,7 +195,7 @@ if (!empty($_SESSION['user']) && isset($_SESSION['user']['id'])) {
                 unset($_SESSION['user']);
             }
         }
-    } catch (\Throwable $refreshException) {
+    } catch (Exception $refreshException) {
         error_log('[Bootstrap] Oturum kullanıcısı yenilenemedi: ' . $refreshException->getMessage());
     }
 }
