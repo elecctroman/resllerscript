@@ -2,16 +2,66 @@
 
 namespace App\Services;
 
+use App\Migrations\Schema;
 use PDO;
 use PDOException;
+use Throwable;
 
 class ProviderIntegrationService
 {
     private PDO $pdo;
+    private bool $schemaEnsured = false;
+    private ?string $lastError = null;
 
     public function __construct(PDO $pdo)
     {
         $this->pdo = $pdo;
+        $this->ensureStorage();
+    }
+
+    public function getLastError(): string
+    {
+        return $this->lastError ?? '';
+    }
+
+    private function setLastError(?string $message): void
+    {
+        $this->lastError = $message !== null ? (string) $message : null;
+    }
+
+    private function ensureStorage(): void
+    {
+        if ($this->schemaEnsured) {
+            return;
+        }
+
+        $this->schemaEnsured = true;
+
+        if (!class_exists(Schema::class)) {
+            return;
+        }
+
+        try {
+            Schema::ensure();
+        } catch (Throwable $exception) {
+            $this->schemaEnsured = false;
+            $this->setLastError('Sağlayıcı tabloları hazırlanırken bir hata oluştu. Lütfen sistem yöneticiniz ile görüşün.');
+            error_log('[ProviderIntegrationService] Schema ensure failed: ' . $exception->getMessage());
+        }
+    }
+
+    private function handleStorageException(PDOException $exception): void
+    {
+        $this->schemaEnsured = false;
+
+        $message = $exception->getMessage();
+        if (stripos($message, 'external_providers') !== false || stripos($message, 'external_provider_products') !== false) {
+            $this->setLastError('Sağlayıcı veritabanı tabloları bulunamadı veya oluşturulamadı. Lütfen şema güncellemelerini çalıştırın.');
+        } else {
+            $this->setLastError('Veritabanı işlemi sırasında bir hata oluştu. Ayrıntılar loglara yazıldı.');
+        }
+
+        error_log('[ProviderIntegrationService] Storage error: ' . $message);
     }
 
     /**
@@ -19,7 +69,17 @@ class ProviderIntegrationService
      */
     public function listProviders(): array
     {
-        $stmt = $this->pdo->query('SELECT * FROM external_providers ORDER BY name ASC');
+        $this->ensureStorage();
+
+        try {
+            $stmt = $this->pdo->query('SELECT * FROM external_providers ORDER BY name ASC');
+        } catch (PDOException $exception) {
+            $this->handleStorageException($exception);
+            return array();
+        }
+
+        $this->setLastError(null);
+
         return $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : array();
     }
 
@@ -29,9 +89,18 @@ class ProviderIntegrationService
      */
     public function findProvider(int $id): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT * FROM external_providers WHERE id = :id');
-        $stmt->execute(array('id' => $id));
-        $provider = $stmt->fetch(PDO::FETCH_ASSOC);
+        $this->ensureStorage();
+
+        try {
+            $stmt = $this->pdo->prepare('SELECT * FROM external_providers WHERE id = :id');
+            $stmt->execute(array('id' => $id));
+            $provider = $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $exception) {
+            $this->handleStorageException($exception);
+            return null;
+        }
+
+        $this->setLastError(null);
 
         return $provider ?: null;
     }
@@ -45,13 +114,22 @@ class ProviderIntegrationService
      */
     public function createProvider(string $name, string $baseUrl, string $apiKey, bool $isActive): int
     {
-        $stmt = $this->pdo->prepare('INSERT INTO external_providers (name, base_url, api_key, is_active, created_at) VALUES (:name, :base_url, :api_key, :is_active, NOW())');
-        $stmt->execute(array(
-            'name' => $name,
-            'base_url' => $baseUrl,
-            'api_key' => $apiKey,
-            'is_active' => $isActive ? 1 : 0,
-        ));
+        $this->ensureStorage();
+
+        try {
+            $stmt = $this->pdo->prepare('INSERT INTO external_providers (name, base_url, api_key, is_active, created_at) VALUES (:name, :base_url, :api_key, :is_active, NOW())');
+            $stmt->execute(array(
+                'name' => $name,
+                'base_url' => $baseUrl,
+                'api_key' => $apiKey,
+                'is_active' => $isActive ? 1 : 0,
+            ));
+        } catch (PDOException $exception) {
+            $this->handleStorageException($exception);
+            return 0;
+        }
+
+        $this->setLastError(null);
 
         return (int) $this->pdo->lastInsertId();
     }
@@ -66,14 +144,25 @@ class ProviderIntegrationService
      */
     public function updateProvider(int $id, string $name, string $baseUrl, string $apiKey, bool $isActive): bool
     {
-        $stmt = $this->pdo->prepare('UPDATE external_providers SET name = :name, base_url = :base_url, api_key = :api_key, is_active = :is_active, updated_at = NOW() WHERE id = :id');
-        return $stmt->execute(array(
-            'id' => $id,
-            'name' => $name,
-            'base_url' => $baseUrl,
-            'api_key' => $apiKey,
-            'is_active' => $isActive ? 1 : 0,
-        ));
+        $this->ensureStorage();
+
+        try {
+            $stmt = $this->pdo->prepare('UPDATE external_providers SET name = :name, base_url = :base_url, api_key = :api_key, is_active = :is_active, updated_at = NOW() WHERE id = :id');
+            $result = $stmt->execute(array(
+                'id' => $id,
+                'name' => $name,
+                'base_url' => $baseUrl,
+                'api_key' => $apiKey,
+                'is_active' => $isActive ? 1 : 0,
+            ));
+        } catch (PDOException $exception) {
+            $this->handleStorageException($exception);
+            return false;
+        }
+
+        $this->setLastError(null);
+
+        return (bool) $result;
     }
 
     /**
@@ -82,8 +171,19 @@ class ProviderIntegrationService
      */
     public function deleteProvider(int $id): bool
     {
-        $stmt = $this->pdo->prepare('DELETE FROM external_providers WHERE id = :id');
-        return $stmt->execute(array('id' => $id));
+        $this->ensureStorage();
+
+        try {
+            $stmt = $this->pdo->prepare('DELETE FROM external_providers WHERE id = :id');
+            $result = $stmt->execute(array('id' => $id));
+        } catch (PDOException $exception) {
+            $this->handleStorageException($exception);
+            return false;
+        }
+
+        $this->setLastError(null);
+
+        return (bool) $result;
     }
 
     /**
@@ -92,6 +192,7 @@ class ProviderIntegrationService
      */
     public function testConnection(array $provider): array
     {
+        $this->setLastError(null);
         $response = $this->sendRequest($provider, 'GET', 'api/user', array('apikey' => $provider['api_key']));
 
         if ($response['error'] !== null) {
@@ -127,6 +228,7 @@ class ProviderIntegrationService
      */
     public function fetchProducts(array $provider)
     {
+        $this->setLastError(null);
         $response = $this->sendRequest($provider, 'GET', 'api/products', array('apikey' => $provider['api_key']));
 
         if ($response['error'] !== null) {
@@ -184,10 +286,18 @@ class ProviderIntegrationService
      */
     public function findMapping(int $providerId, string $remoteProductId): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT * FROM external_provider_products WHERE provider_id = :provider_id AND provider_product_id = :remote_id');
-        $stmt->execute(array('provider_id' => $providerId, 'remote_id' => $remoteProductId));
+        $this->ensureStorage();
 
-        $mapping = $stmt->fetch(PDO::FETCH_ASSOC);
+        try {
+            $stmt = $this->pdo->prepare('SELECT * FROM external_provider_products WHERE provider_id = :provider_id AND provider_product_id = :remote_id');
+            $stmt->execute(array('provider_id' => $providerId, 'remote_id' => $remoteProductId));
+            $mapping = $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $exception) {
+            $this->handleStorageException($exception);
+            return null;
+        }
+
+        $this->setLastError(null);
 
         return $mapping ?: null;
     }
@@ -200,13 +310,20 @@ class ProviderIntegrationService
      */
     public function saveMapping(int $providerId, string $remoteProductId, int $productId): void
     {
-        $stmt = $this->pdo->prepare('INSERT INTO external_provider_products (provider_id, provider_product_id, product_id, created_at, updated_at) VALUES (:provider_id, :remote_id, :product_id, NOW(), NOW())
+        $this->ensureStorage();
+
+        try {
+            $stmt = $this->pdo->prepare('INSERT INTO external_provider_products (provider_id, provider_product_id, product_id, created_at, updated_at) VALUES (:provider_id, :remote_id, :product_id, NOW(), NOW())
             ON DUPLICATE KEY UPDATE product_id = VALUES(product_id), updated_at = NOW()');
-        $stmt->execute(array(
-            'provider_id' => $providerId,
-            'remote_id' => $remoteProductId,
-            'product_id' => $productId,
-        ));
+            $stmt->execute(array(
+                'provider_id' => $providerId,
+                'remote_id' => $remoteProductId,
+                'product_id' => $productId,
+            ));
+            $this->setLastError(null);
+        } catch (PDOException $exception) {
+            $this->handleStorageException($exception);
+        }
     }
 
     /**
@@ -219,6 +336,10 @@ class ProviderIntegrationService
      */
     private function sendRequest(array $provider, string $method, string $path, array $query = array(), ?array $payload = null): array
     {
+        if (!function_exists('curl_init')) {
+            return array('status' => 0, 'body' => '', 'error' => 'Sunucuda cURL eklentisi etkin değil.');
+        }
+
         $baseUrl = isset($provider['base_url']) ? (string) $provider['base_url'] : '';
         $baseUrl = trim($baseUrl);
 
@@ -298,14 +419,29 @@ class ProviderIntegrationService
 
     private function storeTestResult(int $providerId, int $status, string $response): void
     {
+        $this->ensureStorage();
+
         try {
             $stmt = $this->pdo->prepare('UPDATE external_providers SET last_tested_at = NOW(), last_test_response = :response, updated_at = NOW() WHERE id = :id');
             $stmt->execute(array(
                 'id' => $providerId,
-                'response' => $response !== '' ? mb_substr($response, 0, 1000) : null,
+                'response' => $this->truncateResponse($response),
             ));
         } catch (PDOException $exception) {
             error_log('[ProviderIntegrationService] Test sonucu kaydedilemedi: ' . $exception->getMessage());
         }
+    }
+
+    private function truncateResponse(string $response): ?string
+    {
+        if ($response === '') {
+            return null;
+        }
+
+        if (function_exists('mb_substr')) {
+            return mb_substr($response, 0, 1000);
+        }
+
+        return substr($response, 0, 1000);
     }
 }
