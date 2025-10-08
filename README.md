@@ -21,3 +21,7 @@ Bu depo, ePin, lisans ve dijital hesap satış süreçlerini yönetmek için gel
 1. `composer install`
 2. `cp config/config.sample.php config/config.php` ve veritabanı bilgilerini güncelleyin.
 3. `php -S localhost:8000` ile yerel ortamda test edin.
+
+## Entegrasyonlar
+
+Sistem, kendi ürün ve stok yönetiminiz için tasarlanmıştır. Harici sağlayıcı bağlantıları bu sürümde bulunmamaktadır.

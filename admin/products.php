@@ -5,14 +5,15 @@ use App\Auth;
 use App\AuditLog;
 use App\Database;
 use App\Helpers;
+use App\Services\ProductImageService;
 use App\Services\ProductStockService;
-use App\Settings;
 
 Auth::requireRoles(array('super_admin', 'admin', 'content'));
 
 $currentUser = $_SESSION['user'];
 $pdo = Database::connection();
 $errors = array();
+$warnings = array();
 $success = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = isset($_POST['action']) ? $_POST['action'] : '';
@@ -29,6 +30,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $description = isset($_POST['description']) ? trim($_POST['description']) : '';
             $status = isset($_POST['status']) ? 'active' : 'inactive';
             $automaticDelivery = isset($_POST['automatic_delivery']) ? 1 : 0;
+
+            $manualUpload = ProductImageService::validateManualUpload(isset($_FILES['product_image']) ? $_FILES['product_image'] : null);
+            $manualUploadData = null;
+            if ($manualUpload['status'] === 'error') {
+                $errors[] = isset($manualUpload['message']) ? $manualUpload['message'] : 'Görsel yüklenirken hata oluştu.';
+            } elseif ($manualUpload['status'] === 'ready' && isset($manualUpload['data'])) {
+                $manualUploadData = $manualUpload['data'];
+            }
 
             $costSanitized = preg_replace('/[^0-9.,-]/', '', $costInput);
             $costSanitized = str_replace(',', '.', (string)$costSanitized);
@@ -60,13 +69,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'automatic_delivery' => $automaticDelivery,
                 ));
 
+                $productId = (int)$pdo->lastInsertId();
+                $newImagePath = null;
+
+                if ($manualUploadData) {
+                    $storeResult = ProductImageService::storeManualUpload($manualUploadData);
+                    if ($storeResult['success']) {
+                        $newImagePath = $storeResult['path'];
+                    } elseif (isset($storeResult['message'])) {
+                        $warnings[] = $storeResult['message'];
+                    }
+                }
+
+                if (!$newImagePath) {
+                    $categoryStmt = $pdo->prepare('SELECT name FROM categories WHERE id = :id LIMIT 1');
+                    $categoryStmt->execute(array('id' => $categoryId));
+                    $categoryName = (string)$categoryStmt->fetchColumn();
+
+                    $aiResult = ProductImageService::maybeGenerateAiImage($productId, array(
+                        'name' => $name,
+                        'duration' => $automaticDelivery ? 'Anında teslimat' : 'Stoktan teslim',
+                        'category' => $categoryName,
+                    ));
+
+                    if ($aiResult['success']) {
+                        $newImagePath = $aiResult['path'];
+                    } elseif (isset($aiResult['message'])) {
+                        $warnings[] = $aiResult['message'];
+                    }
+                }
+
+                if ($newImagePath) {
+                    $imageStmt = $pdo->prepare('UPDATE products SET image = :image WHERE id = :id');
+                    $imageStmt->execute(array('image' => $newImagePath, 'id' => $productId));
+                }
+
                 $success = 'Ürün kaydedildi.';
 
                 AuditLog::record(
                     $currentUser['id'],
                     'product.create',
                     'product',
-                    (int)$pdo->lastInsertId(),
+                    $productId,
                     sprintf('Ürün eklendi: %s', $name)
                 );
             }
@@ -79,6 +123,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $description = isset($_POST['description']) ? trim($_POST['description']) : '';
             $status = isset($_POST['status']) ? 'active' : 'inactive';
             $automaticDelivery = isset($_POST['automatic_delivery']) ? 1 : 0;
+            $removeImage = isset($_POST['remove_product_image']);
+
+            $manualUploadCheck = ProductImageService::validateManualUpload(isset($_FILES['product_image']) ? $_FILES['product_image'] : null);
+            $manualUploadData = null;
+            if ($manualUploadCheck['status'] === 'error') {
+                $errors[] = isset($manualUploadCheck['message']) ? $manualUploadCheck['message'] : 'Görsel yüklenirken hata oluştu.';
+            } elseif ($manualUploadCheck['status'] === 'ready' && isset($manualUploadCheck['data'])) {
+                $manualUploadData = $manualUploadCheck['data'];
+            }
+
+            if ($manualUploadData) {
+                $removeImage = false;
+            }
+
             $costSanitized = preg_replace('/[^0-9.,-]/', '', $costInput);
             $costSanitized = str_replace(',', '.', (string)$costSanitized);
             $costPriceTry = $costSanitized !== '' ? (float)$costSanitized : 0.0;
@@ -95,6 +153,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             if (!$errors) {
+                $existingStmt = $pdo->prepare('SELECT image FROM products WHERE id = :id LIMIT 1');
+                $existingStmt->execute(array('id' => $productId));
+                $existingImage = $existingStmt->fetchColumn();
+                if ($existingImage === false || $existingImage === '') {
+                    $existingImage = null;
+                } else {
+                    $existingImage = (string)$existingImage;
+                }
+
                 if ($automaticDelivery === 0) {
                     $availableStock = 0;
                     try {
@@ -123,6 +190,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'automatic_delivery' => $automaticDelivery,
                 ));
 
+                $newImagePath = null;
+                $imageShouldUpdate = false;
+
+                if ($manualUploadData) {
+                    $storeResult = ProductImageService::storeManualUpload($manualUploadData);
+                    if ($storeResult['success']) {
+                        $newImagePath = $storeResult['path'];
+                        $imageShouldUpdate = true;
+                    } elseif (isset($storeResult['message'])) {
+                        $warnings[] = $storeResult['message'];
+                    }
+                } elseif ($removeImage) {
+                    $imageShouldUpdate = true;
+                    $newImagePath = null;
+                } elseif (!$existingImage) {
+                    $categoryStmt = $pdo->prepare('SELECT name FROM categories WHERE id = :id LIMIT 1');
+                    $categoryStmt->execute(array('id' => $categoryId));
+                    $categoryName = (string)$categoryStmt->fetchColumn();
+
+                    $aiResult = ProductImageService::maybeGenerateAiImage($productId, array(
+                        'name' => $name,
+                        'duration' => $automaticDelivery ? 'Anında teslimat' : 'Stoktan teslim',
+                        'category' => $categoryName,
+                    ));
+
+                    if ($aiResult['success']) {
+                        $newImagePath = $aiResult['path'];
+                        $imageShouldUpdate = true;
+                    } elseif (isset($aiResult['message'])) {
+                        $warnings[] = $aiResult['message'];
+                    }
+                }
+
+                if ($imageShouldUpdate) {
+                    $imageStmt = $pdo->prepare('UPDATE products SET image = :image WHERE id = :id');
+                    $imageStmt->execute(array('image' => $newImagePath, 'id' => $productId));
+
+                    if ($existingImage && $existingImage !== $newImagePath) {
+                        ProductImageService::deleteImage($existingImage);
+                    }
+                }
+
                 $success = 'Ürün güncellendi.';
 
                 AuditLog::record(
@@ -136,6 +245,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($action === 'delete_product') {
             $productId = isset($_POST['id']) ? (int)$_POST['id'] : 0;
             if ($productId > 0) {
+                $imageStmt = $pdo->prepare('SELECT image FROM products WHERE id = :id LIMIT 1');
+                $imageStmt->execute(array('id' => $productId));
+                $existingImage = $imageStmt->fetchColumn();
+                if ($existingImage === false || $existingImage === '') {
+                    $existingImage = null;
+                } else {
+                    $existingImage = (string)$existingImage;
+                }
+
                 $stmt = $pdo->prepare('DELETE FROM products WHERE id = :id');
                 $stmt->execute(array('id' => $productId));
 
@@ -148,6 +266,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $productId,
                     sprintf('Ürün silindi: #%d', $productId)
                 );
+
+                if ($existingImage) {
+                    ProductImageService::deleteImage($existingImage);
+                }
             }
         }
     }
@@ -215,7 +337,11 @@ $categoryPath = function ($categoryId) use (&$categoryMap) {
     return implode(' / ', array_reverse($parts));
 };
 
-$products = $pdo->query('SELECT pr.*, cat.name AS category_name, (SELECT COUNT(*) FROM product_stock_items psi WHERE psi.product_id = pr.id AND psi.status = "available") AS available_stock FROM products pr INNER JOIN categories cat ON pr.category_id = cat.id ORDER BY pr.created_at DESC')->fetchAll();
+$products = $pdo->query("SELECT pr.*, cat.name AS category_name,
+    (SELECT COUNT(*) FROM product_stock_items psi WHERE psi.product_id = pr.id AND psi.status = 'available') AS available_stock
+    FROM products pr
+    INNER JOIN categories cat ON pr.category_id = cat.id
+    ORDER BY pr.created_at DESC")->fetchAll();
 
 $pageTitle = 'Ürünler';
 
@@ -240,6 +366,16 @@ include __DIR__ . '/../templates/header.php';
                     </div>
                 <?php endif; ?>
 
+                <?php if ($warnings): ?>
+                    <div class="alert alert-warning">
+                        <ul class="mb-0">
+                            <?php foreach ($warnings as $warning): ?>
+                                <li><?= Helpers::sanitize($warning) ?></li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
+                <?php endif; ?>
+
                 <?php if ($success): ?>
                     <div class="alert alert-success"><?= Helpers::sanitize($success) ?></div>
                 <?php endif; ?>
@@ -248,7 +384,7 @@ include __DIR__ . '/../templates/header.php';
                     <div class="alert alert-warning">Ürün ekleyebilmek için önce <a href="/admin/categories.php" class="alert-link">kategori oluşturmanız</a> gerekir.</div>
                 <?php endif; ?>
 
-                <form method="post" class="vstack gap-3">
+                <form method="post" class="vstack gap-3" enctype="multipart/form-data">
                     <input type="hidden" name="action" value="create_product">
                     <input type="hidden" name="csrf_token" value="<?= Helpers::sanitize(Helpers::csrfToken()) ?>">
                     <div>
@@ -277,6 +413,11 @@ include __DIR__ . '/../templates/header.php';
                         <input class="form-check-input" type="checkbox" id="createAutomaticDelivery" name="automatic_delivery" value="1" checked>
                         <label class="form-check-label" for="createAutomaticDelivery">Otomatik teslimat</label>
                         <small class="text-muted d-block">Stok tanımlanana veya sağlayıcı bağlantısı kurulana kadar siparişler otomatik tamamlanır.</small>
+                    </div>
+                    <div>
+                        <label class="form-label">Ürün Görseli</label>
+                        <input type="file" name="product_image" class="form-control" accept="image/png,image/jpeg,image/webp">
+                        <small class="text-muted d-block mt-1">PNG, JPG veya WebP formatında en fazla 6 MB boyutunda görsel yükleyebilirsiniz.</small>
                     </div>
                     <div>
                         <label class="form-label">Açıklama</label>
@@ -373,7 +514,7 @@ include __DIR__ . '/../templates/header.php';
                                 <div class="modal fade" id="editProduct<?= (int)$product['id'] ?>" tabindex="-1" aria-hidden="true">
                                     <div class="modal-dialog modal-lg modal-dialog-centered">
                                         <div class="modal-content">
-                                            <form method="post">
+                                            <form method="post" enctype="multipart/form-data">
                                                 <div class="modal-header">
                                                     <h5 class="modal-title">Ürün Düzenle</h5>
                                                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -416,6 +557,22 @@ include __DIR__ . '/../templates/header.php';
                                                                 <input class="form-check-input" type="checkbox" id="productAuto<?= (int)$product['id'] ?>" name="automatic_delivery" value="1" <?= isset($product['automatic_delivery']) && (int)$product['automatic_delivery'] === 1 ? 'checked' : '' ?>>
                                                                 <label class="form-check-label" for="productAuto<?= (int)$product['id'] ?>">Otomatik teslimat</label>
                                                             </div>
+                                                        </div>
+                                                        <div class="col-12">
+                                                            <label class="form-label">Ürün Görseli</label>
+                                                            <?php $existingImagePath = isset($product['image']) ? trim((string)$product['image']) : ''; ?>
+                                                            <?php if ($existingImagePath !== ''): ?>
+                                                                <?php $imageUrl = $existingImagePath[0] === '/' ? $existingImagePath : '/' . ltrim($existingImagePath, '/'); ?>
+                                                                <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-3 mb-2">
+                                                                    <img src="<?= Helpers::sanitize($imageUrl) ?>" alt="<?= Helpers::sanitize($product['name']) ?>" class="rounded border" style="max-height: 72px;">
+                                                                    <div class="form-check mb-0">
+                                                                        <input class="form-check-input" type="checkbox" name="remove_product_image" value="1" id="removeProductImage<?= (int)$product['id'] ?>">
+                                                                        <label class="form-check-label" for="removeProductImage<?= (int)$product['id'] ?>">Mevcut görseli kaldır</label>
+                                                                    </div>
+                                                                </div>
+                                                            <?php endif; ?>
+                                                            <input type="file" name="product_image" class="form-control" accept="image/png,image/jpeg,image/webp">
+                                                            <small class="text-muted d-block mt-1">PNG, JPG veya WebP formatında en fazla 6 MB boyutunda yeni görsel yükleyebilirsiniz.</small>
                                                         </div>
                                                         <div class="col-12">
                                                             <label class="form-label">Açıklama</label>
