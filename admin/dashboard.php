@@ -6,9 +6,7 @@ use App\Helpers;
 use App\Database;
 use App\Reporting;
 
-Auth::requireRoles(array('super_admin', 'admin', 'finance'));
-
-$user = $_SESSION['user'];
+$user = Auth::requireAdmin(array('super_admin', 'admin', 'finance'));
 $pdo = Database::connection();
 $pageTitle = 'Yönetici Paneli';
 
