@@ -50,12 +50,12 @@ switch (true) {
         try {
             $pdo = Database::connection();
             $stmt = $pdo->query(
-                'SELECT p.id, p.name, p.description, p.price, p.automatic_delivery, c.name AS category_name,
-                        (SELECT COUNT(*) FROM product_stock_items WHERE product_id = p.id AND status = "available") AS stock
+                "SELECT p.id, p.name, p.description, p.price, p.automatic_delivery, c.name AS category_name,
+                        (SELECT COUNT(*) FROM product_stock_items WHERE product_id = p.id AND status = 'available') AS stock
                  FROM products p
                  INNER JOIN categories c ON c.id = p.category_id
-                 WHERE p.status = "active"
-                 ORDER BY p.name ASC'
+                 WHERE p.status = 'active'
+                 ORDER BY p.name ASC"
             );
             $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         } catch (\PDOException $exception) {

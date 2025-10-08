@@ -4,6 +4,9 @@ namespace App;
 
 use PDO;
 
+/** @noinspection PhpUnused */
+use App\Auth;
+
 class Lang
 {
     /**
@@ -48,8 +51,11 @@ class Lang
         $default = self::defaultLocale();
         $sessionLocale = isset($_SESSION['locale']) ? strtolower((string)$_SESSION['locale']) : '';
 
-        if ($sessionLocale === '' && isset($_SESSION['user']) && isset($_SESSION['user']['locale']) && $_SESSION['user']['locale'] !== null) {
-            $sessionLocale = strtolower((string)$_SESSION['user']['locale']);
+        if ($sessionLocale === '') {
+            $currentUser = Auth::currentUser();
+            if ($currentUser && isset($currentUser['locale']) && $currentUser['locale'] !== null) {
+                $sessionLocale = strtolower((string)$currentUser['locale']);
+            }
         }
 
         $locale = $sessionLocale !== '' ? $sessionLocale : $default;
