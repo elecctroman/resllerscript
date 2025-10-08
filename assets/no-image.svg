@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450" role="img" aria-labelledby="title desc">
+  <title id="title">Görsel mevcut değil</title>
+  <desc id="desc">Ürün görseli henüz eklenmediği için yer tutucu</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1b3c73" />
+      <stop offset="100%" stop-color="#2f5fb3" />
+    </linearGradient>
+  </defs>
+  <rect width="800" height="450" fill="url(#bg)" rx="24" />
+  <g fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" opacity="0.8">
+    <path d="M250 140h300a30 30 0 0 1 30 30v210a30 30 0 0 1-30 30H250a30 30 0 0 1-30-30V170a30 30 0 0 1 30-30z" />
+    <circle cx="320" cy="220" r="38" />
+    <path d="M230 360l110-110 80 80 70-70 90 100" />
+  </g>
+  <text x="400" y="400" fill="#ffffff" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="36" text-anchor="middle" opacity="0.85">
+    Görsel mevcut değil
+  </text>
+</svg>
