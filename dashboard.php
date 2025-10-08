@@ -1,14 +1,11 @@
 <?php
 require __DIR__ . '/bootstrap.php';
 
+use App\Auth;
 use App\Helpers;
 use App\Database;
 
-if (empty($_SESSION['user'])) {
-    Helpers::redirect('/');
-}
-
-$user = $_SESSION['user'];
+$user = Auth::requireReseller();
 $pdo = Database::connection();
 
 $pageTitle = 'Kontrol Paneli';
