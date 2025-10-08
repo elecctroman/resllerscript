@@ -6,11 +6,7 @@ use App\Database;
 use App\Helpers;
 use App\Services\ProductOrderService;
 
-if (empty($_SESSION['user'])) {
-    Helpers::redirect('/');
-}
-
-$user = $_SESSION['user'];
+$user = Auth::requireReseller();
 
 if (Auth::isAdminRole($user['role'])) {
     Helpers::redirect('/admin/products.php');
@@ -58,8 +54,12 @@ try {
         $favoritePlaceholders = implode(',', array_fill(0, count($favoriteProductIds), '?'));
         $favoriteQuery = 'SELECT pr.*, cat.name AS category_name, (
                 SELECT COUNT(*) FROM product_stock_items psi
-                WHERE psi.product_id = pr.id AND psi.status = "available"
-            ) AS available_stock
+                WHERE psi.product_id = pr.id AND psi.status = \'available\'
+            ) AS available_stock,
+            (
+                SELECT COUNT(*) FROM product_stock_items psi_all
+                WHERE psi_all.product_id = pr.id
+            ) AS total_stock_items
             FROM products pr
             INNER JOIN categories cat ON pr.category_id = cat.id
             WHERE pr.status = ? AND pr.id IN (' . $favoritePlaceholders . ')
@@ -254,7 +254,10 @@ try {
         }
 
         $placeholders = implode(',', array_fill(0, count($categoryIds), '?'));
-        $productsQuery = 'SELECT pr.*, cat.name AS category_name, (SELECT COUNT(*) FROM product_stock_items psi WHERE psi.product_id = pr.id AND psi.status = "available") AS available_stock FROM products pr INNER JOIN categories cat ON pr.category_id = cat.id WHERE pr.status = ? AND pr.category_id IN (' . $placeholders . ')';
+        $productsQuery = 'SELECT pr.*, cat.name AS category_name,
+            (SELECT COUNT(*) FROM product_stock_items psi WHERE psi.product_id = pr.id AND psi.status = \'available\') AS available_stock,
+            (SELECT COUNT(*) FROM product_stock_items psi_all WHERE psi_all.product_id = pr.id) AS total_stock_items
+            FROM products pr INNER JOIN categories cat ON pr.category_id = cat.id WHERE pr.status = ? AND pr.category_id IN (' . $placeholders . ')';
         $productParams = array_merge(['active'], $categoryIds);
 
         if ($searchTerm !== '') {
@@ -269,7 +272,10 @@ try {
         $products = $productsStmt->fetchAll();
     } else {
         if ($searchTerm !== '') {
-            $productsQuery = 'SELECT pr.*, cat.name AS category_name, (SELECT COUNT(*) FROM product_stock_items psi WHERE psi.product_id = pr.id AND psi.status = "available") AS available_stock FROM products pr INNER JOIN categories cat ON pr.category_id = cat.id WHERE pr.status = ?';
+            $productsQuery = 'SELECT pr.*, cat.name AS category_name,
+                (SELECT COUNT(*) FROM product_stock_items psi WHERE psi.product_id = pr.id AND psi.status = \'available\') AS available_stock,
+                (SELECT COUNT(*) FROM product_stock_items psi_all WHERE psi_all.product_id = pr.id) AS total_stock_items
+                FROM products pr INNER JOIN categories cat ON pr.category_id = cat.id WHERE pr.status = ?';
             $productParams = ['active'];
 
             if ($searchTerm !== '') {
@@ -322,16 +328,32 @@ $renderProductCard = function (array $product, $highlight = false) use ($categor
     $shortDescription = Helpers::truncate($rawDescription, 140);
     $skuValue = (isset($product['sku']) && $product['sku'] !== '') ? $product['sku'] : null;
     $automaticDelivery = isset($product['automatic_delivery']) ? (int)$product['automatic_delivery'] === 1 : false;
-    $isStockBased = !$automaticDelivery;
+    $totalStockItems = isset($product['total_stock_items']) ? (int)$product['total_stock_items'] : 0;
+    $usesStock = !$automaticDelivery || $totalStockItems > 0;
     $availableStock = isset($product['available_stock']) ? (int)$product['available_stock'] : 0;
     $stockBadgeClass = 'bg-info text-dark';
     $stockLabel = 'Teslimat durumunu yöneticinizden öğrenin';
+    $stockDetail = '';
     $restockHint = '';
 
-    if ($automaticDelivery && !$isStockBased) {
+    if ($automaticDelivery) {
         $stockBadgeClass = 'bg-primary';
         $stockLabel = 'Otomatik teslimat';
-    } elseif ($isStockBased) {
+        if ($usesStock) {
+            if ($availableStock > 0) {
+                $stockDetail = sprintf('Stok: %d adet', $availableStock);
+                if ($availableStock <= 3) {
+                    $restockHint = 'Stok seviyesi kritik, yöneticinizden yenileme talep edin.';
+                }
+            } else {
+                $stockBadgeClass = 'bg-danger';
+                $stockDetail = 'Stok tükendi';
+                $restockHint = 'Bu ürün için stok bildirimi ayarlayabilirsiniz.';
+            }
+        } else {
+            $stockDetail = 'Sınırsız teslimat';
+        }
+    } elseif ($usesStock) {
         if ($availableStock > 0) {
             $stockBadgeClass = 'bg-success';
             $stockLabel = sprintf('Stokta %d adet', $availableStock);
@@ -347,62 +369,81 @@ $renderProductCard = function (array $product, $highlight = false) use ($categor
 
     $isFavorited = in_array($productId, $favoriteProductIds, true) || $highlight;
     $isWatching = in_array($productId, $watchingProductIds, true);
-    $buttonDisabled = $isStockBased && $availableStock <= 0;
+    $buttonDisabled = $usesStock && $availableStock <= 0;
 
     $cardClasses = 'product-card';
     if ($highlight) {
         $cardClasses .= ' product-card--favorite';
     }
 
+    $imagePath = isset($product['image']) ? trim((string)$product['image']) : '';
+    $imageUrl = $imagePath !== '' ? ($imagePath[0] === '/' ? $imagePath : '/' . ltrim($imagePath, '/')) : '/assets/no-image.svg';
+    $durationLabel = $automaticDelivery ? 'Anında Teslim' : 'Stoktan Teslim';
+    $supplierLabel = isset($product['provider_name']) && $product['provider_name'] !== '' ? (string)$product['provider_name'] : 'Panel';
+    $categorySupplierLabel = $categoryTrail . ' / ' . $supplierLabel;
+    $hasUnlimitedDelivery = $automaticDelivery && !$usesStock;
+    $automaticBadgeClass = $automaticDelivery ? 'bg-primary text-white' : 'bg-secondary text-white';
+    $unlimitedBadgeClass = $hasUnlimitedDelivery ? 'bg-success text-white' : 'bg-secondary text-white';
+
     ob_start();
     ?>
     <div class="<?= $cardClasses ?>" data-product-card="<?= $productId ?>"<?= $highlight ? ' data-favorite-card="1"' : '' ?>>
-        <div class="product-card__header">
-            <div>
-                <h3 class="product-card__title"><?= Helpers::sanitize($productName) ?></h3>
-                <div class="product-card__category"><?= Helpers::sanitize($categoryTrail) ?></div>
-            </div>
-            <div class="product-card__price"><?= $productPriceHtml ?></div>
+        <div class="product-card__media">
+            <img src="<?= Helpers::sanitize($imageUrl) ?>" alt="<?= Helpers::sanitize($productName) ?>">
         </div>
-        <?php if ($skuValue): ?>
-            <div class="product-card__sku">SKU: <?= Helpers::sanitize($skuValue) ?></div>
-        <?php endif; ?>
-        <div class="product-card__stock">
-            <span class="badge <?= htmlspecialchars($stockBadgeClass, ENT_QUOTES, 'UTF-8') ?>"><?= Helpers::sanitize($stockLabel) ?></span>
-        </div>
-        <p class="product-card__description"><?= Helpers::sanitize($shortDescription) ?></p>
-        <?php if ($restockHint !== ''): ?>
-            <div class="product-card__hint text-muted small mb-2">
-                <i class="bi bi-lightbulb me-1"></i><?= Helpers::sanitize($restockHint) ?>
+        <div class="product-card__body">
+            <div class="product-card__top">
+                <h3 class="product-card__title"><?= Helpers::sanitize($productName) ?><span class="product-card__duration"> – <?= Helpers::sanitize($durationLabel) ?></span></h3>
+                <div class="product-card__price"><?= $productPriceHtml ?></div>
             </div>
-        <?php endif; ?>
-        <div class="product-card__actions">
-            <button type="button"
-                    class="product-card__button<?= $buttonDisabled ? ' is-disabled' : '' ?>"
-                    data-bs-toggle="modal"
-                    data-bs-target="#orderModal"
-                    data-product-id="<?= $productId ?>"
-                    data-product-name="<?= Helpers::sanitize($productName) ?>"
-                    data-product-price-html="<?= htmlspecialchars($productPriceHtml, ENT_QUOTES, 'UTF-8') ?>"
-                    data-product-base-amount="<?= Helpers::sanitize(number_format($productBaseAmount, 6, '.', '')) ?>"
-                    data-product-base-currency="<?= Helpers::sanitize($productBaseCurrency) ?>"
-                    data-product-sku="<?= Helpers::sanitize($skuValue ?: '-') ?>"
-                    data-product-category="<?= Helpers::sanitize($categoryTrail) ?>"
-                    <?= $buttonDisabled ? 'disabled aria-disabled="true" title="Stok tükendi"' : '' ?>>
-                Sipariş ver
-            </button>
-            <button type="button"
-                    class="btn btn-outline-secondary btn-sm ms-2 js-favorite-toggle<?= $isFavorited ? ' active' : '' ?>"
-                    data-product-id="<?= $productId ?>"
-                    title="<?= $isFavorited ? 'Favorilerden çıkar' : 'Favorilere ekle' ?>">
-                <i class="bi <?= $isFavorited ? 'bi-heart-fill text-danger' : 'bi-heart' ?>"></i>
-            </button>
-            <button type="button"
-                    class="btn btn-outline-warning btn-sm ms-2 js-watch-toggle<?= $isWatching ? ' active' : '' ?>"
-                    data-product-id="<?= $productId ?>"
-                    title="Stok bildirimi">
-                <i class="bi <?= $isWatching ? 'bi-bell-fill' : 'bi-bell' ?>"></i>
-            </button>
+            <div class="product-card__meta-line"><?= Helpers::sanitize($categorySupplierLabel) ?></div>
+            <?php if ($skuValue): ?>
+                <div class="product-card__sku">SKU: <?= Helpers::sanitize($skuValue) ?></div>
+            <?php endif; ?>
+            <div class="product-card__badges">
+                <span class="badge <?= htmlspecialchars($automaticBadgeClass, ENT_QUOTES, 'UTF-8') ?>"><?= Helpers::sanitize($automaticDelivery ? 'Otomatik Teslimat' : 'Manuel Teslimat') ?></span>
+                <span class="badge <?= htmlspecialchars($unlimitedBadgeClass, ENT_QUOTES, 'UTF-8') ?>"><?= Helpers::sanitize($hasUnlimitedDelivery ? 'Sınırsız Teslimat' : 'Stok Takipli') ?></span>
+            </div>
+            <div class="product-card__stock">
+                <span class="badge <?= htmlspecialchars($stockBadgeClass, ENT_QUOTES, 'UTF-8') ?>"><?= Helpers::sanitize($stockLabel) ?></span>
+                <?php if ($stockDetail !== ''): ?>
+                    <div class="product-card__stock-detail"><?= Helpers::sanitize($stockDetail) ?></div>
+                <?php endif; ?>
+            </div>
+            <p class="product-card__description"><?= Helpers::sanitize($shortDescription) ?></p>
+            <?php if ($restockHint !== ''): ?>
+                <div class="product-card__hint">
+                    <i class="bi bi-lightbulb me-1"></i><?= Helpers::sanitize($restockHint) ?>
+                </div>
+            <?php endif; ?>
+            <div class="product-card__actions">
+                <button type="button"
+                        class="product-card__button<?= $buttonDisabled ? ' is-disabled' : '' ?>"
+                        data-bs-toggle="modal"
+                        data-bs-target="#orderModal"
+                        data-product-id="<?= $productId ?>"
+                        data-product-name="<?= Helpers::sanitize($productName) ?>"
+                        data-product-price-html="<?= htmlspecialchars($productPriceHtml, ENT_QUOTES, 'UTF-8') ?>"
+                        data-product-base-amount="<?= Helpers::sanitize(number_format($productBaseAmount, 6, '.', '')) ?>"
+                        data-product-base-currency="<?= Helpers::sanitize($productBaseCurrency) ?>"
+                        data-product-sku="<?= Helpers::sanitize($skuValue ?: '-') ?>"
+                        data-product-category="<?= Helpers::sanitize($categoryTrail) ?>"
+                        <?= $buttonDisabled ? 'disabled aria-disabled="true" title="Stok tükendi"' : '' ?>>
+                    Sipariş ver
+                </button>
+                <button type="button"
+                        class="btn btn-outline-secondary btn-sm js-favorite-toggle<?= $isFavorited ? ' active' : '' ?>"
+                        data-product-id="<?= $productId ?>"
+                        title="<?= $isFavorited ? 'Favorilerden çıkar' : 'Favorilere ekle' ?>">
+                    <i class="bi <?= $isFavorited ? 'bi-heart-fill text-danger' : 'bi-heart' ?>"></i>
+                </button>
+                <button type="button"
+                        class="btn btn-outline-warning btn-sm js-watch-toggle<?= $isWatching ? ' active' : '' ?>"
+                        data-product-id="<?= $productId ?>"
+                        title="Stok bildirimi">
+                    <i class="bi <?= $isWatching ? 'bi-bell-fill' : 'bi-bell' ?>"></i>
+                </button>
+            </div>
         </div>
     </div>
     <?php
@@ -564,9 +605,11 @@ include __DIR__ . '/templates/header.php';
             <div class="catalog-subheader">Ürünler</div>
 
             <?php if ($products): ?>
-                <div class="catalog-products">
+                <div class="catalog-products row g-4">
                     <?php foreach ($products as $product): ?>
-                        <?= $renderProductCard($product) ?>
+                        <div class="col-12 col-sm-6 col-md-4 col-lg-3 d-flex">
+                            <?= $renderProductCard($product) ?>
+                        </div>
                     <?php endforeach; ?>
                 </div>
             <?php else: ?>

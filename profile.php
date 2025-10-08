@@ -5,11 +5,7 @@ use App\Auth;
 use App\Database;
 use App\Helpers;
 
-if (empty($_SESSION['user'])) {
-    Helpers::redirect('/');
-}
-
-$user = $_SESSION['user'];
+$user = Auth::requireReseller();
 
 $pdo = Database::connection();
 $errors = array();
@@ -100,7 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                         $freshUser = Auth::findUser($user['id']);
                         if ($freshUser) {
-                            $_SESSION['user'] = $freshUser;
+                            Auth::refreshUser($freshUser);
                             $user = $freshUser;
                         }
 
@@ -137,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $freshUser = Auth::findUser($user['id']);
                 if ($freshUser) {
-                    $_SESSION['user'] = $freshUser;
+                    Auth::refreshUser($freshUser);
                     $user = $freshUser;
                 }
 
@@ -176,7 +172,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     $freshUser = Auth::findUser($user['id']);
                     if ($freshUser) {
-                        $_SESSION['user'] = $freshUser;
+                        Auth::refreshUser($freshUser);
                         $user = $freshUser;
                     }
 

@@ -7,9 +7,7 @@ use App\Helpers;
 use App\Settings;
 use App\Telegram;
 
-Auth::requireRoles(array('super_admin', 'admin'));
-
-$currentUser = $_SESSION['user'];
+$currentUser = Auth::requireAdmin(array('super_admin', 'admin'));
 $errors = array();
 $success = '';
 
