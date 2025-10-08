@@ -21,6 +21,10 @@ final class Schema
         self::ensureLanguageTranslationsTable($pdo);
         self::ensureCategoriesTable($pdo);
         self::ensureProductsTable($pdo);
+        self::ensureAnnouncementsTable($pdo);
+        self::ensureProviderSourcesTable($pdo);
+        self::ensureProviderRemoteCategoriesTable($pdo);
+        self::ensureProviderRemoteProductsTable($pdo);
         self::ensureProductStockTable($pdo);
         self::ensureProductOrdersTable($pdo);
         self::ensureResellerFavoritesTable($pdo);
@@ -30,7 +34,7 @@ final class Schema
         self::ensureBlogCategoriesTable($pdo);
         self::ensureBlogPostsTable($pdo);
         self::ensureInstructionsTable($pdo);
-        self::ensureAnnouncementsTable($pdo);
+        self::ensureSystemSettingsTable($pdo);
         self::ensureUserApiKeyColumn($pdo);
 
     }
@@ -125,6 +129,7 @@ final class Schema
             name VARCHAR(150) NOT NULL,
             sku VARCHAR(150) NULL,
             description MEDIUMTEXT NULL,
+            image VARCHAR(255) NULL,
             cost_price_try DECIMAL(12,2) NULL,
             price DECIMAL(12,2) NOT NULL DEFAULT 0,
             status ENUM('active','inactive') NOT NULL DEFAULT 'active',
@@ -135,6 +140,87 @@ final class Schema
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
         self::ensureColumn($pdo, 'products', 'automatic_delivery', "TINYINT(1) NOT NULL DEFAULT 1");
+        self::ensureColumn($pdo, 'products', 'image', 'VARCHAR(255) NULL');
+    }
+
+    private static function ensureProviderSourcesTable(PDO $pdo): void
+    {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS provider_sources (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(150) NOT NULL,
+            base_url VARCHAR(255) NOT NULL,
+            consumer_key VARCHAR(191) NULL,
+            consumer_secret VARCHAR(191) NULL,
+            webhook_secret VARCHAR(191) NULL,
+            status ENUM('active','inactive') NOT NULL DEFAULT 'inactive',
+            last_synced_at DATETIME NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_provider_name (name)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        self::ensureColumn($pdo, 'provider_sources', 'webhook_secret', 'VARCHAR(191) NULL');
+        self::ensureColumn($pdo, 'provider_sources', 'last_synced_at', 'DATETIME NULL');
+    }
+
+    private static function ensureProviderRemoteCategoriesTable(PDO $pdo): void
+    {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS provider_remote_categories (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            provider_id INT NOT NULL,
+            remote_id BIGINT NOT NULL,
+            parent_remote_id BIGINT NULL,
+            name VARCHAR(191) NOT NULL,
+            slug VARCHAR(191) NULL,
+            mapped_category_id INT NULL,
+            last_synced_at DATETIME NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_provider_remote_category (provider_id, remote_id),
+            INDEX idx_provider_category_lookup (provider_id, mapped_category_id),
+            CONSTRAINT fk_provider_category_source FOREIGN KEY (provider_id) REFERENCES provider_sources(id) ON DELETE CASCADE,
+            CONSTRAINT fk_provider_category_mapping FOREIGN KEY (mapped_category_id) REFERENCES categories(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        self::ensureColumn($pdo, 'provider_remote_categories', 'last_synced_at', 'DATETIME NULL');
+        self::ensureColumn($pdo, 'provider_remote_categories', 'mapped_category_id', 'INT NULL');
+        self::addIndex($pdo, 'provider_remote_categories', 'idx_provider_category_lookup', 'ADD INDEX idx_provider_category_lookup (provider_id, mapped_category_id)');
+    }
+
+    private static function ensureProviderRemoteProductsTable(PDO $pdo): void
+    {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS provider_remote_products (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            provider_id INT NOT NULL,
+            remote_id BIGINT NOT NULL,
+            name VARCHAR(191) NOT NULL,
+            slug VARCHAR(191) NULL,
+            price DECIMAL(12,2) NULL,
+            currency VARCHAR(10) NULL,
+            status VARCHAR(50) NULL,
+            remote_category_id BIGINT NULL,
+            remote_category_name VARCHAR(191) NULL,
+            stock_quantity INT NULL,
+            stock_status VARCHAR(50) NULL,
+            imported_product_id INT NULL,
+            announcement_id INT NULL,
+            last_synced_at DATETIME NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_provider_remote_product (provider_id, remote_id),
+            INDEX idx_provider_remote_category (provider_id, remote_category_id),
+            CONSTRAINT fk_provider_product_source FOREIGN KEY (provider_id) REFERENCES provider_sources(id) ON DELETE CASCADE,
+            CONSTRAINT fk_provider_product_local FOREIGN KEY (imported_product_id) REFERENCES products(id) ON DELETE SET NULL,
+            CONSTRAINT fk_provider_product_announcement FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        self::ensureColumn($pdo, 'provider_remote_products', 'currency', 'VARCHAR(10) NULL');
+        self::ensureColumn($pdo, 'provider_remote_products', 'remote_category_name', 'VARCHAR(191) NULL');
+        self::ensureColumn($pdo, 'provider_remote_products', 'stock_quantity', 'INT NULL');
+        self::ensureColumn($pdo, 'provider_remote_products', 'stock_status', 'VARCHAR(50) NULL');
+        self::ensureColumn($pdo, 'provider_remote_products', 'announcement_id', 'INT NULL');
+        self::ensureColumn($pdo, 'provider_remote_products', 'last_synced_at', 'DATETIME NULL');
+        self::addIndex($pdo, 'provider_remote_products', 'idx_provider_remote_category', 'ADD INDEX idx_provider_remote_category (provider_id, remote_category_id)');
     }
 
     private static function ensureProductStockTable(PDO $pdo): void
@@ -338,6 +424,33 @@ final class Schema
         self::ensureColumn($pdo, 'announcements', 'starts_at', 'DATETIME NULL');
         self::ensureColumn($pdo, 'announcements', 'ends_at', 'DATETIME NULL');
         self::ensureColumn($pdo, 'announcements', 'created_by', 'INT NULL');
+    }
+
+    private static function ensureSystemSettingsTable(PDO $pdo): void
+    {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS system_settings (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            setting_key VARCHAR(150) NOT NULL UNIQUE,
+            setting_value TEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $stmt = $pdo->prepare('INSERT INTO system_settings (setting_key, setting_value, created_at)
+            VALUES (:key, :value, NOW())
+            ON DUPLICATE KEY UPDATE setting_value = setting_value');
+
+        $defaults = array(
+            'ai_image_enabled' => '0',
+            'ai_api_key' => null,
+            'ai_prompt' => null,
+            'ai_image_template' => null,
+            'store_active_theme' => 'default'
+        );
+
+        foreach ($defaults as $key => $value) {
+            $stmt->execute(array('key' => $key, 'value' => $value));
+        }
     }
 
 

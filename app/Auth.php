@@ -10,6 +10,17 @@ use RuntimeException;
 
 class Auth
 {
+    const ADMIN_SESSION_KEY = 'admin_user';
+    const ADMIN_ID_SESSION_KEY = 'admin_id';
+    const RESELLER_SESSION_KEY = 'reseller_user';
+    const RESELLER_ID_SESSION_KEY = 'reseller_id';
+
+    private static function ensureSessionStarted()
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
+        }
+    }
     private static $roleLabels = array(
         'super_admin' => 'Süper Yönetici',
         'admin' => 'Yönetici',
@@ -75,15 +86,132 @@ class Auth
             $roles = array($roles);
         }
 
-        if (session_status() !== PHP_SESSION_ACTIVE) {
-            session_start();
-        }
-
-        $user = isset($_SESSION['user']) ? $_SESSION['user'] : null;
+        $user = self::currentUser();
 
         if (!$user || !self::userHasRole($user, $roles)) {
             Helpers::redirect($redirect);
         }
+    }
+
+    public static function requireAdmin($roles = null, $redirect = '/admin/login.php')
+    {
+        $admin = self::currentAdmin();
+
+        if (!$admin) {
+            Helpers::redirect($redirect);
+        }
+
+        if ($roles !== null) {
+            if (!is_array($roles)) {
+                $roles = array($roles);
+            }
+
+            if (!self::userHasRole($admin, $roles)) {
+                Helpers::redirect($redirect);
+            }
+        }
+
+        return $admin;
+    }
+
+    public static function requireReseller($redirect = '/bayi/login.php')
+    {
+        $reseller = self::currentReseller();
+
+        if (!$reseller) {
+            Helpers::redirect($redirect);
+        }
+
+        return $reseller;
+    }
+
+    public static function login(array $user)
+    {
+        if (self::isAdminRole($user['role'])) {
+            self::loginAdmin($user);
+            return;
+        }
+
+        self::loginReseller($user);
+    }
+
+    public static function loginAdmin(array $user)
+    {
+        self::ensureSessionStarted();
+        $_SESSION[self::ADMIN_SESSION_KEY] = $user;
+        $_SESSION[self::ADMIN_ID_SESSION_KEY] = isset($user['id']) ? (int)$user['id'] : null;
+    }
+
+    public static function loginReseller(array $user)
+    {
+        self::ensureSessionStarted();
+        $_SESSION[self::RESELLER_SESSION_KEY] = $user;
+        $_SESSION[self::RESELLER_ID_SESSION_KEY] = isset($user['id']) ? (int)$user['id'] : null;
+    }
+
+    public static function logoutAdmin()
+    {
+        self::ensureSessionStarted();
+        unset($_SESSION[self::ADMIN_SESSION_KEY], $_SESSION[self::ADMIN_ID_SESSION_KEY]);
+    }
+
+    public static function logoutReseller()
+    {
+        self::ensureSessionStarted();
+        unset($_SESSION[self::RESELLER_SESSION_KEY], $_SESSION[self::RESELLER_ID_SESSION_KEY]);
+    }
+
+    public static function currentAdmin()
+    {
+        self::ensureSessionStarted();
+        return isset($_SESSION[self::ADMIN_SESSION_KEY]) ? $_SESSION[self::ADMIN_SESSION_KEY] : null;
+    }
+
+    public static function currentReseller()
+    {
+        self::ensureSessionStarted();
+        return isset($_SESSION[self::RESELLER_SESSION_KEY]) ? $_SESSION[self::RESELLER_SESSION_KEY] : null;
+    }
+
+    public static function currentUser()
+    {
+        self::ensureSessionStarted();
+
+        $path = Helpers::currentPath();
+
+        if (strpos($path, '/admin/') === 0) {
+            $admin = self::currentAdmin();
+            if ($admin) {
+                return $admin;
+            }
+        }
+
+        if (strpos($path, '/bayi/') === 0) {
+            $reseller = self::currentReseller();
+            if ($reseller) {
+                return $reseller;
+            }
+        }
+
+        if (isset($_SESSION[self::ADMIN_SESSION_KEY])) {
+            return $_SESSION[self::ADMIN_SESSION_KEY];
+        }
+
+        if (isset($_SESSION[self::RESELLER_SESSION_KEY])) {
+            return $_SESSION[self::RESELLER_SESSION_KEY];
+        }
+
+        return null;
+    }
+
+    public static function refreshUser(array $user)
+    {
+        if (self::isAdminRole($user['role'])) {
+            self::loginAdmin($user);
+            return;
+        }
+
+        self::loginReseller($user);
     }
 
     /**
@@ -142,6 +270,20 @@ class Auth
         }
 
         return null;
+    }
+
+    public static function findActiveUserByEmail(string $email): ?array
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT * FROM users WHERE email = :email AND status = :status LIMIT 1');
+        $stmt->execute([
+            'email' => $email,
+            'status' => 'active',
+        ]);
+
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $user ?: null;
     }
 
     /**
