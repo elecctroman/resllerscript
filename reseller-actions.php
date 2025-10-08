@@ -8,16 +8,10 @@ use App\Services\ProductOrderService;
 
 header('Content-Type: application/json');
 
-if (empty($_SESSION['user'])) {
+$user = Auth::currentReseller();
+if (!$user) {
     http_response_code(401);
     echo json_encode(['success' => false, 'error' => 'Yetkilendirme başarısız.']);
-    exit;
-}
-
-$user = $_SESSION['user'];
-if (Auth::isAdminRole($user['role'])) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'error' => 'Yalnızca bayi kullanıcıları işlem yapabilir.']);
     exit;
 }
 

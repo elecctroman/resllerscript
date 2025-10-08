@@ -1,0 +1,9 @@
+{
+  "name": "Default",
+  "version": "1.0.0",
+  "author": "Reseller Automation",
+  "assets": {
+    "css": ["css/style.css"],
+    "js": ["js/app.js"]
+  }
+}

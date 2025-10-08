@@ -1,14 +1,11 @@
 <?php
 require __DIR__ . '/bootstrap.php';
 
+use App\Auth;
 use App\Helpers;
 use App\Services\PremiumPurchaseService;
 
-if (empty($_SESSION['user'])) {
-    Helpers::redirect('/');
-}
-
-$user = $_SESSION['user'];
+$user = Auth::requireReseller();
 
 $purchaseId = isset($_GET['purchase']) ? (int) $_GET['purchase'] : 0;
 $expires = isset($_GET['expires']) ? (int) $_GET['expires'] : 0;
