@@ -156,6 +156,33 @@ class Settings
     }
 
     /**
+     * Clears the in-memory settings cache so subsequent lookups hit the database again.
+     *
+     * @param string|array<int,string>|null $keys
+     * @return void
+     */
+    public static function clearCache($keys = null)
+    {
+        if ($keys === null) {
+            self::$cache = [];
+            self::$settingsTableChecked = false;
+            self::$settingsTableMissing = false;
+
+            return;
+        }
+
+        if (!is_array($keys)) {
+            $keys = [$keys];
+        }
+
+        foreach ($keys as $key) {
+            if (is_string($key)) {
+                unset(self::$cache[$key]);
+            }
+        }
+    }
+
+    /**
      * @param PDOException $exception
      * @return bool
      */
