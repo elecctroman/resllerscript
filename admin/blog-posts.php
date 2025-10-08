@@ -7,10 +7,9 @@ use App\Blog\BlogRepository;
 use App\Database;
 use App\Helpers;
 
-Auth::requireRoles(array('super_admin', 'admin', 'content'));
+$currentUser = Auth::requireAdmin(array('super_admin', 'admin', 'content'));
 
 $pdo = Database::connection();
-$currentUser = $_SESSION['user'];
 $errors = array();
 $success = '';
 $categories = $pdo->query('SELECT id, name FROM blog_categories ORDER BY name ASC')->fetchAll();

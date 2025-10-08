@@ -1,0 +1,20 @@
+RewriteEngine On
+
+# Legacy mağaza yollarını köke yönlendir
+RewriteCond %{REQUEST_URI} ^/magaza/?(.*)$ [NC]
+RewriteRule ^magaza/?(.*)$ /$1 [R=301,L]
+
+# Admin ve bayi alt yollarına dokunma
+RewriteCond %{REQUEST_URI} ^/admin [NC]
+RewriteRule ^ - [L]
+
+RewriteCond %{REQUEST_URI} ^/bayi [NC]
+RewriteRule ^ - [L]
+
+# Statik dosyaları olduğu gibi sun
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Diğer tüm istekleri mağaza girişine yönlendir
+RewriteRule ^ index.php [L]
