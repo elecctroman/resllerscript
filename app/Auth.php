@@ -144,6 +144,20 @@ class Auth
         return null;
     }
 
+    public static function findActiveUserByEmail(string $email): ?array
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT * FROM users WHERE email = :email AND status = :status LIMIT 1');
+        $stmt->execute([
+            'email' => $email,
+            'status' => 'active',
+        ]);
+
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $user ?: null;
+    }
+
     /**
      * @param string $name
      * @param string $email
