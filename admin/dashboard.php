@@ -6,9 +6,7 @@ use App\Helpers;
 use App\Database;
 use App\Reporting;
 
-Auth::requireRoles(array('super_admin', 'admin', 'finance'));
-
-$user = $_SESSION['user'];
+$user = Auth::requireAdmin(array('super_admin', 'admin', 'finance'));
 $pdo = Database::connection();
 $pageTitle = 'Yönetici Paneli';
 
@@ -204,7 +202,7 @@ include __DIR__ . '/../templates/header.php';
                         <a href="/admin/product-orders.php" class="btn btn-outline-primary w-100">Ürün Siparişleri</a>
                     </div>
                     <div class="col-sm-6 col-xl-3">
-                        <a href="/admin/users.php" class="btn btn-outline-primary w-100">Bayiler</a>
+                        <a href="/admin/users/index.php" class="btn btn-outline-primary w-100">Üyeler</a>
                     </div>
                     <div class="col-sm-6 col-xl-3">
                         <a href="/admin/products.php" class="btn btn-outline-primary w-100">Ürünler &amp; Kategoriler</a>
