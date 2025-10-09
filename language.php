@@ -38,10 +38,12 @@ if ($isJsonRequest && $_SERVER['REQUEST_METHOD'] === 'POST') {
     Lang::setLocale($locale);
     $activeLocale = Lang::locale();
 
-    if (!empty($_SESSION['user']) && isset($_SESSION['user']['id'])) {
-        $userId = (int) $_SESSION['user']['id'];
+    $currentUser = Auth::currentUser();
+    if ($currentUser && isset($currentUser['id'])) {
+        $userId = (int) $currentUser['id'];
         Settings::set('user_' . $userId . '_preferred_language', $activeLocale);
-        $_SESSION['user']['locale'] = $activeLocale;
+        $currentUser['locale'] = $activeLocale;
+        Auth::refreshUser($currentUser);
     }
 
     $defaultLocale = class_exists(LanguageService::class) ? LanguageService::defaultCode() : Lang::defaultLocale();
@@ -107,14 +109,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 Lang::setLocale($locale);
 $activeLocale = Lang::locale();
 
-if (!empty($_SESSION['user']) && isset($_SESSION['user']['id'])) {
-    $userId = (int) $_SESSION['user']['id'];
+if (!isset($currentUser)) {
+    $currentUser = Auth::currentUser();
+}
+
+if ($currentUser && isset($currentUser['id'])) {
+    $userId = (int) $currentUser['id'];
     Settings::set('user_' . $userId . '_preferred_language', $activeLocale);
-    $_SESSION['user']['locale'] = $activeLocale;
+
     $freshUser = Auth::findUser($userId);
     if ($freshUser) {
-        $_SESSION['user'] = $freshUser;
-        $_SESSION['user']['locale'] = $activeLocale;
+        $freshUser['locale'] = $activeLocale;
+        Auth::refreshUser($freshUser);
+    } else {
+        $currentUser['locale'] = $activeLocale;
+        Auth::refreshUser($currentUser);
     }
 }
 

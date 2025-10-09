@@ -4,6 +4,8 @@ require __DIR__ . '/../bootstrap.php';
 use App\Helpers;
 use App\Auth;
 
-Auth::requireRoles(Auth::adminRoles(), '/dashboard.php');
+if (!Auth::currentAdmin()) {
+    Helpers::redirect('/admin/login.php');
+}
 
 Helpers::redirect('/admin/dashboard.php');

@@ -6,9 +6,7 @@ use App\AuditLog;
 use App\Helpers;
 use App\Database;
 
-Auth::requireRoles(array('super_admin', 'admin'));
-
-$currentUser = $_SESSION['user'];
+$currentUser = Auth::requireAdmin(array('super_admin', 'admin'));
 $pdo = Database::connection();
 $errors = array();
 $success = '';

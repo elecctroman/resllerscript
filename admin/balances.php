@@ -9,9 +9,7 @@ use App\Notifications\ResellerNotifier;
 use App\Services\PackageOrderService;
 use App\Telegram;
 
-Auth::requireRoles(array('super_admin', 'admin', 'finance'));
-
-$currentUser = $_SESSION['user'];
+$currentUser = Auth::requireAdmin(array('super_admin', 'admin', 'finance'));
 $pdo = Database::connection();
 $errors = [];
 $success = '';
