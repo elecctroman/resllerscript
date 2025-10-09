@@ -7,9 +7,7 @@ use App\Helpers;
 use App\Database;
 use App\Notifications\ResellerNotifier;
 
-Auth::requireRoles(array('super_admin', 'admin', 'support'));
-
-$currentUser = $_SESSION['user'];
+$currentUser = Auth::requireAdmin(array('super_admin', 'admin', 'support'));
 $pdo = Database::connection();
 $errors = [];
 $success = '';
