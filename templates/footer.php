@@ -25,63 +25,70 @@ $pageInlineScripts = isset($GLOBALS['pageInlineScripts']) && is_array($GLOBALS['
     document.addEventListener('DOMContentLoaded', function () {
         var app = window.App = window.App || {};
 
-        var sidebar = document.getElementById('appSidebar');
-        if (sidebar) {
-            var body = document.body;
-            var toggles = document.querySelectorAll('[data-sidebar-toggle]');
-            var closers = document.querySelectorAll('[data-sidebar-close]');
-            var sidebarLinks = sidebar.querySelectorAll('a');
+        var tables = Array.prototype.slice.call(document.querySelectorAll('table'));
+        tables.forEach(function (table) {
+            if (!table || table.closest('.table-responsive')) {
+                return;
+            }
+            var wrapper = document.createElement('div');
+            wrapper.className = 'table-responsive';
+            table.parentNode.insertBefore(wrapper, table);
+            wrapper.appendChild(table);
+        });
 
-            var closeSidebar = function () {
-                if (!body.classList.contains('sidebar-open')) {
-                    return;
-                }
-                body.classList.remove('sidebar-open');
-                toggles.forEach(function (toggle) {
-                    toggle.setAttribute('aria-expanded', 'false');
-                });
-            };
+        if (window.bootstrap) {
+            var navbarElement = document.getElementById('appNavbar');
+            if (navbarElement) {
+                var dropdownToggles = Array.prototype.slice.call(navbarElement.querySelectorAll('.dropdown-toggle'));
+                dropdownToggles.forEach(function (toggle) {
+                    toggle.addEventListener('keydown', function (event) {
+                        var key = event.key || event.code;
+                        if (key === ' ' || key === 'Spacebar') {
+                            key = 'Space';
+                        }
+                        if (key === 'Enter' || key === 'Space' || key === 'ArrowDown') {
+                            event.preventDefault();
+                            var dropdown = bootstrap.Dropdown.getOrCreateInstance(toggle, { autoClose: 'outside' });
+                            dropdown.show();
+                            var menu = toggle.nextElementSibling;
+                            if (menu) {
+                                var firstItem = menu.querySelector('.dropdown-item');
+                                if (firstItem) {
+                                    setTimeout(function () {
+                                        firstItem.focus();
+                                    }, 10);
+                                }
+                            }
+                        } else if (key === 'ArrowUp') {
+                            event.preventDefault();
+                            var dropdownUp = bootstrap.Dropdown.getOrCreateInstance(toggle, { autoClose: 'outside' });
+                            dropdownUp.show();
+                            var menuUp = toggle.nextElementSibling;
+                            if (menuUp) {
+                                var items = menuUp.querySelectorAll('.dropdown-item');
+                                if (items.length) {
+                                    setTimeout(function () {
+                                        items[items.length - 1].focus();
+                                    }, 10);
+                                }
+                            }
+                        }
+                    });
 
-            var openSidebar = function (trigger) {
-                body.classList.add('sidebar-open');
-                toggles.forEach(function (toggle) {
-                    toggle.setAttribute('aria-expanded', toggle === trigger ? 'true' : 'false');
-                });
-            };
-
-            toggles.forEach(function (toggle) {
-                toggle.addEventListener('click', function () {
-                    if (body.classList.contains('sidebar-open')) {
-                        closeSidebar();
-                    } else {
-                        openSidebar(toggle);
+                    var menuElement = toggle.nextElementSibling;
+                    if (menuElement && !menuElement.hasAttribute('data-app-dropdown-keyboard')) {
+                        menuElement.setAttribute('data-app-dropdown-keyboard', 'true');
+                        menuElement.addEventListener('keydown', function (event) {
+                            if (event.key === 'Escape' || event.key === 'Esc') {
+                                event.preventDefault();
+                                var dropdownInstance = bootstrap.Dropdown.getOrCreateInstance(toggle, { autoClose: 'outside' });
+                                dropdownInstance.hide();
+                                toggle.focus();
+                            }
+                        });
                     }
                 });
-            });
-
-            closers.forEach(function (closer) {
-                closer.addEventListener('click', closeSidebar);
-            });
-
-            sidebarLinks.forEach(function (link) {
-                link.addEventListener('click', function () {
-                    if (window.innerWidth < 992) {
-                        closeSidebar();
-                    }
-                });
-            });
-
-            document.addEventListener('keyup', function (event) {
-                if (event.key === 'Escape') {
-                    closeSidebar();
-                }
-            });
-
-            window.addEventListener('resize', function () {
-                if (window.innerWidth >= 992) {
-                    closeSidebar();
-                }
-            });
+            }
         }
 
         function toPairs(dictionary) {
