@@ -1,0 +1,13 @@
+<svg width="160" height="40" viewBox="0 0 160 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="160" height="40" rx="12" fill="url(#gradient)"/>
+  <path d="M29 13H23V27H29C33.4183 27 37 23.4183 37 19C37 14.5817 33.4183 13 29 13Z" fill="white" opacity="0.25"/>
+  <path d="M20 27H12.5C11.6716 27 11 26.3284 11 25.5V14.5C11 13.6716 11.6716 13 12.5 13H20C23.5899 13 26.5 15.9101 26.5 19.5C26.5 23.0899 23.5899 27 20 27Z" fill="white"/>
+  <text x="52" y="24" fill="white" font-family="'Inter', 'Segoe UI', sans-serif" font-size="14" font-weight="600">Bayi Yönetim</text>
+  <text x="52" y="33" fill="rgba(255,255,255,0.65)" font-family="'Inter', 'Segoe UI', sans-serif" font-size="10">Otomasyon Paneli</text>
+  <defs>
+    <linearGradient id="gradient" x1="0" y1="0" x2="160" y2="40" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1f3c88"/>
+      <stop offset="100%" stop-color="#151a3b"/>
+    </linearGradient>
+  </defs>
+</svg>
