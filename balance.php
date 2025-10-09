@@ -21,7 +21,7 @@ if (Auth::isAdminRole($user['role'])) {
 
 if (!Helpers::featureEnabled('balance')) {
     Helpers::setFlash('warning', 'Bakiye işlemleri şu anda devre dışı.');
-    Helpers::redirect('/dashboard.php');
+    Helpers::redirect('/account/index.php');
 }
 
 $pdo = Database::connection();
