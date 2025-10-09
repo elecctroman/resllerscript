@@ -19,7 +19,7 @@ if (Auth::isAdminRole($user['role'])) {
 $featureAvailable = Helpers::featureEnabled('products');
 if (!$featureAvailable) {
     Helpers::setFlash('warning', 'Ürün kataloğu şu anda kullanılamıyor.');
-    Helpers::redirect('/dashboard.php');
+    Helpers::redirect('/account/index.php');
 }
 
 $selectedCategoryId = isset($_GET['category']) ? max(0, (int)$_GET['category']) : 0;

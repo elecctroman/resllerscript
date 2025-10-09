@@ -5,7 +5,7 @@ use App\Auth;
 use App\Helpers;
 
 if (!empty($_SESSION['user'])) {
-    Helpers::redirect('/dashboard.php');
+    Helpers::redirect('/account/index.php');
 }
 
 $errors = [];

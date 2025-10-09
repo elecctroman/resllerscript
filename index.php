@@ -216,7 +216,7 @@ $siteName = Helpers::siteName();
 $siteTagline = Helpers::siteTagline();
 
 if (!empty($_SESSION['user'])) {
-    $redirectTarget = Auth::isAdminRole($_SESSION['user']['role']) ? '/admin/dashboard.php' : '/dashboard.php';
+    $redirectTarget = Auth::isAdminRole($_SESSION['user']['role']) ? '/admin/dashboard.php' : '/account/index.php';
     Helpers::redirect($redirectTarget);
 }
 
@@ -245,7 +245,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } else {
                     Lang::boot();
                 }
-                $redirectTarget = Auth::isAdminRole($user['role']) ? '/admin/dashboard.php' : '/dashboard.php';
+                $redirectTarget = Auth::isAdminRole($user['role']) ? '/admin/dashboard.php' : '/account/index.php';
                 Helpers::redirect($redirectTarget);
             } else {
                 $errors[] = 'Bilgileriniz doğrulanamadı. Lütfen tekrar deneyin.';

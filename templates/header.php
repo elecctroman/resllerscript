@@ -206,7 +206,7 @@ if ($user) {
         }
     } else {
         $resellerItems = array(
-            array('label' => 'Kontrol Paneli', 'href' => '/dashboard.php', 'pattern' => '/dashboard.php', 'icon' => 'bi-speedometer2'),
+            array('label' => 'Kontrol Paneli', 'href' => '/account/index.php', 'pattern' => '/account/*', 'icon' => 'bi-speedometer2'),
             array('label' => 'Bayi Analitiği', 'href' => '/analytics.php', 'pattern' => '/analytics.php', 'icon' => 'bi-graph-up'),
         );
 
@@ -214,13 +214,13 @@ if ($user) {
             $resellerItems[] = array('label' => 'Ürünler', 'href' => '/products.php', 'pattern' => '/products.php', 'icon' => 'bi-box');
         }
         if (Helpers::featureEnabled('orders')) {
-            $resellerItems[] = array('label' => 'Siparişlerim', 'href' => '/orders.php', 'pattern' => '/orders.php', 'icon' => 'bi-receipt');
+            $resellerItems[] = array('label' => 'Siparişlerim', 'href' => '/account/orders.php', 'pattern' => '/account/orders.php', 'icon' => 'bi-receipt');
         }
         if (Helpers::featureEnabled('balance')) {
             $resellerItems[] = array('label' => 'Bakiyem', 'href' => '/balance.php', 'pattern' => '/balance.php', 'icon' => 'bi-wallet2');
         }
         if (Helpers::featureEnabled('support')) {
-            $resellerItems[] = array('label' => 'Destek', 'href' => '/support.php', 'pattern' => '/support.php', 'icon' => 'bi-life-preserver');
+            $resellerItems[] = array('label' => 'Destek', 'href' => '/account/support.php', 'pattern' => '/account/support.php', 'icon' => 'bi-life-preserver');
         }
 
         $resellerItems[] = array('label' => 'Talimatlar', 'href' => '/instructions.php', 'pattern' => '/instructions.php', 'icon' => 'bi-journal-check');
@@ -229,7 +229,7 @@ if ($user) {
             $resellerItems[] = array('label' => 'Premium Modüller', 'href' => '/premium-modules.php', 'pattern' => '/premium-modules.php', 'icon' => 'bi-gem');
         }
 
-        $resellerItems[] = array('label' => 'Profilim', 'href' => '/profile.php', 'pattern' => '/profile.php', 'icon' => 'bi-person');
+        $resellerItems[] = array('label' => 'Profilim', 'href' => '/account/index.php', 'pattern' => '/account/index.php', 'icon' => 'bi-person');
 
         $menuSections[] = array(
             'heading' => 'Bayi Paneli',
@@ -281,7 +281,7 @@ $userRoleLabel = $user ? Auth::roleLabel($user['role']) : '';
     <?php if ($user): ?>
         <aside class="app-sidebar" id="appSidebar">
             <div class="sidebar-brand">
-                <a href="<?= $isAdminArea ? '/admin/dashboard.php' : '/dashboard.php' ?>"><?= Helpers::sanitize($siteName) ?></a>
+                <a href="<?= $isAdminArea ? '/admin/dashboard.php' : '/account/index.php' ?>"><?= Helpers::sanitize($siteName) ?></a>
                 <?php if ($siteTagline): ?>
                     <div class="sidebar-brand-tagline text-muted small"><?= Helpers::sanitize($siteTagline) ?></div>
                 <?php endif; ?>

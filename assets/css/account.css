@@ -1,0 +1,239 @@
+:root {
+    --account-primary: #14A800;
+    --account-secondary: #333549;
+    --account-muted: #6c7a91;
+    --account-border: #e3f1f8;
+    --account-bg: #ecf9ff;
+}
+
+body.account-app {
+    background: var(--account-bg);
+    font-family: 'Poppins', 'Roboto', sans-serif;
+    color: var(--account-secondary);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.account-header {
+    background: #fff;
+    border-bottom: 1px solid var(--account-border);
+    padding: 1.25rem 0;
+}
+
+.account-header__inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+}
+
+.account-brand__logo {
+    font-weight: 700;
+    font-size: 1.25rem;
+    color: var(--account-secondary);
+    text-decoration: none;
+}
+
+.account-brand__logo:hover {
+    text-decoration: none;
+    color: var(--account-primary);
+}
+
+.account-brand__tagline {
+    display: block;
+    font-size: 0.875rem;
+    color: var(--account-muted);
+}
+
+.account-user {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.account-user__avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(20, 168, 0, 0.12);
+    color: var(--account-primary);
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.125rem;
+}
+
+.account-user__name {
+    font-weight: 600;
+    display: block;
+}
+
+.account-user__email {
+    font-size: 0.875rem;
+    color: var(--account-muted);
+}
+
+.account-main {
+    flex: 1;
+}
+
+.account-shell .card {
+    border-radius: 18px;
+}
+
+.account-profile__avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: rgba(20, 168, 0, 0.1);
+    color: var(--account-primary);
+    font-weight: 600;
+    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.account-profile__name {
+    font-weight: 600;
+}
+
+.account-profile__email {
+    font-size: 0.9rem;
+    color: var(--account-muted);
+}
+
+.account-menu ul {
+    padding: 0;
+}
+
+.account-menu__link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.85rem 1.25rem;
+    color: var(--account-secondary);
+    text-decoration: none;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.account-menu__link:hover,
+.account-menu__link:focus {
+    background: rgba(20, 168, 0, 0.08);
+    color: var(--account-primary);
+}
+
+.account-menu__link.active {
+    background: rgba(20, 168, 0, 0.15);
+    color: var(--account-primary);
+    font-weight: 600;
+}
+
+.account-menu__icon {
+    font-size: 1.25rem;
+}
+
+#accountMenuItems.open {
+    display: block;
+}
+
+.account-content__title {
+    font-weight: 600;
+}
+
+.account-balance {
+    background: rgba(20, 168, 0, 0.15);
+    color: var(--account-primary);
+    font-weight: 600;
+    padding: 0.5rem 0.85rem;
+}
+
+.account-footer {
+    background: transparent;
+    color: var(--account-muted);
+}
+
+.account-section + .account-section {
+    margin-top: 2rem;
+}
+
+.account-section__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+}
+
+.account-section__title {
+    font-size: 1.15rem;
+    font-weight: 600;
+}
+
+.account-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.account-table thead th {
+    font-weight: 600;
+    color: var(--account-muted);
+    border-bottom: 1px solid var(--account-border);
+    padding: 0.75rem 0.5rem;
+}
+
+.account-table tbody td {
+    padding: 0.75rem 0.5rem;
+    border-bottom: 1px solid var(--account-border);
+    vertical-align: middle;
+}
+
+.account-ticket__messages {
+    background: rgba(20, 168, 0, 0.05);
+    border-radius: 12px;
+    padding: 1rem;
+}
+
+.account-ticket__message + .account-ticket__message {
+    margin-top: 0.75rem;
+    border-top: 1px dashed rgba(20, 168, 0, 0.3);
+    padding-top: 0.75rem;
+}
+
+.account-ticket__message.admin {
+    background: rgba(51, 53, 73, 0.06);
+    border-radius: 10px;
+    padding: 0.75rem;
+}
+
+@media (max-width: 991.98px) {
+    .account-header__inner {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .account-user {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .account-menu ul {
+        display: none;
+    }
+
+    #accountMenuItems.open {
+        display: block;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .account-menu__link {
+        padding: 0.75rem 1rem;
+    }
+
+    .account-balance {
+        width: 100%;
+        text-align: center;
+    }
+}

@@ -18,7 +18,7 @@ if (Auth::isAdminRole($user['role'])) {
 
 if (!Helpers::featureEnabled('premium_modules')) {
     Helpers::setFlash('warning', 'Premium modüller şu anda devre dışı.');
-    Helpers::redirect('/dashboard.php');
+    Helpers::redirect('/account/index.php');
 }
 
 $controller = new PremiumModuleController();

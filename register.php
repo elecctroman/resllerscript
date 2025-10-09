@@ -11,7 +11,7 @@ use App\Services\PackageOrderService;
 use App\Notifications\ResellerNotifier;
 
 if (!empty($_SESSION['user'])) {
-    Helpers::redirect('/dashboard.php');
+    Helpers::redirect('/account/index.php');
 }
 
 $pdo = Database::connection();
