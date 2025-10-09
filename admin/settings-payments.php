@@ -6,9 +6,7 @@ use App\AuditLog;
 use App\Helpers;
 use App\Settings;
 
-Auth::requireRoles(array('super_admin', 'admin', 'finance'));
-
-$currentUser = $_SESSION['user'];
+$currentUser = Auth::requireAdmin(array('super_admin', 'admin', 'finance'));
 $errors = array();
 $success = '';
 

@@ -7,9 +7,7 @@ use App\Database;
 use App\Auth;
 use App\Notifications\ResellerNotifier;
 
-Auth::requireRoles(array('super_admin', 'admin'));
-
-$currentUser = $_SESSION['user'];
+$currentUser = Auth::requireAdmin(array('super_admin', 'admin'));
 $pdo = Database::connection();
 $errors = array();
 $success = '';
@@ -173,7 +171,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
 
                 if ($userId === $currentUser['id']) {
-                    $_SESSION['user']['role'] = $newRole;
+                    $currentUser['role'] = $newRole;
+                    Auth::refreshUser($currentUser);
                 }
 
                 $success = 'Kullanıcı rolü güncellendi.';
