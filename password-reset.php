@@ -4,8 +4,10 @@ require __DIR__ . '/bootstrap.php';
 use App\Auth;
 use App\Helpers;
 
-if (!empty($_SESSION['user'])) {
-    Helpers::redirect('/dashboard.php');
+$activeUser = Auth::currentUser();
+if ($activeUser) {
+    $redirectTarget = Auth::isAdminRole($activeUser['role']) ? '/admin/dashboard.php' : '/dashboard.php';
+    Helpers::redirect($redirectTarget);
 }
 
 $errors = [];
