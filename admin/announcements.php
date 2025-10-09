@@ -6,9 +6,7 @@ use App\Auth;
 use App\Database;
 use App\Helpers;
 
-Auth::requireRoles(array('super_admin', 'admin', 'content'));
-
-$currentUser = $_SESSION['user'];
+$currentUser = Auth::requireAdmin(array('super_admin', 'admin', 'content'));
 $pdo = Database::connection();
 
 $errors = array();
