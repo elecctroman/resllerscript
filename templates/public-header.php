@@ -23,7 +23,7 @@ $metaKeywords = isset($metaKeywords) && $metaKeywords ? $metaKeywords : Helpers:
     <meta name="keywords" content="<?= Helpers::sanitize($metaKeywords) ?>">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="/assets/css/public.css">
+    <link rel="stylesheet" href="/assets/store/css/store.css">
 </head>
 <body class="public-app">
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark py-3 shadow-sm">

@@ -1,0 +1,29 @@
+RewriteEngine On
+
+# Legacy mağaza yollarını köke yönlendir
+RewriteCond %{REQUEST_URI} ^/magaza($|/.*) [NC]
+RewriteRule ^.*$ / [R=301,L]
+
+# Admin ve bayi alt yollarını koru
+RewriteRule ^admin($|/.*) - [L]
+RewriteRule ^bayi($|/.*) - [L]
+
+# Panel kısayollarını PHP betiklerine yönlendir
+RewriteRule ^panel/?$ panel/index.php [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}.php -f
+RewriteRule ^panel/(.+)$ panel/$1.php [L]
+
+# Var olan dosya ve dizinleri aynen sun
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Mağaza ön kontrolörü
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(account|product|category|search|cart|checkout|order|assets)/?(.*)$ index.php [L,QSA]
+
+# Diğer tüm istekleri mağazaya yönlendir
+RewriteRule ^ index.php [L]

@@ -5,9 +5,7 @@ use App\Auth;
 use App\Helpers;
 use App\Reporting;
 
-Auth::requireRoles(array('super_admin', 'admin', 'finance'));
-
-$currentUser = $_SESSION['user'];
+$currentUser = Auth::requireAdmin(array('super_admin', 'admin', 'finance'));
 $pageTitle = 'Raporlar';
 
 $today = new DateTime('today');

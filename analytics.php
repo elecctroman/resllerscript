@@ -5,11 +5,7 @@ use App\Auth;
 use App\Helpers;
 use App\Services\AnalyticsService;
 
-if (empty($_SESSION['user'])) {
-    Helpers::redirect('/');
-}
-
-$user = $_SESSION['user'];
+$user = Auth::requireCustomer('/account/login');
 if (Auth::isAdminRole($user['role'])) {
     Helpers::redirect('/admin/dashboard.php');
 }
