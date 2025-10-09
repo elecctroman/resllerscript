@@ -6,11 +6,7 @@ use App\Helpers;
 use App\Controllers\Reseller\PremiumModuleController;
 use App\View;
 
-if (empty($_SESSION['user'])) {
-    Helpers::redirect('/');
-}
-
-$user = $_SESSION['user'];
+$user = Auth::requireReseller();
 
 if (Auth::isAdminRole($user['role'])) {
     Helpers::redirect('/admin/premium-modules.php');

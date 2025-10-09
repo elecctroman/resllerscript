@@ -1,0 +1,149 @@
+{
+  "info": {
+    "_postman_id": "5f4bde80-7f9f-4fd1-a3cb-woo-commerce",
+    "name": "WooCommerce Sağlayıcı Entegrasyonu",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "WooCommerce REST API üzerinden ürün ve kategori senkronizasyonu için örnek istekler."
+  },
+  "item": [
+    {
+      "name": "Kullanıcı Bilgisi",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/wp-json/wc/v3/customers/me?consumer_key={{consumer_key}}&consumer_secret={{consumer_secret}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "wp-json",
+            "wc",
+            "v3",
+            "customers",
+            "me"
+          ],
+          "query": [
+            {
+              "key": "consumer_key",
+              "value": "{{consumer_key}}"
+            },
+            {
+              "key": "consumer_secret",
+              "value": "{{consumer_secret}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Ürün Listesi",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/wp-json/wc/v3/products?per_page=25&page=1&consumer_key={{consumer_key}}&consumer_secret={{consumer_secret}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "wp-json",
+            "wc",
+            "v3",
+            "products"
+          ],
+          "query": [
+            {
+              "key": "per_page",
+              "value": "25"
+            },
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "status",
+              "value": "publish"
+            },
+            {
+              "key": "consumer_key",
+              "value": "{{consumer_key}}"
+            },
+            {
+              "key": "consumer_secret",
+              "value": "{{consumer_secret}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Kategori Listesi",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/wp-json/wc/v3/products/categories?per_page=50&page=1&consumer_key={{consumer_key}}&consumer_secret={{consumer_secret}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "wp-json",
+            "wc",
+            "v3",
+            "products",
+            "categories"
+          ],
+          "query": [
+            {
+              "key": "per_page",
+              "value": "50"
+            },
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "consumer_key",
+              "value": "{{consumer_key}}"
+            },
+            {
+              "key": "consumer_secret",
+              "value": "{{consumer_secret}}"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "event": [],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://example.com"
+    },
+    {
+      "key": "consumer_key",
+      "value": "ck_xxxxxxxxxxxxxxxxxxxxx"
+    },
+    {
+      "key": "consumer_secret",
+      "value": "cs_xxxxxxxxxxxxxxxxxxxxx"
+    }
+  ]
+}
