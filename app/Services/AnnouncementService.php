@@ -88,4 +88,35 @@ final class AnnouncementService
             return array();
         }
     }
+
+    public static function create(string $title, string $body, string $audience = 'admin', bool $pinned = false, ?int $createdBy = null): ?int
+    {
+        try {
+            $pdo = Database::connection();
+        } catch (PDOException $exception) {
+            return null;
+        }
+
+        $stmt = $pdo->prepare('INSERT INTO announcements (title, body, audience, is_active, pinned, created_by, created_at) VALUES (:title, :body, :audience, 1, :pinned, :created_by, NOW())');
+        $stmt->execute(array(
+            'title' => $title,
+            'body' => $body,
+            'audience' => in_array($audience, array('admin', 'reseller', 'all'), true) ? $audience : 'admin',
+            'pinned' => $pinned ? 1 : 0,
+            'created_by' => $createdBy,
+        ));
+
+        return (int) $pdo->lastInsertId();
+    }
+
+    public static function deactivate(int $announcementId): void
+    {
+        try {
+            $pdo = Database::connection();
+        } catch (PDOException $exception) {
+            return;
+        }
+
+        $pdo->prepare('UPDATE announcements SET is_active = 0, updated_at = NOW() WHERE id = :id')->execute(array('id' => $announcementId));
+    }
 }

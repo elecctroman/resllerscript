@@ -1,6 +1,9 @@
 <?php
 require __DIR__ . '/bootstrap.php';
 
-session_destroy();
+use App\Auth;
+use App\Helpers;
 
-App\Helpers::redirect('/index.php');
+Auth::logoutReseller();
+
+Helpers::redirect('/bayi/login.php');

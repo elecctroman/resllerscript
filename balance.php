@@ -9,11 +9,7 @@ use App\Settings;
 use App\Telegram;
 use App\Payments\PaymentGatewayManager;
 
-if (empty($_SESSION['user'])) {
-    Helpers::redirect('/');
-}
-
-$user = $_SESSION['user'];
+$user = Auth::requireCustomer('/account/login');
 
 if (Auth::isAdminRole($user['role'])) {
     Helpers::redirect('/admin/balances.php');
@@ -138,7 +134,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->commit();
                 $freshUser = Auth::findUser($user['id']);
                 if ($freshUser) {
-                    $_SESSION['user'] = $freshUser;
+                    Auth::refreshUser($freshUser);
                     $user = $freshUser;
 
                     $requestPayload = array(
@@ -196,7 +192,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $freshUser = Auth::findUser($user['id']);
                 if ($freshUser) {
-                    $_SESSION['user'] = $freshUser;
+                    Auth::refreshUser($freshUser);
                     $user = $freshUser;
 
                     $messageLines = array(
@@ -303,7 +299,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $freshUser = Auth::findUser($user['id']);
             if ($freshUser) {
-                $_SESSION['user'] = $freshUser;
+                Auth::refreshUser($freshUser);
                 $user = $freshUser;
 
                 $messageLines = array(

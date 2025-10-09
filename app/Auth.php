@@ -10,6 +10,18 @@ use RuntimeException;
 
 class Auth
 {
+    const ADMIN_SESSION_KEY = 'admin_user';
+    const ADMIN_ID_SESSION_KEY = 'admin_id';
+    const RESELLER_SESSION_KEY = 'reseller_user';
+    const RESELLER_ID_SESSION_KEY = 'reseller_id';
+    const STORE_SESSION_KEY = 'user';
+
+    private static function ensureSessionStarted()
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
+        }
+    }
     private static $roleLabels = array(
         'super_admin' => 'Süper Yönetici',
         'admin' => 'Yönetici',
@@ -17,6 +29,7 @@ class Auth
         'support' => 'Destek',
         'content' => 'İçerik',
         'reseller' => 'Bayi',
+        'customer' => 'Müşteri',
     );
 
     /**
@@ -75,15 +88,288 @@ class Auth
             $roles = array($roles);
         }
 
-        if (session_status() !== PHP_SESSION_ACTIVE) {
-            session_start();
-        }
-
-        $user = isset($_SESSION['user']) ? $_SESSION['user'] : null;
+        $user = self::currentUser();
 
         if (!$user || !self::userHasRole($user, $roles)) {
             Helpers::redirect($redirect);
         }
+    }
+
+    public static function requireAdmin($roles = null, $redirect = '/admin/login.php')
+    {
+        $admin = self::currentAdmin();
+
+        if (!$admin) {
+            Helpers::redirect($redirect);
+        }
+
+        if ($roles !== null) {
+            if (!is_array($roles)) {
+                $roles = array($roles);
+            }
+
+            if (!self::userHasRole($admin, $roles)) {
+                Helpers::redirect($redirect);
+            }
+        }
+
+        return $admin;
+    }
+
+    /**
+     * Ensure a storefront customer session is present.
+     *
+     * @param string $redirect
+     * @return array
+     */
+    public static function requireCustomer($redirect = '/account/login')
+    {
+        $customer = self::user();
+
+        if (!$customer) {
+            Helpers::redirect($redirect);
+        }
+
+        return $customer;
+    }
+
+    public static function requireReseller($redirect = '/bayi/login.php')
+    {
+        $user = self::requireCustomer($redirect);
+
+        if (!self::userHasRole($user, array('reseller', 'admin'))) {
+            Helpers::redirect($redirect);
+        }
+
+        return $user;
+    }
+
+    public static function login(array $user)
+    {
+        if (isset($user['role']) && self::isAdminRole($user['role'])) {
+            self::loginAdmin($user);
+            return;
+        }
+
+        if (isset($user['role']) && $user['role'] === 'reseller') {
+            self::loginReseller($user);
+            return;
+        }
+
+        self::loginStoreUser($user);
+    }
+
+    public static function loginStoreUser(array $user, array $extraRoles = array())
+    {
+        self::ensureSessionStarted();
+
+        $storeUser = self::prepareStoreUserPayload($user, $extraRoles);
+        $_SESSION[self::STORE_SESSION_KEY] = $storeUser;
+    }
+
+    public static function loginAdmin(array $user)
+    {
+        self::ensureSessionStarted();
+        $_SESSION[self::ADMIN_SESSION_KEY] = $user;
+        $_SESSION[self::ADMIN_ID_SESSION_KEY] = isset($user['id']) ? (int)$user['id'] : null;
+        self::loginStoreUser($user);
+    }
+
+    public static function loginReseller(array $user)
+    {
+        self::ensureSessionStarted();
+        $_SESSION[self::RESELLER_SESSION_KEY] = $user;
+        $_SESSION[self::RESELLER_ID_SESSION_KEY] = isset($user['id']) ? (int)$user['id'] : null;
+        self::loginStoreUser($user);
+    }
+
+    public static function logoutAdmin()
+    {
+        self::ensureSessionStarted();
+        unset($_SESSION[self::ADMIN_SESSION_KEY], $_SESSION[self::ADMIN_ID_SESSION_KEY]);
+        self::logoutStoreUser();
+    }
+
+    public static function logoutReseller()
+    {
+        self::ensureSessionStarted();
+        unset($_SESSION[self::RESELLER_SESSION_KEY], $_SESSION[self::RESELLER_ID_SESSION_KEY]);
+        self::logoutStoreUser();
+    }
+
+    public static function logoutStoreUser()
+    {
+        self::ensureSessionStarted();
+        unset($_SESSION[self::STORE_SESSION_KEY]);
+    }
+
+    public static function check()
+    {
+        self::ensureSessionStarted();
+        if (isset($_SESSION[self::STORE_SESSION_KEY])) {
+            return true;
+        }
+
+        if (isset($_SESSION[self::ADMIN_SESSION_KEY]) || isset($_SESSION[self::RESELLER_SESSION_KEY])) {
+            return true;
+        }
+
+        return false;
+    }
+
+    public static function user()
+    {
+        self::ensureSessionStarted();
+        return isset($_SESSION[self::STORE_SESSION_KEY]) ? $_SESSION[self::STORE_SESSION_KEY] : null;
+    }
+
+    public static function hasRole($role)
+    {
+        $user = self::user();
+        if (!$user) {
+            return false;
+        }
+
+        $roles = isset($user['roles']) && is_array($user['roles']) ? $user['roles'] : array();
+
+        if (is_array($role)) {
+            foreach ($role as $candidate) {
+                if (in_array($candidate, $roles, true)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        return in_array($role, $roles, true);
+    }
+
+    private static function determineStoreRoles(array $user, array $extraRoles = array())
+    {
+        $roles = array();
+
+        if (isset($user['roles']) && is_array($user['roles'])) {
+            foreach ($user['roles'] as $role) {
+                if (is_string($role) && $role !== '') {
+                    $roles[] = $role;
+                }
+            }
+        }
+
+        if (isset($user['role']) && is_string($user['role']) && $user['role'] !== '') {
+            $roles[] = $user['role'];
+            if (self::isAdminRole($user['role'])) {
+                $roles[] = 'admin';
+            }
+            if ($user['role'] === 'reseller') {
+                $roles[] = 'reseller';
+            }
+        }
+
+        if (!$roles) {
+            $roles[] = 'customer';
+        }
+
+        foreach ($extraRoles as $role) {
+            if (is_string($role) && $role !== '') {
+                $roles[] = $role;
+            }
+        }
+
+        if (!in_array('customer', $roles, true)) {
+            $roles[] = 'customer';
+        }
+
+        return array_values(array_unique($roles));
+    }
+
+    private static function prepareStoreUserPayload(array $user, array $extraRoles = array())
+    {
+        $roles = self::determineStoreRoles($user, $extraRoles);
+
+        $payload = array(
+            'id' => isset($user['id']) ? (int) $user['id'] : null,
+            'email' => isset($user['email']) ? (string) $user['email'] : '',
+            'name' => isset($user['name']) ? (string) $user['name'] : '',
+            'role' => isset($user['role']) ? (string) $user['role'] : 'customer',
+            'roles' => $roles,
+        );
+
+        if (isset($user['balance'])) {
+            $payload['balance'] = (float) $user['balance'];
+        }
+
+        if (isset($user['status'])) {
+            $payload['status'] = (string) $user['status'];
+        }
+
+        if (isset($user['avatar']) && $user['avatar'] !== null) {
+            $payload['avatar'] = (string) $user['avatar'];
+        }
+
+        return $payload;
+    }
+
+    public static function currentAdmin()
+    {
+        self::ensureSessionStarted();
+        return isset($_SESSION[self::ADMIN_SESSION_KEY]) ? $_SESSION[self::ADMIN_SESSION_KEY] : null;
+    }
+
+    public static function currentReseller()
+    {
+        self::ensureSessionStarted();
+        return isset($_SESSION[self::RESELLER_SESSION_KEY]) ? $_SESSION[self::RESELLER_SESSION_KEY] : null;
+    }
+
+    public static function currentUser()
+    {
+        self::ensureSessionStarted();
+
+        $path = Helpers::currentPath();
+
+        if (strpos($path, '/admin/') === 0) {
+            $admin = self::currentAdmin();
+            if ($admin) {
+                return $admin;
+            }
+        }
+
+        if (strpos($path, '/bayi/') === 0) {
+            $reseller = self::currentReseller();
+            if ($reseller) {
+                return $reseller;
+            }
+        }
+
+        if (isset($_SESSION[self::STORE_SESSION_KEY])) {
+            return $_SESSION[self::STORE_SESSION_KEY];
+        }
+
+        if (isset($_SESSION[self::ADMIN_SESSION_KEY])) {
+            return $_SESSION[self::ADMIN_SESSION_KEY];
+        }
+
+        if (isset($_SESSION[self::RESELLER_SESSION_KEY])) {
+            return $_SESSION[self::RESELLER_SESSION_KEY];
+        }
+
+        return null;
+    }
+
+    public static function refreshUser(array $user)
+    {
+        if (isset($user['role']) && self::isAdminRole($user['role'])) {
+            self::loginAdmin($user);
+            return;
+        }
+
+        if (isset($user['role']) && $user['role'] === 'reseller') {
+            self::loginReseller($user);
+            return;
+        }
+
+        self::loginStoreUser($user);
     }
 
     /**
@@ -99,18 +385,18 @@ class Auth
         }
 
         if ($role === 'admin') {
-            return array('admin', 'finance', 'support', 'content', 'reseller');
+            return array('admin', 'finance', 'support', 'content', 'reseller', 'customer');
         }
 
         if ($role === 'finance') {
-            return array('finance', 'support', 'reseller');
+            return array('finance', 'support', 'reseller', 'customer');
         }
 
         if ($role === 'support' || $role === 'content') {
-            return array('support', 'content', 'reseller');
+            return array('support', 'content', 'reseller', 'customer');
         }
 
-        return array('reseller');
+        return array('reseller', 'customer');
     }
 
     /**
@@ -142,6 +428,20 @@ class Auth
         }
 
         return null;
+    }
+
+    public static function findActiveUserByEmail(string $email): ?array
+    {
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT * FROM users WHERE email = :email AND status = :status LIMIT 1');
+        $stmt->execute([
+            'email' => $email,
+            'status' => 'active',
+        ]);
+
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $user ?: null;
     }
 
     /**
