@@ -403,7 +403,15 @@ img {
     color: var(--color-text);
 }
 
-.
+.hero-section {
+    position: relative;
+    z-index: 1;
+}
+
+.hero-carousel {
+    position: relative;
+    overflow: hidden;
+}
 
 .hero-track {
     display: grid;
@@ -457,6 +465,12 @@ img {
     margin-bottom: 0;
 }
 
+.hero-nav {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
 .hero-nav button {
     position: absolute;
     top: 50%;
@@ -465,9 +479,12 @@ img {
     height: 44px;
     border-radius: 999px;
     border: none;
-    background: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.92);
     color: var(--color-text);
     font-size: 1.5rem;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.18);
+    pointer-events: auto;
+    z-index: 9;
 }
 
 .hero-prev { left: 16px; }
@@ -480,6 +497,7 @@ img {
     transform: translateX(-50%);
     display: inline-flex;
     gap: 8px;
+    z-index: 10;
 }
 
 .hero-indicators button {
@@ -578,6 +596,17 @@ img {
     background: var(--color-surface-alt);
 }
 
+.product-card__flags {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    z-index: 2;
+}
+
 .product-card__media img {
     width: 100%;
     height: 100%;
@@ -602,6 +631,22 @@ img {
     flex-direction: column;
     gap: 0.75rem;
     flex: 1;
+}
+
+.product-flag {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    background: rgba(37, 99, 235, 0.12);
+    color: var(--color-primary);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.product-flag--danger {
+    background: rgba(239, 68, 68, 0.18);
+    color: #b91c1c;
 }
 
 .product-card__title {
@@ -1088,27 +1133,6 @@ html.menu-open .mobile-menu-panel {
     background: rgba(22, 163, 74, 0.9);
 }
 
-.product-card__badge-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-}
-
-.product-card__badge--auto {
-    background: rgba(20, 184, 166, 0.18);
-    color: #047857;
-}
-
-.product-card__badge--stock {
-    background: rgba(37, 99, 235, 0.15);
-    color: var(--color-primary);
-}
-
-.product-card__badge--out {
-    background: rgba(248, 113, 113, 0.18);
-    color: #b91c1c;
-}
-
 .product-card__body {
     padding: 1.25rem;
     display: flex;
@@ -1172,6 +1196,34 @@ html.menu-open .mobile-menu-panel {
 .product-card__actions .btn-outline-secondary:focus {
     border-color: var(--color-primary);
     color: var(--color-primary);
+}
+
+.product-description {
+    max-width: 65ch;
+    white-space: normal;
+    word-break: break-word;
+    color: var(--color-text);
+}
+
+.product-description.is-clamped {
+    display: -webkit-box;
+    -webkit-line-clamp: 6;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.product-description__toggle {
+    margin-top: 0.5rem;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--color-primary);
+    font-weight: 600;
+}
+
+.product-description__toggle:hover,
+.product-description__toggle:focus {
+    text-decoration: underline;
 }
 
 @media (max-width: 575px) {

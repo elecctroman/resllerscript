@@ -632,6 +632,22 @@
         });
     })();
 
+    (function initDescriptionToggle() {
+        document.querySelectorAll('[data-description-toggle]').forEach(function (button) {
+            var targetId = button.getAttribute('data-target');
+            if (!targetId) { return; }
+            var target = document.getElementById(targetId);
+            if (!target) { return; }
+
+            button.addEventListener('click', function () {
+                var isClamped = target.classList.toggle('is-clamped');
+                var expanded = !isClamped;
+                button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+                button.textContent = expanded ? 'Daha az' : 'Daha fazla';
+            });
+        });
+    })();
+
     function escapeHtml(value) {
         return String(value).replace(/[&<>"]/g, function (char) {
             switch (char) {

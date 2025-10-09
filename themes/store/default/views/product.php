@@ -39,8 +39,11 @@ $productId = isset($product['id']) ? (int) $product['id'] : 0;
             <?php endif; ?>
         </ul>
         <?php if (!empty($product['description'])): ?>
-            <div class="product-description">
-                <?php echo nl2br(htmlspecialchars($product['description'], ENT_QUOTES, 'UTF-8')); ?>
+            <div>
+                <div id="productDescription" class="product-description is-clamped">
+                    <?php echo nl2br(htmlspecialchars($product['description'], ENT_QUOTES, 'UTF-8')); ?>
+                </div>
+                <button type="button" class="product-description__toggle" data-description-toggle data-target="productDescription" aria-expanded="false">Daha fazla</button>
             </div>
         <?php endif; ?>
         <div class="d-flex flex-wrap gap-2">

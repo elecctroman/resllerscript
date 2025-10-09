@@ -35,16 +35,22 @@ if (isset($product['discount_percent']) && $product['discount_percent'] !== '') 
 }
 
 $automatic = !empty($product['automatic_delivery']);
-
-$stockLabel = $inStock ? 'Stokta' : 'Stokta yok';
-if ($stockAvailable !== null && $stockAvailable > 0) {
-    $stockLabel = 'Stokta ' . $stockAvailable . ' adet';
-}
+$showFlags = $automatic || !$inStock;
 
 ?>
 <article class="product-card" data-product-card>
     <a class="product-card__media" href="<?= htmlspecialchars($productUrl, ENT_QUOTES, 'UTF-8') ?>">
         <img src="<?= htmlspecialchars($imagePath, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($name, ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+        <?php if ($showFlags): ?>
+            <div class="product-card__flags">
+                <?php if ($automatic): ?>
+                    <span class="product-flag">Otomatik teslim</span>
+                <?php endif; ?>
+                <?php if (!$inStock): ?>
+                    <span class="product-flag product-flag--danger">Stokta yok</span>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
         <?php if ($discountBadge !== ''): ?>
             <span class="product-card__badge product-card__badge--discount"><?= htmlspecialchars($discountBadge, ENT_QUOTES, 'UTF-8') ?></span>
         <?php endif; ?>
@@ -56,12 +62,6 @@ if ($stockAvailable !== null && $stockAvailable > 0) {
         <?php endif; ?>
         <div class="product-card__price-row">
             <span class="product-card__price"><?= htmlspecialchars($price, ENT_QUOTES, 'UTF-8') ?></span>
-        </div>
-        <div class="product-card__badge-row">
-            <?php if ($automatic): ?>
-                <span class="product-card__badge product-card__badge--auto">Otomatik teslim</span>
-            <?php endif; ?>
-            <span class="product-card__badge <?= $inStock ? 'product-card__badge--stock' : 'product-card__badge--out' ?>"><?= htmlspecialchars($stockLabel, ENT_QUOTES, 'UTF-8') ?></span>
         </div>
         <div class="product-card__actions">
             <form method="post" action="<?= htmlspecialchars(store_url('cart/add'), ENT_QUOTES, 'UTF-8') ?>" data-cart-add class="product-card__cart-form">
