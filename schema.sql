@@ -19,6 +19,22 @@ CREATE TABLE IF NOT EXISTS users (
     UNIQUE KEY uniq_users_api_key (api_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS user_profiles (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    first_name VARCHAR(100) NULL,
+    last_name VARCHAR(100) NULL,
+    phone VARCHAR(50) NULL,
+    country VARCHAR(120) NULL,
+    city VARCHAR(120) NULL,
+    district VARCHAR(120) NULL,
+    address TEXT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_user_profile_user (user_id),
+    CONSTRAINT fk_user_profiles_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS languages (
     id INT AUTO_INCREMENT PRIMARY KEY,
     code VARCHAR(10) NOT NULL,
@@ -82,8 +98,11 @@ CREATE TABLE IF NOT EXISTS categories (
     parent_id INT NULL,
     name VARCHAR(150) NOT NULL,
     description TEXT NULL,
+    slug VARCHAR(160) NULL,
+    icon_key VARCHAR(80) NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_categories_slug (slug),
     FOREIGN KEY (parent_id) REFERENCES categories(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -93,6 +112,7 @@ CREATE TABLE IF NOT EXISTS products (
     name VARCHAR(150) NOT NULL,
     sku VARCHAR(150) NULL,
     description TEXT NULL,
+    image VARCHAR(255) NULL,
     cost_price_try DECIMAL(12,2) NULL,
     price DECIMAL(12,2) NOT NULL DEFAULT 0,
     status ENUM('active','inactive') NOT NULL DEFAULT 'active',
@@ -100,6 +120,105 @@ CREATE TABLE IF NOT EXISTS products (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (category_id) REFERENCES categories(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS provider_sources (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    base_url VARCHAR(255) NOT NULL,
+    consumer_key VARCHAR(191) NULL,
+    consumer_secret VARCHAR(191) NULL,
+    webhook_secret VARCHAR(191) NULL,
+    status ENUM('active','inactive') NOT NULL DEFAULT 'inactive',
+    last_synced_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_provider_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS provider_remote_categories (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    provider_id INT NOT NULL,
+    remote_id BIGINT NOT NULL,
+    parent_remote_id BIGINT NULL,
+    name VARCHAR(191) NOT NULL,
+    slug VARCHAR(191) NULL,
+    mapped_category_id INT NULL,
+    last_synced_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_provider_remote_category (provider_id, remote_id),
+    INDEX idx_provider_category_lookup (provider_id, mapped_category_id),
+    FOREIGN KEY (provider_id) REFERENCES provider_sources(id) ON DELETE CASCADE,
+    FOREIGN KEY (mapped_category_id) REFERENCES categories(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS mega_menu_groups (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    slug VARCHAR(160) NOT NULL UNIQUE,
+    sort_order INT NOT NULL DEFAULT 0,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS mega_menu_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    group_id INT NOT NULL,
+    category_id INT NULL,
+    custom_label VARCHAR(160) NULL,
+    custom_url VARCHAR(300) NULL,
+    icon_key VARCHAR(80) NULL,
+    custom_image VARCHAR(255) NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (group_id) REFERENCES mega_menu_groups(id) ON DELETE CASCADE,
+    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS announcements (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(191) NOT NULL,
+    body MEDIUMTEXT NOT NULL,
+    audience ENUM('reseller','admin','all') NOT NULL DEFAULT 'reseller',
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    pinned TINYINT(1) NOT NULL DEFAULT 0,
+    starts_at DATETIME NULL,
+    ends_at DATETIME NULL,
+    created_by INT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_announcements_active (is_active, audience, starts_at, ends_at),
+    KEY idx_announcements_pinned (pinned),
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS provider_remote_products (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    provider_id INT NOT NULL,
+    remote_id BIGINT NOT NULL,
+    name VARCHAR(191) NOT NULL,
+    slug VARCHAR(191) NULL,
+    price DECIMAL(12,2) NULL,
+    currency VARCHAR(10) NULL,
+    status VARCHAR(50) NULL,
+    remote_category_id BIGINT NULL,
+    remote_category_name VARCHAR(191) NULL,
+    stock_quantity INT NULL,
+    stock_status VARCHAR(50) NULL,
+    imported_product_id INT NULL,
+    announcement_id INT NULL,
+    last_synced_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_provider_remote_product (provider_id, remote_id),
+    INDEX idx_provider_remote_category (provider_id, remote_category_id),
+    FOREIGN KEY (provider_id) REFERENCES provider_sources(id) ON DELETE CASCADE,
+    FOREIGN KEY (imported_product_id) REFERENCES products(id) ON DELETE SET NULL,
+    FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS reseller_favorites (
@@ -131,23 +250,6 @@ CREATE TABLE IF NOT EXISTS instructions (
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS announcements (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(191) NOT NULL,
-    body MEDIUMTEXT NOT NULL,
-    audience ENUM('reseller','admin','all') NOT NULL DEFAULT 'reseller',
-    is_active TINYINT(1) NOT NULL DEFAULT 1,
-    pinned TINYINT(1) NOT NULL DEFAULT 0,
-    starts_at DATETIME NULL,
-    ends_at DATETIME NULL,
-    created_by INT NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-    KEY idx_announcements_active (is_active, audience, starts_at, ends_at),
-    KEY idx_announcements_pinned (pinned),
-    CONSTRAINT fk_announcements_creator FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS product_orders (
@@ -241,6 +343,14 @@ CREATE TABLE IF NOT EXISTS system_settings (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO system_settings (setting_key, setting_value, created_at) VALUES
+    ('ai_image_enabled', '0', NOW()),
+    ('ai_api_key', NULL, NOW()),
+    ('ai_prompt', NULL, NOW()),
+    ('ai_image_template', NULL, NOW()),
+    ('store_active_theme', 'default', NOW())
+    ON DUPLICATE KEY UPDATE setting_value = setting_value;
 
 CREATE TABLE IF NOT EXISTS admin_activity_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,

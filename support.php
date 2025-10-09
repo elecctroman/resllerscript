@@ -6,11 +6,7 @@ use App\Helpers;
 use App\Database;
 use App\Telegram;
 
-if (empty($_SESSION['user'])) {
-    Helpers::redirect('/');
-}
-
-$user = $_SESSION['user'];
+$user = Auth::requireCustomer('/account/login');
 
 if (!Helpers::featureEnabled('support')) {
     Helpers::setFlash('warning', 'Destek sistemi şu anda devre dışı.');
