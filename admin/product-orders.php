@@ -8,9 +8,7 @@ use App\Database;
 use App\Telegram;
 use App\Notifications\ResellerNotifier;
 
-Auth::requireRoles(array('super_admin', 'admin', 'support'));
-
-$currentUser = $_SESSION['user'];
+$currentUser = Auth::requireAdmin(array('super_admin', 'admin', 'support'));
 $pdo = Database::connection();
 $errors = Helpers::getFlash('errors', array());
 $success = Helpers::getFlash('success', '');
